@@ -58,6 +58,10 @@ const (
 )
 
 // RawFATBootSectorWithBPB is the on-disk representation of the boot sector.
+//
+// Note: This is only the section of the boot sector common to all FAT versions. Other
+// fields specific to a particular version can be found in RawFAT12BootSector, RawFAT16BootSector,
+// and RawFAT32BootSector.
 type RawFATBootSectorWithBPB struct {
 	JmpBoot           [3]byte
 	OEMName           [8]byte
@@ -75,6 +79,8 @@ type RawFATBootSectorWithBPB struct {
 	totalSectors32    uint32
 }
 
+// FATBootSector extends RawFATBootSectorWithBPB with precomputed fields useful in other
+// operations.
 type FATBootSector struct {
 	RawFATBootSectorWithBPB
 	SectorsPerFAT     uint

@@ -62,6 +62,10 @@ type Driver interface {
 // If a file system doesn't support a particular feature, it should use a reasonable
 // default value. For most of these 0 is fine, but for compatibility drivers should use
 // 1 for `Nlink` and either 0o666 or 0o777 for `Mode`.
+//
+// BUG(dargueta): We have a collision -- os.FileInfo and syscall.Stat_t both have a field
+// called `Mode`. FileInfo.Mode is a function returning an os.FileMode (uint32), and
+// Stat_t.Mode is the uint32 representing the file mode flags.
 type DirectoryEntry struct {
 	os.FileInfo
 	syscall.Stat_t
@@ -78,9 +82,3 @@ func (d *DirectoryEntry) Mode() os.FileMode {
 func (d *DirectoryEntry) IsDir() bool {
 	return (d.Stat_t.Mode & syscall.S_IFDIR) != 0
 }
-
-/*
-   Name() string       // base name of the file
-   Size() int64        // length in bytes for regular files; system-dependent for others
-   Sys() interface{}   // underlying data source (can return nil)
-*/
