@@ -82,7 +82,7 @@ func (d *DirectoryEntry) Mode() os.FileMode {
 	return os.FileMode(d.Stat_t.Mode & 0x1ff)
 }
 
-// IsDir returns true if its a directory.
+// IsDir returns true if it's a directory.
 func (d *DirectoryEntry) IsDir() bool {
 	return (d.Stat_t.Mode & syscall.S_IFDIR) != 0
 }
