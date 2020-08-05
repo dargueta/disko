@@ -63,22 +63,26 @@ type Driver interface {
 // default value. For most of these 0 is fine, but for compatibility drivers should use
 // 1 for `Nlink` and either 0o666 or 0o777 for `Mode`.
 //
-// BUG(dargueta): We have a collision -- os.FileInfo and syscall.Stat_t both have a field
-// called `Mode`. FileInfo.Mode is a function returning an os.FileMode (uint32), and
-// Stat_t.Mode is the uint32 representing the file mode flags.
 type DirectoryEntry struct {
 	os.FileInfo
 	syscall.Stat_t
 }
 
+// ModTime returns the timestamp of the DirectoryEntry.
 func (d *DirectoryEntry) ModTime() time.Time {
-	return time.Unix(d.Mtim.Sec, d.Mtim.Nsec)
+	return time.Unix(int64(d.ModTime().Second()), int64(d.ModTime().Nanosecond()))
 }
 
+// Mode returns the file system mode of the directory.
+//
+// BUG(dargueta): We have a collision -- os.FileInfo and syscall.Stat_t both have a field
+// called `Mode`. FileInfo.Mode is a function returning an os.FileMode (uint32), and
+// Stat_t.Mode is the uint32 representing the file mode flags.
 func (d *DirectoryEntry) Mode() os.FileMode {
 	return os.FileMode(d.Stat_t.Mode & 0x1ff)
 }
 
+// IsDir returns true if its a directory.
 func (d *DirectoryEntry) IsDir() bool {
 	return (d.Stat_t.Mode & syscall.S_IFDIR) != 0
 }
