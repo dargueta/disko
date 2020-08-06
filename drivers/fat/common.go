@@ -1,5 +1,4 @@
 // Package fat implements a driver for accessing FAT file systems.
-
 package fat
 
 import (
@@ -21,12 +20,12 @@ const (
 	//
 	// Drivers don't need to honor this flag when reading, but should not modify it unless
 	// explicitly requested by the user.
-	AttrHidden = 1 << iota
+	AttrHidden
 
-	// AttrHidden is an attribute flag marking a directory entry as essential to the
+	// AttrSystem is an attribute flag marking a directory entry as essential to the
 	// operating system and must not be moved (e.g. during defragmentation) because the
 	// OS may have hard-coded pointers to the file.
-	AttrSystem = 1 << iota
+	AttrSystem
 
 	// AttrVolumeLabel is an attribute flag that marks a file as containing the true
 	// volume label of the file system. It must reside in the root directory, and there
@@ -36,25 +35,25 @@ const (
 	// The struct in the boot sector only has eleven bytes of space for the volume label.
 	// This is not always enough, especially for systems or languages using multi-byte
 	// character encodings.
-	AttrVolumeLabel = 1 << iota
+	AttrVolumeLabel
 
 	// AttrDirectory is an attribute flag marking a directory entry as being a directory.
-	AttrDirectory = 1 << iota
+	AttrDirectory
 
 	// AttrArchived is an attribute flag used by some systems to mark a directory entry
 	// as "dirty", and is set it whenever the directory entry is created or modified.
 	// Archiving tools use this flag to determine whether the file/directory needs to be
 	// backed up or not.
-	AttrArchived = 1 << iota
+	AttrArchived
 
 	// AttrDevice is an attribute flag marking a directory entry as abstracting a device.
 	// This is typically only found on in-memory file systems; if encountered on a disk,
 	// it must not be modified.
-	AttrDevice = 1 << iota
+	AttrDevice
 
 	// AttrReserved is an attribute flag that is undefined by the FAT standard and must
 	// not be moified by tools.
-	AttrReserved = 1 << iota
+	AttrReserved
 )
 
 // RawFATBootSectorWithBPB is the on-disk representation of the boot sector.
