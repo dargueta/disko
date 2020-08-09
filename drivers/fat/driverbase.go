@@ -3,6 +3,7 @@ package fat
 import (
 	"fmt"
 	"io"
+	"path/filepath"
 	"syscall"
 
 	disko "github.com/dargueta/disko"
@@ -21,6 +22,7 @@ type FATDriverCommon interface {
 	GetNextClusterInChain(cluster ClusterID) (ClusterID, error)
 	IsValidCluster(cluster ClusterID) bool
 	IsEndOfChain(cluster ClusterID) bool
+	ListRootDirectory() ([]Dirent, error)
 }
 
 type FATDriver struct {
@@ -181,9 +183,47 @@ func (drv *FATDriver) readClusterOfDirent(dirent *Dirent, index uint) ([]byte, e
 // Parts of the Driver interface that can be implemented with little knowledge of the
 // underlying file system.
 
-// ReadDirFromDirent returns a list of the directory entries found in directoryDirent,
+// resolvePathToDirent converts a path to the directory entry corresponding to that
+// path. If an error occurs, the second return value is an Error object indicating what
+// went wrong.
+func (drv *FATDriver) resolvePathToDirent(path string) (Dirent, error) {
+	cleanedPath := filepath.Clean(path)
+	pathParts := filepath.SplitList(cleanedPath)
+
+	if len(pathParts) == 0 {
+		// Caller gave us an empty path after components were resolved.
+		return Dirent{}, disko.NewDriverErrorWithMessage(
+			syscall.EINVAL, fmt.Sprintf("file path \"%s\" resolves to empty path", path))
+	}
+
+	// Get a listing for the root directory. We need to call a separate function because
+	// unlike FAT 32, FAT 12/16 have fixed-size root directories that aren't actually files.
+	// Drivers must give us a list of directory entries in the root directory.
+	currentDirContents, err := drv.fs.ListRootDirectory()
+	if err != nil {
+		return Dirent{}, nil
+	}
+
+	var currentDirent Dirent
+
+	for _, component := range pathParts {
+		for _, entry := range currentDirContents {
+			if entry.name == component {
+				currentDirent = entry
+				currentDirContents, err = drv.readDirFromDirent(&entry)
+				if err != nil {
+					return Dirent{}, err
+				}
+			}
+		}
+	}
+
+	return currentDirent, disko.NewDriverError(syscall.ENOSYS)
+}
+
+// readDirFromDirent returns a list of the directory entries found in directoryDirent,
 // including the `.` and `..` entries.
-func (drv *FATDriver) ReadDirFromDirent(directoryDirent *Dirent) ([]Dirent, error) {
+func (drv *FATDriver) readDirFromDirent(directoryDirent *Dirent) ([]Dirent, error) {
 	if !directoryDirent.IsDir() {
 		return nil, disko.NewDriverError(syscall.ENOTDIR)
 	}

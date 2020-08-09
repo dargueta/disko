@@ -10,52 +10,6 @@ import (
 	disko "github.com/dargueta/disko"
 )
 
-const (
-	// AttrReadOnly is an attribute flag marking a directory entry as read-only.
-	AttrReadOnly = 1 << iota
-
-	// AttrHidden is an attribute flag marking a directory entry as "hidden", meaning it
-	// wouldn't show up in normal directory listings. This is most commonly used for
-	// hiding operating system files from normal users.
-	//
-	// Drivers don't need to honor this flag when reading, but should not modify it unless
-	// explicitly requested by the user.
-	AttrHidden
-
-	// AttrSystem is an attribute flag marking a directory entry as essential to the
-	// operating system and must not be moved (e.g. during defragmentation) because the
-	// OS may have hard-coded pointers to the file.
-	AttrSystem
-
-	// AttrVolumeLabel is an attribute flag that marks a file as containing the true
-	// volume label of the file system. It must reside in the root directory, and there
-	// must be only one. For compatibility reasons it should be the first directory entry
-	// after `.` and `..` but this is not required.
-	//
-	// The struct in the boot sector only has eleven bytes of space for the volume label.
-	// This is not always enough, especially for systems or languages using multi-byte
-	// character encodings.
-	AttrVolumeLabel
-
-	// AttrDirectory is an attribute flag marking a directory entry as being a directory.
-	AttrDirectory
-
-	// AttrArchived is an attribute flag used by some systems to mark a directory entry
-	// as "dirty", and is set it whenever the directory entry is created or modified.
-	// Archiving tools use this flag to determine whether the file/directory needs to be
-	// backed up or not.
-	AttrArchived
-
-	// AttrDevice is an attribute flag marking a directory entry as abstracting a device.
-	// This is typically only found on in-memory file systems; if encountered on a disk,
-	// it must not be modified.
-	AttrDevice
-
-	// AttrReserved is an attribute flag that is undefined by the FAT standard and must
-	// not be moified by tools.
-	AttrReserved
-)
-
 // RawFATBootSectorWithBPB is the on-disk representation of the boot sector.
 //
 // Note: This is only the section of the boot sector common to all FAT versions. Other
@@ -157,7 +111,7 @@ func NewFATBootSectorFromStream(reader io.Reader) (*FATBootSector, error) {
 	case 4096:
 	default:
 		message := fmt.Sprintf(
-			"bad value for BytesPerSector: need 512, 1024, 2048, or 4096, got %d",
+			"corruption detected: BytesPerSector must be 512, 1024, 2048, or 4096, got %d",
 			rawHeader.BytesPerSector)
 		return nil, disko.NewDriverErrorWithMessage(syscall.EINVAL, message)
 	}

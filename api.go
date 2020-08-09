@@ -21,8 +21,13 @@ type ReadingDriver interface {
 	SameFile(fi1, fi2 os.FileInfo) bool
 	Open(path string) (*os.File, error)
 	ReadDir(path string) ([]os.FileInfo, error)
+	// Return the contents of the file at the given path.
 	ReadFile(path string) ([]byte, error)
 	// Stat returns information about the directory entry at the given path.
+	//
+	// If a file system doesn't support a particular feature, drivers should use a
+	// reasonable default value. For most of these 0 is fine, but for compatibility
+	// drivers use 1 for `Nlink` and 0o777 for `Mode`.
 	Stat(path string) (syscall.Stat_t, error)
 	// Lstat returns the same information as Stat but follows symbolic links. On file
 	// systems that don't support symbolic links, the behavior is exactly the same as
@@ -56,33 +61,39 @@ type Driver interface {
 }
 
 // DirectoryEntry represents a file, directory, device, or other entity encountered on
-// the file system. It must implement the FileInfo interface and contain all the same
-// fields as syscall.Stat_t, though not all fields need to be implemented.
+// the file system. It must simplement the FileInfo interface but only needs to fill values
+// in Stat for the features it supports. (As far as the os.FileInfo interface goes,
+// drivers only need to implement Name(); all others have default implementations.)
 //
-// If a file system doesn't support a particular feature, it should use a reasonable
-// default value. For most of these 0 is fine, but for compatibility drivers should use
-// 1 for `Nlink` and either 0o666 or 0o777 for `Mode`.
-//
+// For recommendations for how to fill the fields in Stat, see Driver.Stat().
 type DirectoryEntry struct {
 	os.FileInfo
-	syscall.Stat_t
+	name string
+	Stat syscall.Stat_t
+}
+
+// Name returns the base name of the directory entry on the file system.
+func (d *DirectoryEntry) Name() string {
+	return d.name
 }
 
 // ModTime returns the timestamp of the DirectoryEntry.
 func (d *DirectoryEntry) ModTime() time.Time {
-	return time.Unix(int64(d.ModTime().Second()), int64(d.ModTime().Nanosecond()))
+	return time.Unix(d.Stat.Mtim.Sec, d.Stat.Mtim.Nsec)
 }
 
-// Mode returns the file system mode of the directory.
-//
-// BUG(dargueta): We have a collision -- os.FileInfo and syscall.Stat_t both have a field
-// called `Mode`. FileInfo.Mode is a function returning an os.FileMode (uint32), and
-// Stat_t.Mode is the uint32 representing the file mode flags.
+// Mode returns the file system mode of the directory as an os.FileMode. If you need more
+// detailed information, see DirectoryEntry.Stat.
 func (d *DirectoryEntry) Mode() os.FileMode {
-	return os.FileMode(d.Stat_t.Mode & 0x1ff)
+	return os.FileMode(d.Stat.Mode & 0x1ff)
 }
 
 // IsDir returns true if it's a directory.
 func (d *DirectoryEntry) IsDir() bool {
-	return (d.Stat_t.Mode & syscall.S_IFDIR) != 0
+	return (d.Stat.Mode & syscall.S_IFDIR) != 0
+}
+
+// Sys returns a copy of the syscall.Stat_t object backing this directory entry.
+func (d *DirectoryEntry) Sys() interface{} {
+	return d.Stat
 }

@@ -5,8 +5,8 @@ The `FAT file system`_ has been around for decades and is still in widespread us
 to this day.
 
 
-Support
-~~~~~~~
+Supported Features
+------------------
 
 ====== ==== ===== ====== ======
 System Read Write Create Delete
@@ -21,7 +21,7 @@ Though Microsoft published the `exFAT specification`_ for free, it's covered by
 a patent, and creating a driver requires purchasing a license.
 
 Further Reading
-~~~~~~~~~~~~~~~
+---------------
 
 * `Microsoft EFI FAT32 File System Specification`_
 * `Design of the FAT file system`_

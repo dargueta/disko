@@ -10,6 +10,52 @@ import (
 	disko "github.com/dargueta/disko"
 )
 
+const (
+	// AttrReadOnly is an attribute flag marking a directory entry as read-only.
+	AttrReadOnly = 1 << iota
+
+	// AttrHidden is an attribute flag marking a directory entry as "hidden", meaning it
+	// wouldn't show up in normal directory listings. This is most commonly used for
+	// hiding operating system files from normal users.
+	//
+	// Drivers don't need to honor this flag when reading, but should not modify it unless
+	// explicitly requested by the user.
+	AttrHidden
+
+	// AttrSystem is an attribute flag marking a directory entry as essential to the
+	// operating system and must not be moved (e.g. during defragmentation) because the
+	// OS may have hard-coded pointers to the file.
+	AttrSystem
+
+	// AttrVolumeLabel is an attribute flag that marks a file as containing the true
+	// volume label of the file system. It must reside in the root directory, and there
+	// must be only one. For compatibility reasons it should be the first directory entry
+	// after `.` and `..` but this is not required.
+	//
+	// The struct in the boot sector only has eleven bytes of space for the volume label.
+	// This is not always enough, especially for systems or languages using multi-byte
+	// character encodings.
+	AttrVolumeLabel
+
+	// AttrDirectory is an attribute flag marking a directory entry as being a directory.
+	AttrDirectory
+
+	// AttrArchived is an attribute flag used by some systems to mark a directory entry
+	// as "dirty", and is set it whenever the directory entry is created or modified.
+	// Archiving tools use this flag to determine whether the file/directory needs to be
+	// backed up or not.
+	AttrArchived
+
+	// AttrDevice is an attribute flag marking a directory entry as abstracting a device.
+	// This is typically only found on in-memory file systems; if encountered on a disk,
+	// it must not be modified.
+	AttrDevice
+
+	// AttrReserved is an attribute flag that is undefined by the FAT standard and must
+	// not be moified by tools.
+	AttrReserved
+)
+
 // RawDirent is the on-disk representation of a directory entry, broken down into its
 // constituent fields.
 type RawDirent struct {
@@ -31,6 +77,7 @@ type RawDirent struct {
 // Dirent is a representation of a FAT directory entry's data in a user-friendly format,
 // e.g. 0x50FC is a time.Time representing 2020-07-28 00:00:00 local time.
 type Dirent struct {
+	disko.DirectoryEntry
 	name           string
 	AttributeFlags int
 	NTReserved     int
@@ -77,25 +124,24 @@ func TimestampFromParts(datePart uint16, timePart uint16, hundredths uint8) time
 		dateDt.Year(), dateDt.Month(), dateDt.Day(), hours, minutes, seconds, nanoseconds, nil)
 }
 
-// AttrFlagsToFileMode converts FAT attribute flags into Go's os.FileMode.
-//
-// TODO (dargueta): Losing info here; should probably just have StatInfo be a superset of
-// os.FileInfo.
-func AttrFlagsToFileMode(flags uint8) os.FileMode {
-	var mode os.FileMode
+// AttrFlagsToFileMode converts FAT attribute flags into the mode flags used by
+// syscall.Stat_t.Mode.
+func AttrFlagsToFileMode(flags uint8) uint32 {
+	var mode uint32
 
-	// FAT has no way to mark files as executable, so the executable bit is always clear
-	// for files.
+	// FAT has no way to mark files as executable or not, so the executable bit is always set.
 	if (flags & AttrReadOnly) != 0 {
-		mode = 0o644
+		mode = 0o755
 	} else {
-		mode = 0o666
+		mode = 0o777
 	}
 
 	if (flags & AttrDirectory) != 0 {
-		// By Unix convention directories must be executable or else you can't go into
-		// them. Why that is, I don't know.
-		return os.ModeDir | 0o111
+		mode |= syscall.S_IFDIR
+	} else if (flags & AttrDevice) != 0 {
+		mode |= syscall.S_IFCHR
+	} else {
+		mode |= syscall.S_IFREG
 	}
 
 	return mode
@@ -123,18 +169,46 @@ func NewRawDirentFromBytes(data []byte) (RawDirent, error) {
 	return dirent, nil
 }
 
+func TimeToTimespec(t time.Time) syscall.Timespec {
+	return syscall.NsecToTimespec(t.UnixNano())
+}
+
 // NewDirentFromRaw creates a fully processed Dirent from a raw one, such as converting
 // 24-bit values into time.Time values.
-func NewDirentFromRaw(rawDirent *RawDirent) (Dirent, error) {
+func NewDirentFromRaw(bootSector *FATBootSector, rawDirent *RawDirent) (Dirent, error) {
+	lastModified := TimestampFromParts(
+		rawDirent.LastModifiedDate, rawDirent.LastModifiedTime, 0)
+	size := int64(rawDirent.FileSize)
+	sizeInClusters := size / int64(bootSector.BytesPerCluster)
+	if size%int64(bootSector.BytesPerCluster) != 0 {
+		sizeInClusters++
+	}
+	mode := AttrFlagsToFileMode(rawDirent.AttributeFlags)
+
 	dirent := Dirent{
+		DirectoryEntry: disko.DirectoryEntry{
+			Stat: syscall.Stat_t{
+				Dev:     0,
+				Ino:     0,
+				Nlink:   1,
+				Mode:    mode,
+				Uid:     0,
+				Gid:     0,
+				Rdev:    0,
+				Size:    size,
+				Blksize: int64(bootSector.BytesPerCluster),
+				Blocks:  sizeInClusters,
+				Atim:    TimeToTimespec(DateFromInt(rawDirent.LastAccessedDate)),
+				Mtim:    TimeToTimespec(lastModified),
+			},
+		},
 		AttributeFlags: int(rawDirent.AttributeFlags),
 		NTReserved:     int(rawDirent.NTReserved),
 		LastAccessed:   DateFromInt(rawDirent.LastAccessedDate),
 		isDeleted:      rawDirent.Name[0] == 0xE5,
-		size:           int64(rawDirent.FileSize),
-		mode:           AttrFlagsToFileMode(rawDirent.AttributeFlags),
-		LastModified: TimestampFromParts(
-			rawDirent.LastModifiedDate, rawDirent.LastModifiedTime, 0),
+		size:           size,
+		mode:           os.FileMode(mode),
+		LastModified:   lastModified,
 		FirstCluster: ClusterID(
 			(uint32(rawDirent.FirstClusterHigh) << 16) | uint32(rawDirent.FirstClusterLow)),
 	}
@@ -181,7 +255,7 @@ func (drv *FATDriver) clusterToDirentSlice(data []byte) ([]Dirent, error) {
 		offset := i * DirentSize
 		rawDirent, _ := NewRawDirentFromBytes(data[offset : offset+DirentSize])
 
-		dirent, err := NewDirentFromRaw(&rawDirent)
+		dirent, err := NewDirentFromRaw(bootSector, &rawDirent)
 		if err != nil {
 			// If this is a DriverError there may be further action we can take.
 			drverr, ok := err.(disko.DriverError)
