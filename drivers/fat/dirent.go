@@ -183,13 +183,17 @@ func NewDirentFromRaw(bootSector *FATBootSector, rawDirent *RawDirent) (Dirent, 
 	if size%int64(bootSector.BytesPerCluster) != 0 {
 		sizeInClusters++
 	}
-	mode := AttrFlagsToFileMode(rawDirent.AttributeFlags)
 
+	mode := AttrFlagsToFileMode(rawDirent.AttributeFlags)
+	firstCluster := (uint32(rawDirent.FirstClusterHigh) << 16) | uint32(rawDirent.FirstClusterLow)
 	dirent := Dirent{
 		DirectoryEntry: disko.DirectoryEntry{
 			Stat: syscall.Stat_t{
-				Dev:     0,
-				Ino:     0,
+				Dev: 0,
+				// FAT systems have no concept of inodes but a quick way to see if two
+				// directory entries point to the same thing is to see if the first cluster
+				// is the same. Thus, we'll sorta cheat and use that as a file ID.
+				Ino:     uint64(firstCluster),
 				Nlink:   1,
 				Mode:    mode,
 				Uid:     0,
@@ -209,8 +213,7 @@ func NewDirentFromRaw(bootSector *FATBootSector, rawDirent *RawDirent) (Dirent, 
 		size:           size,
 		mode:           os.FileMode(mode),
 		LastModified:   lastModified,
-		FirstCluster: ClusterID(
-			(uint32(rawDirent.FirstClusterHigh) << 16) | uint32(rawDirent.FirstClusterLow)),
+		FirstCluster:   ClusterID(firstCluster),
 	}
 
 	trimmedName := strings.TrimRight(string(rawDirent.Name[:]), " ")
@@ -303,6 +306,6 @@ func (d *Dirent) ModTime() time.Time { return d.LastModified }
 
 func (d *Dirent) IsDir() bool { return d.mode.IsDir() }
 
-func (d *Dirent) Sys() interface{} { return nil }
+func (d *Dirent) Sys() interface{} { return d.Stat }
 
 // -----------------------------------------------------------------------------
