@@ -78,6 +78,7 @@ type RawDirent struct {
 // e.g. 0x50FC is a time.Time representing 2020-07-28 00:00:00 local time.
 type Dirent struct {
 	disko.DirectoryEntry
+	os.FileInfo
 	name           string
 	AttributeFlags int
 	NTReserved     int
