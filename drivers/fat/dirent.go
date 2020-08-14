@@ -289,7 +289,7 @@ func (drv *FATDriver) clusterToDirentSlice(data []byte) ([]Dirent, error) {
 // Name returns the name of the directory entry.
 //
 // TODO (dargueta): Implement LFN support.
-func (d *Dirent) Name() string { return d.name }
+func (d Dirent) Name() string { return d.name }
 
 // Size is the size of the directory entry if and ONLY if it's a regular file.
 //
@@ -299,14 +299,14 @@ func (d *Dirent) Name() string { return d.name }
 // TODO (dargueta): Is there a more efficient way to get the size for directories?
 // All directories must contain at least `.` and `..` entries, so they'll always be at
 // least 64 bytes.
-func (d *Dirent) Size() int64 { return d.size }
+func (d Dirent) Size() int64 { return d.size }
 
-func (d *Dirent) Mode() os.FileMode { return d.mode }
+func (d Dirent) Mode() os.FileMode { return d.mode }
 
-func (d *Dirent) ModTime() time.Time { return d.LastModified }
+func (d Dirent) ModTime() time.Time { return d.LastModified }
 
-func (d *Dirent) IsDir() bool { return d.mode.IsDir() }
+func (d Dirent) IsDir() bool { return d.mode.IsDir() }
 
-func (d *Dirent) Sys() interface{} { return d.Stat }
+func (d Dirent) Sys() interface{} { return d.Stat }
 
 // -----------------------------------------------------------------------------

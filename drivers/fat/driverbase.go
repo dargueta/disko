@@ -299,8 +299,12 @@ func (drv *FATDriver) Readdir(path string) ([]os.FileInfo, error) {
 		return nil, err
 	}
 
-	// FIXME: wtf -- Dirent implements os.FileInfo so why is the compiler angry?
-	return []os.FileInfo(dirContents), nil
+	fileInfos := make([]os.FileInfo, len(dirContents))
+	for i, dir := range dirContents {
+		fileInfos[i] = dir
+	}
+
+	return fileInfos, nil
 }
 
 // ReadFile returns the entire contents of the file at the given path.
