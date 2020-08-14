@@ -1,10 +1,13 @@
 package fat
 
 import (
+	"bytes"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"syscall"
+	"time"
 
 	disko "github.com/dargueta/disko"
 )
@@ -23,6 +26,10 @@ type FATDriverCommon interface {
 	IsValidCluster(cluster ClusterID) bool
 	IsEndOfChain(cluster ClusterID) bool
 	ListRootDirectory() ([]Dirent, error)
+	AllocateCluster(count uint) ([]ClusterID, error)
+	FreeCluster(cluster ClusterID) error
+	UpdateDirent(dirent *Dirent) error
+	DeleteDirent(dirent, parent *Dirent) error
 }
 
 type FATDriver struct {
@@ -55,7 +62,7 @@ func (drv *FATDriver) readAbsoluteSectors(sector SectorID, numSectors uint) ([]b
 }
 
 // readCluster returns the bytes of the `index`th cluster on the file system.
-func (drv *FATDriver) readCluster(cluster ClusterID, index uint) ([]byte, error) {
+func (drv *FATDriver) readCluster(cluster ClusterID) ([]byte, error) {
 	sectorID, err := drv.getFirstSectorOfCluster(cluster)
 	if err != nil {
 		return nil, err
@@ -176,7 +183,7 @@ func (drv *FATDriver) readClusterOfDirent(dirent *Dirent, index uint) ([]byte, e
 	if err != nil {
 		return nil, err
 	}
-	return drv.readCluster(cluster, 1)
+	return drv.readCluster(cluster)
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -253,3 +260,203 @@ func (drv *FATDriver) readDirFromDirent(directoryDirent *Dirent) ([]Dirent, erro
 
 	return allDirents, nil
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// IMPLEMENTATION OF PUBLIC DRIVER INTERFACE
+//
+// Please keep functions in the order they're declared in in disko.ReadingDriver
+// and disko.Writing driver.
+
+// Readlink is unsupported on FAT file systems, so calling this function will return an
+// error.
+func (drv *FATDriver) Readlink(path string) (string, error) {
+	return "", disko.NewDriverError(syscall.ENOSYS)
+}
+
+// SameFile determines if two FileInfos reference the same file.
+func (drv *FATDriver) SameFile(fi1, fi2 os.FileInfo) bool {
+	dirLeft := fi1.Sys().(Dirent)
+	dirRight := fi2.Sys().(Dirent)
+
+	return dirLeft.FirstCluster == dirRight.FirstCluster
+}
+
+// TODO: Open
+
+func (drv *FATDriver) Readdir(path string) ([]os.FileInfo, error) {
+	dirent, err := drv.resolvePathToDirent(path)
+	if err != nil {
+		return nil, err
+	}
+
+	if !dirent.IsDir() {
+		// TODO: Provide the path in the error message
+		return nil, disko.NewDriverError(syscall.ENOTDIR)
+	}
+
+	dirContents, err := drv.readDirFromDirent(&dirent)
+	if err != nil {
+		return nil, err
+	}
+
+	// FIXME: wtf -- Dirent implements os.FileInfo so why is the compiler angry?
+	return []os.FileInfo(dirContents), nil
+}
+
+// ReadFile returns the entire contents of the file at the given path.
+func (drv *FATDriver) ReadFile(path string) ([]byte, error) {
+	dirent, err := drv.resolvePathToDirent(path)
+	if err != nil {
+		return nil, err
+	}
+
+	if dirent.IsDir() {
+		return nil, disko.NewDriverError(syscall.EISDIR)
+	}
+
+	allClusters, err := drv.listClusters(dirent.FirstCluster)
+	if err != nil {
+		return nil, err
+	}
+
+	bs := drv.fs.GetBootSector()
+	bytesRemaining := dirent.size
+
+	// Now that we have a list of all the clusters in this file, we can stitch the file
+	// together by concatenating their contents. The last cluster may not be completely
+	// used.
+	buffer := new(bytes.Buffer)
+	for _, clusterID := range allClusters {
+		clusterContents, err := drv.readCluster(clusterID)
+		if err != nil {
+			return nil, err
+		}
+
+		if bytesRemaining < int64(bs.BytesPerCluster) {
+			// This is the last cluster; only write bytesRemaining bytes, not the full
+			// cluster.
+			_, err = buffer.Write(clusterContents[:bytesRemaining])
+		} else {
+			// Write the entirety of the cluster to the output buffer. (Either this
+			// isn't the last cluster or the dirent is an exact multiple of the cluster
+			// size.
+			_, err = buffer.Write(clusterContents)
+		}
+
+		if err != nil {
+			return nil, err
+		}
+
+		bytesRemaining -= int64(bs.BytesPerCluster)
+	}
+
+	return buffer.Bytes(), nil
+}
+
+// Stat returns information about the file or directory at the given path.
+func (drv *FATDriver) Stat(path string) (syscall.Stat_t, error) {
+	dirent, err := drv.resolvePathToDirent(path)
+	if err != nil {
+		return syscall.Stat_t{}, err
+	}
+
+	return dirent.Stat, nil
+}
+
+// Lstat returns information about the file or directory at the given path.
+//
+// Since FAT file systems have no concept of links, this behaves exactly the same as
+// Stat.
+func (drv *FATDriver) Lstat(path string) (syscall.Stat_t, error) {
+	return drv.Stat(path)
+}
+
+// TODO: Chmod
+
+// Chown is unsupported on FAT file systems since they have no concept of ownership.
+// This function does nothing, only returns an error.
+func (drv *FATDriver) Chown(path string, uid, gid int) error {
+	return disko.NewDriverError(syscall.ENOSYS)
+}
+
+// Chtimes changes the last accessed and last modified timestamps of a directory entry.
+func (drv *FATDriver) Chtimes(path string, atime, mtime time.Time) error {
+	dirent, err := drv.resolvePathToDirent(path)
+	if err != nil {
+		return err
+	}
+
+	dirent.LastAccessed = atime
+	dirent.LastModified = mtime
+	return drv.fs.UpdateDirent(&dirent)
+}
+
+// Lchown is unsupported on FAT file systems since they have no concept of ownership.
+// This function does nothing, only returns an error.
+func (drv *FATDriver) Lchown(path string, uid, gid int) error {
+	return disko.NewDriverError(syscall.ENOSYS)
+}
+
+// Link does nothing and returns an error since links are unsupported on FAT file systems.
+func (drv *FATDriver) Link(oldpath, newpath string) error {
+	return disko.NewDriverError(syscall.ENOSYS)
+}
+
+// TODO: Mkdir
+// TODO: MkdirAll
+
+func (drv *FATDriver) Remove(path string) error {
+	dirent, err := drv.resolvePathToDirent(path)
+	if err != nil {
+		return err
+	}
+
+	if dirent.IsDir() {
+		return disko.NewDriverError(syscall.EISDIR)
+	}
+
+	parentDirent, err := drv.resolvePathToDirent(filepath.Dir(path))
+	if err != nil {
+		return err
+	}
+
+	// Once we get here we can delete the directory entry *first* and then deallocate its
+	// clusters. If we were to free the clusters first and then try to delete the dirent
+	// but fail, we'd have a dirent pointing at garbage at best, or into a valid cluster
+	// chain of another directory entry at worst.
+	err = drv.fs.DeleteDirent(&dirent, &parentDirent)
+	if err != nil {
+		return err
+	}
+
+	// Successfully deleted the directory entry. Now we release its clusters.
+	fileClusters, err := drv.listClusters(dirent.FirstCluster)
+	if err != nil {
+		return err
+	}
+
+	// Release clusters starting from the end of the chain, not the beginning. This way,
+	// if we hit an error then the dirent still points to the beginning of the cluster
+	// chain and we don't end up with an orphaned chain that would take up disk space.
+	for i := len(fileClusters) - 1; i >= 0; i-- {
+		err = drv.fs.FreeCluster(ClusterID(i))
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// TODO: RemoveAll
+// TODO: Repath
+
+// Symlink does nothing and returns an error since links are unsupported on FAT file
+// systems.
+func (drv *FATDriver) Symlink(oldpath, newpath string) error {
+	return disko.NewDriverError(syscall.ENOSYS)
+}
+
+// TODO: Truncate
+// TODO: Create
+// TODO: WriteFile
