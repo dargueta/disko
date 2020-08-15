@@ -350,6 +350,7 @@ func (d Dirent) Name() string { return d.name }
 // least 64 bytes.
 func (d Dirent) Size() int64 { return d.size }
 
+// Mode returns the mode flags of this directory entry.
 func (d Dirent) Mode() os.FileMode { return d.mode }
 
 func (d Dirent) ModTime() time.Time { return d.GetLastModifiedAt() }

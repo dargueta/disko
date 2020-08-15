@@ -261,11 +261,12 @@ func (drv *FATDriver) readDirFromDirent(directoryDirent *Dirent) ([]Dirent, erro
 	return allDirents, nil
 }
 
-////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////
 // IMPLEMENTATION OF PUBLIC DRIVER INTERFACE
 //
-// Please keep functions in the order they're declared in in disko.ReadingDriver
-// and disko.Writing driver.
+// Please keep functions in the order they're declared in in disko.ReadingDriver and
+// disko.Writing driver.
+//////////////////////////////////////////////////////////////////////////////////////////
 
 // Readlink is unsupported on FAT file systems, so calling this function will return an
 // error.
@@ -283,6 +284,7 @@ func (drv *FATDriver) SameFile(fi1, fi2 os.FileInfo) bool {
 
 // TODO: Open
 
+// Readdir returns information about all files in the directory pointed to by `path`.
 func (drv *FATDriver) Readdir(path string) ([]os.FileInfo, error) {
 	dirent, err := drv.resolvePathToDirent(path)
 	if err != nil {
@@ -375,6 +377,13 @@ func (drv *FATDriver) Lstat(path string) (syscall.Stat_t, error) {
 	return drv.Stat(path)
 }
 
+// Chmod changes the file mode information for the file at the given path.
+//
+// The FAT file system has a very limited concept of file modes, so this has little
+// effect. FAT only recognizes read-only attributes, so if you want to make a file read-only
+// you need to clear the read bit from **all** modes.
+//
+// This function cannot be used to set any mode flags aside from read-only.
 func (drv *FATDriver) Chmod(path string, mode os.FileMode) error {
 	dirent, err := drv.resolvePathToDirent(path)
 	if err != nil {
@@ -426,6 +435,8 @@ func (drv *FATDriver) Link(oldpath, newpath string) error {
 // TODO: Mkdir
 // TODO: MkdirAll
 
+// Remove deletes the file at the given path. If you want to delete a directory, use
+// RemoveAll.
 func (drv *FATDriver) Remove(path string) error {
 	dirent, err := drv.resolvePathToDirent(path)
 	if err != nil {

@@ -61,8 +61,8 @@ type Driver interface {
 }
 
 // DirectoryEntry represents a file, directory, device, or other entity encountered on
-// the file system. It must simplement the FileInfo interface but only needs to fill values
-// in Stat for the features it supports. (As far as the os.FileInfo interface goes,
+// the file system. It must simplement the os.FileInfo interface but only needs to fill
+// values in Stat for the features it supports. (As far as the os.FileInfo interface goes,
 // drivers only need to implement Name(); all others have default implementations.)
 //
 // For recommendations for how to fill the fields in Stat, see Driver.Stat().
