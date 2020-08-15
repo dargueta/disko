@@ -21,7 +21,7 @@ type ReadingDriver interface {
 	SameFile(fi1, fi2 os.FileInfo) bool
 	Open(path string) (*os.File, error)
 	ReadDir(path string) ([]os.FileInfo, error)
-	// Return the contents of the file at the given path.
+	// ReadFile return the contents of the file at the given path.
 	ReadFile(path string) ([]byte, error)
 	// Stat returns information about the directory entry at the given path.
 	//
