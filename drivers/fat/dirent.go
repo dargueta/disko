@@ -12,7 +12,7 @@ import (
 
 const (
 	// AttrReadOnly is an attribute flag marking a directory entry as read-only.
-	AttrReadOnly = 1 << iota
+	AttrReadOnly = 1
 
 	// AttrHidden is an attribute flag marking a directory entry as "hidden", meaning it
 	// wouldn't show up in normal directory listings. This is most commonly used for
@@ -20,12 +20,12 @@ const (
 	//
 	// Drivers don't need to honor this flag when reading, but should not modify it unless
 	// explicitly requested by the user.
-	AttrHidden
+	AttrHidden = 2
 
 	// AttrSystem is an attribute flag marking a directory entry as essential to the
 	// operating system and must not be moved (e.g. during defragmentation) because the
 	// OS may have hard-coded pointers to the file.
-	AttrSystem
+	AttrSystem = 4
 
 	// AttrVolumeLabel is an attribute flag that marks a file as containing the true
 	// volume label of the file system. It must reside in the root directory, and there
@@ -35,25 +35,25 @@ const (
 	// The struct in the boot sector only has eleven bytes of space for the volume label.
 	// This is not always enough, especially for systems or languages using multi-byte
 	// character encodings.
-	AttrVolumeLabel
+	AttrVolumeLabel = 8
 
 	// AttrDirectory is an attribute flag marking a directory entry as being a directory.
-	AttrDirectory
+	AttrDirectory = 16
 
 	// AttrArchived is an attribute flag used by some systems to mark a directory entry
 	// as "dirty", and is set it whenever the directory entry is created or modified.
 	// Archiving tools use this flag to determine whether the file/directory needs to be
 	// backed up or not.
-	AttrArchived
+	AttrArchived = 32
 
 	// AttrDevice is an attribute flag marking a directory entry as abstracting a device.
 	// This is typically only found on in-memory file systems; if encountered on a disk,
 	// it must not be modified.
-	AttrDevice
+	AttrDevice = 64
 
 	// AttrReserved is an attribute flag that is undefined by the FAT standard and must
 	// not be moified by tools.
-	AttrReserved
+	AttrReserved = 128
 )
 
 // RawDirent is the on-disk representation of a directory entry, broken down into its
