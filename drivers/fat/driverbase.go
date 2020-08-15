@@ -375,7 +375,24 @@ func (drv *FATDriver) Lstat(path string) (syscall.Stat_t, error) {
 	return drv.Stat(path)
 }
 
-// TODO: Chmod
+func (drv *FATDriver) Chmod(path string, mode os.FileMode) error {
+	dirent, err := drv.resolvePathToDirent(path)
+	if err != nil {
+		return err
+	}
+
+	// Most file mode flags can be ignored. We have to take the most permissive of mode
+	// flags since FAT file systems only have a single read-only flag and don't recognize
+	// anything beyond that.
+	if (mode & 0b010010010) == 0 {
+		// No one has write access
+		dirent.Stat.Mode &= ^uint32(0b010010010)
+	} else {
+		dirent.Stat.Mode |= 0b010010010
+	}
+
+	return drv.fs.UpdateDirent(&dirent)
+}
 
 // Chown is unsupported on FAT file systems since they have no concept of ownership.
 // This function does nothing, only returns an error.
