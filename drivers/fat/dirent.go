@@ -10,6 +10,9 @@ import (
 	disko "github.com/dargueta/disko"
 )
 
+// fatEpoch is 1980-01-01 00:00:00 at local time.
+var fatEpoch = time.Unix(315561600, 0)
+
 const (
 	// AttrReadOnly is an attribute flag marking a directory entry as read-only.
 	AttrReadOnly = 1
@@ -82,14 +85,58 @@ type Dirent struct {
 	name           string
 	AttributeFlags int
 	NTReserved     int
-	Created        time.Time
-	Deleted        time.Time
-	LastAccessed   time.Time
-	LastModified   time.Time
 	FirstCluster   ClusterID
 	isDeleted      bool
 	size           int64
 	mode           os.FileMode
+}
+
+func (d *Dirent) GetLastAccessedAt() time.Time {
+	return time.Unix(d.Stat.Atim.Sec, d.Stat.Atim.Nsec)
+}
+
+func (d *Dirent) SetLastAccessedAt(t time.Time) error {
+
+	d.Stat.Atim = TimeToTimespec(t)
+	return nil
+}
+
+func (d *Dirent) GetLastModifiedAt() time.Time {
+	return time.Unix(d.Stat.Mtim.Sec, d.Stat.Mtim.Nsec)
+}
+
+func (d *Dirent) SetLastModifiedAt(t time.Time) error {
+	if t.Before(fatEpoch) {
+		return disko.NewDriverError(syscall.ERANGE)
+	}
+
+	d.Stat.Mtim = TimeToTimespec(t)
+	return nil
+}
+
+func (d *Dirent) GetCreatedAt() time.Time {
+	return time.Unix(d.Stat.Ctim.Sec, d.Stat.Ctim.Nsec)
+}
+
+func (d *Dirent) SetCreatedAt(t time.Time) error {
+	if t.Before(fatEpoch) {
+		return disko.NewDriverError(syscall.ERANGE)
+	}
+
+	d.Stat.Ctim = TimeToTimespec(t)
+	return nil
+}
+
+func (d *Dirent) GetDeletedAt() time.Time {
+	if !d.isDeleted {
+		return fatEpoch
+	}
+	return d.GetCreatedAt()
+}
+
+func (d *Dirent) SetDeletedAt(t time.Time) error {
+	// This assumes that the dirent has already been marked as deleted.
+	return d.SetCreatedAt(t)
 }
 
 // DirentSize is the size of a single raw directory entry, in bytes.
@@ -187,6 +234,17 @@ func NewDirentFromRaw(bootSector *FATBootSector, rawDirent *RawDirent) (Dirent, 
 
 	mode := AttrFlagsToFileMode(rawDirent.AttributeFlags)
 	firstCluster := (uint32(rawDirent.FirstClusterHigh) << 16) | uint32(rawDirent.FirstClusterLow)
+
+	isDeleted := rawDirent.Name[0] == 0xE5
+
+	var createdAt time.Time
+	if isDeleted {
+		createdAt = time.Unix(0, 0)
+	} else {
+		createdAt = TimestampFromParts(
+			rawDirent.CreatedDate, rawDirent.CreatedTime, rawDirent.CreatedTimeMillis)
+	}
+
 	dirent := Dirent{
 		DirectoryEntry: disko.DirectoryEntry{
 			Stat: syscall.Stat_t{
@@ -205,15 +263,14 @@ func NewDirentFromRaw(bootSector *FATBootSector, rawDirent *RawDirent) (Dirent, 
 				Blocks:  sizeInClusters,
 				Atim:    TimeToTimespec(DateFromInt(rawDirent.LastAccessedDate)),
 				Mtim:    TimeToTimespec(lastModified),
+				Ctim:    TimeToTimespec(createdAt),
 			},
 		},
 		AttributeFlags: int(rawDirent.AttributeFlags),
 		NTReserved:     int(rawDirent.NTReserved),
-		LastAccessed:   DateFromInt(rawDirent.LastAccessedDate),
-		isDeleted:      rawDirent.Name[0] == 0xE5,
+		isDeleted:      isDeleted,
 		size:           size,
 		mode:           os.FileMode(mode),
-		LastModified:   lastModified,
 		FirstCluster:   ClusterID(firstCluster),
 	}
 
@@ -236,14 +293,6 @@ func NewDirentFromRaw(bootSector *FATBootSector, rawDirent *RawDirent) (Dirent, 
 		dirent.name = trimmedName
 	} else {
 		dirent.name = trimmedName + "." + trimmedExt
-	}
-
-	if dirent.isDeleted {
-		dirent.Deleted = TimestampFromParts(
-			rawDirent.CreatedDate, rawDirent.CreatedTime, 0)
-	} else {
-		dirent.Created = TimestampFromParts(
-			rawDirent.CreatedDate, rawDirent.CreatedTime, rawDirent.CreatedTimeMillis)
 	}
 
 	return dirent, nil
@@ -303,7 +352,7 @@ func (d Dirent) Size() int64 { return d.size }
 
 func (d Dirent) Mode() os.FileMode { return d.mode }
 
-func (d Dirent) ModTime() time.Time { return d.LastModified }
+func (d Dirent) ModTime() time.Time { return d.GetLastModifiedAt() }
 
 func (d Dirent) IsDir() bool { return d.mode.IsDir() }
 

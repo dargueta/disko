@@ -390,8 +390,8 @@ func (drv *FATDriver) Chtimes(path string, atime, mtime time.Time) error {
 		return err
 	}
 
-	dirent.LastAccessed = atime
-	dirent.LastModified = mtime
+	dirent.SetLastAccessedAt(atime)
+	dirent.SetLastModifiedAt(mtime)
 	return drv.fs.UpdateDirent(&dirent)
 }
 
