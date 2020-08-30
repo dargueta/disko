@@ -122,7 +122,7 @@ func (drv *FATDriver) listClusters(chainStart ClusterID) ([]ClusterID, error) {
 			// Hit an invalid cluster. This is not the same as EOF, and usually indicates
 			// corruption of some sort.
 			return chain, disko.NewDriverErrorWithMessage(
-				syscall.EINVAL,
+				syscall.EUCLEAN,
 				fmt.Sprintf(
 					"cluster %d followed by invalid cluster 0x%x at index %d in chain from %d",
 					currentCluster,
@@ -225,7 +225,7 @@ func (drv *FATDriver) resolvePathToDirent(path string) (Dirent, error) {
 		}
 	}
 
-	return currentDirent, disko.NewDriverError(syscall.ENOSYS)
+	return currentDirent, nil
 }
 
 // readDirFromDirent returns a list of the directory entries found in directoryDirent,
@@ -271,7 +271,7 @@ func (drv *FATDriver) readDirFromDirent(directoryDirent *Dirent) ([]Dirent, erro
 // Readlink is unsupported on FAT file systems, so calling this function will return an
 // error.
 func (drv *FATDriver) Readlink(path string) (string, error) {
-	return "", disko.NewDriverError(syscall.ENOSYS)
+	return "", disko.NewDriverError(syscall.ENOTSUP)
 }
 
 // SameFile determines if two FileInfos reference the same file.
@@ -424,12 +424,12 @@ func (drv *FATDriver) Chtimes(path string, atime, mtime time.Time) error {
 // Lchown is unsupported on FAT file systems since they have no concept of ownership.
 // This function does nothing, only returns an error.
 func (drv *FATDriver) Lchown(path string, uid, gid int) error {
-	return disko.NewDriverError(syscall.ENOSYS)
+	return disko.NewDriverError(syscall.ENOTSUP)
 }
 
 // Link does nothing and returns an error since links are unsupported on FAT file systems.
 func (drv *FATDriver) Link(oldpath, newpath string) error {
-	return disko.NewDriverError(syscall.ENOSYS)
+	return disko.NewDriverError(syscall.ENOTSUP)
 }
 
 // TODO: Mkdir
@@ -486,7 +486,7 @@ func (drv *FATDriver) Remove(path string) error {
 // Symlink does nothing and returns an error since links are unsupported on FAT file
 // systems.
 func (drv *FATDriver) Symlink(oldpath, newpath string) error {
-	return disko.NewDriverError(syscall.ENOSYS)
+	return disko.NewDriverError(syscall.ENOTSUP)
 }
 
 // TODO: Truncate
