@@ -78,7 +78,7 @@ type RawDirent struct {
 }
 
 // Dirent is a representation of a FAT directory entry's data in a user-friendly format,
-// e.g. 0x50FC is a time.Time representing 2020-07-28 00:00:00 local time.
+// e.g. 0x50FC is converted to a time.Time representing 2020-07-28 00:00:00 local time.
 type Dirent struct {
 	disko.DirectoryEntry
 	os.FileInfo
@@ -91,12 +91,17 @@ type Dirent struct {
 	mode           os.FileMode
 }
 
+// GetLastAccessedAt returns the timestamp at which the directory entry was last accessed.
 func (d *Dirent) GetLastAccessedAt() time.Time {
 	return time.Unix(d.Stat.Atim.Sec, d.Stat.Atim.Nsec)
 }
 
+// SetLastAccessedAt sets the timestamp at which the directory entry was last accessed.
+// It is an error to try to set this time before 1980-01-01 00:00:00 local time.
 func (d *Dirent) SetLastAccessedAt(t time.Time) error {
-
+	if t.Before(fatEpoch) {
+		return disko.NewDriverError(syscall.ERANGE)
+	}
 	d.Stat.Atim = TimeToTimespec(t)
 	return nil
 }
@@ -105,37 +110,58 @@ func (d *Dirent) GetLastModifiedAt() time.Time {
 	return time.Unix(d.Stat.Mtim.Sec, d.Stat.Mtim.Nsec)
 }
 
+// SetLastModifiedAt sets the timestamp at which the directory entry was last modified.
+// It is an error to try to set this time before 1980-01-01 00:00:00 local time.
 func (d *Dirent) SetLastModifiedAt(t time.Time) error {
 	if t.Before(fatEpoch) {
 		return disko.NewDriverError(syscall.ERANGE)
 	}
-
 	d.Stat.Mtim = TimeToTimespec(t)
 	return nil
 }
 
-func (d *Dirent) GetCreatedAt() time.Time {
-	return time.Unix(d.Stat.Ctim.Sec, d.Stat.Ctim.Nsec)
+// GetCreatedAt returns the timestamp at which the directory entry was created.
+// It is an error to get this timestamp for a dirent that has been deleted.
+func (d *Dirent) GetCreatedAt() (time.Time, error) {
+	if d.isDeleted {
+		return time.Unix(0, 0), disko.NewDriverError(syscall.ENOENT)
+	}
+	return time.Unix(d.Stat.Ctim.Sec, d.Stat.Ctim.Nsec), nil
 }
 
+// SetCreatedAt sets the timestamp at which the directory entry was created.
+// It is an error to try to set this time before 1980-01-01 00:00:00 local time, or to set
+// this timestamp for a dirent that has been deleted.
 func (d *Dirent) SetCreatedAt(t time.Time) error {
 	if t.Before(fatEpoch) {
 		return disko.NewDriverError(syscall.ERANGE)
+	} else if d.isDeleted {
+		return disko.NewDriverError(syscall.ENOENT)
 	}
 
 	d.Stat.Ctim = TimeToTimespec(t)
 	return nil
 }
 
-func (d *Dirent) GetDeletedAt() time.Time {
+// GetDeletedAt returns the time at which the directory entry was deleted, or the Unix
+// epoch and an error object if the file hasn't been deleted. Note that the Unix epoch,
+// 1970-01-01 00:00:00 UTC, is a decade *before* the earliest representable date in a
+// FAT timestamp, 1980-01-01 00:00:00 local time.
+func (d *Dirent) GetDeletedAt() (time.Time, error) {
 	if !d.isDeleted {
-		return fatEpoch
+		return time.Unix(0, 0), disko.NewDriverError(syscall.EINVAL)
 	}
-	return d.GetCreatedAt()
+	return time.Unix(d.Stat.Ctim.Sec, d.Stat.Ctim.Nsec), nil
 }
 
+// SetDeletedAt sets the time at which a directory entry was deleted, marking it as deleted
+// if it hasn't already been.
+// It is an error to try to set this time before 1980-01-01 00:00:00 local time.
 func (d *Dirent) SetDeletedAt(t time.Time) error {
-	// This assumes that the dirent has already been marked as deleted.
+	if t.Before(fatEpoch) {
+		return disko.NewDriverError(syscall.ERANGE)
+	}
+	d.isDeleted = true
 	return d.SetCreatedAt(t)
 }
 

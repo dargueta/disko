@@ -379,9 +379,9 @@ func (drv *FATDriver) Lstat(path string) (syscall.Stat_t, error) {
 
 // Chmod changes the file mode information for the file at the given path.
 //
-// The FAT file system has a very limited concept of file modes, so this has little
-// effect. FAT only recognizes read-only attributes, so if you want to make a file read-only
-// you need to clear the read bit from **all** modes.
+// The FAT file system has a very limited concept of file modes, so this has little effect.
+// FAT only recognizes read-only attributes, so if you want to make a file read-only you
+// need to clear the read bit from **all** modes.
 //
 // This function cannot be used to set any mode flags aside from read-only.
 func (drv *FATDriver) Chmod(path string, mode os.FileMode) error {
