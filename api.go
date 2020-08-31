@@ -27,7 +27,7 @@ type ReadingDriver interface {
 	//
 	// If a file system doesn't support a particular feature, drivers should use a
 	// reasonable default value. For most of these 0 is fine, but for compatibility
-	// drivers use 1 for `Nlink` and 0o777 for `Mode`.
+	// drivers should use 1 for `Nlink` and 0o777 for `Mode`.
 	Stat(path string) (syscall.Stat_t, error)
 	// Lstat returns the same information as Stat but follows symbolic links. On file
 	// systems that don't support symbolic links, the behavior is exactly the same as
@@ -58,6 +58,20 @@ type Driver interface {
 	OpeningDriver
 	ReadingDriver
 	WritingDriver
+
+	// Mount initializes the driver with a file for the disk image. This must not be
+	// called more than once, and it must be called before using the driver. Drivers must
+	// return an error in these cases, but the state of the driver after a second call
+	// is undefined.
+	Mount(file interface{}) error
+
+	// Flush writes all changes to the disk image. Read-only drivers must ignore this
+	// and should not return an error.
+	Flush() error
+
+	// Unmount flushes all changes to the disk image and frees all resources. The driver
+	// must not be used after this function is called.
+	Unmount() error
 }
 
 // DirectoryEntry represents a file, directory, device, or other entity encountered on
