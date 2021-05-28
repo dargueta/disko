@@ -1,0 +1,70 @@
+CREATE TABLE inodes (
+	id INTEGER PRIMARY KEY,
+	size BIGINT DEFAULT 0,
+	nlinks INTEGER DEFAULT 1,
+    t_created DATETIME,
+	t_accessed DATETIME,
+	t_modified DATETIME,
+    t_changed DATETIME,
+    t_deleted DATETIME,
+	uid INTEGER,
+	gid INTEGER,
+	mode_flags INTEGER,
+    unix_flags INTEGER
+);
+
+
+CREATE TABLE dirents (
+    id INTEGER PRIMARY KEY,
+    inode_id INTEGER NOT NULL REFERENCES inodes(id),
+    "name" TEXT NOT NULL,
+    -- Only directory entries in the root directory are allowed to have this null,
+    -- and only on certain file systems like FAT8/12/16. It's up to individual
+    -- drivers to ensure the value here is correct.
+    parent_dirent_id INTEGER REFERENCES dirents(id) ON DELETE CASCADE,
+    UNIQUE(parent_dirent_id, "name")
+);
+-- Despite being a foreign key, we're not creating an index on the inode ID since
+-- we're extremely unlikely to search across directory entries for an inode, as
+-- opposed to the other way around (finding the inode of a directory entry).
+--
+-- Because we have a unique index on the parent ID and name (in that order), we
+-- don't need to create a separate index for just the parent ID, as the engine
+-- can use that unique constraint for a partial index search.
+
+
+CREATE TABLE blocks (
+    id INTEGER PRIMARY KEY,
+    inode_id INTEGER REFERENCES inodes(id),
+    sequence_number INTEGER,
+    UNIQUE(inode_id, sequence_number)
+);
+-- Same note as earlier -- no need to create a separate index on the inode ID,
+-- since we can use the unique index for this.
+
+
+-- Decrement `nlinks`` of an inode when a directory entry that references it is
+-- deleted.
+CREATE TRIGGER trg_decrement_nlinks
+AFTER DELETE ON dirents
+BEGIN
+    UPDATE inodes
+    SET nlinks = nlinks - 1,
+        -- Automatically set the deleted timestamp if the reference count is
+        -- about to drop to zero (or negative). Otherwise, it leaves the column
+        -- unmodified.
+        t_deleted = CASE
+            WHEN nlinks <= 1 THEN datetime('now')
+            ELSE t_deleted
+        END
+    WHERE id = OLD.inode_id;
+END;
+
+
+-- Deallocate all the blocks of an inode when the number of references to it
+-- reaches zero.
+CREATE TRIGGER trg_deallocate_blocks
+AFTER UPDATE OF nlinks ON inodes WHEN nlinks <= 0
+BEGIN
+    UPDATE blocks SET inode_id = NULL WHERE inode_id = OLD.id;
+END;
