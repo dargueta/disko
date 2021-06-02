@@ -93,7 +93,7 @@ type Dirent struct {
 
 // GetLastAccessedAt returns the timestamp at which the directory entry was last accessed.
 func (d *Dirent) GetLastAccessedAt() time.Time {
-	return time.Unix(d.Stat.Atim.Sec, d.Stat.Atim.Nsec)
+	return d.Stat.LastAccessed
 }
 
 // SetLastAccessedAt sets the timestamp at which the directory entry was last accessed.
@@ -102,12 +102,12 @@ func (d *Dirent) SetLastAccessedAt(t time.Time) error {
 	if t.Before(fatEpoch) {
 		return disko.NewDriverError(syscall.ERANGE)
 	}
-	d.Stat.Atim = TimeToTimespec(t)
+	d.Stat.LastAccessed = t
 	return nil
 }
 
 func (d *Dirent) GetLastModifiedAt() time.Time {
-	return time.Unix(d.Stat.Mtim.Sec, d.Stat.Mtim.Nsec)
+	return d.Stat.LastModified
 }
 
 // SetLastModifiedAt sets the timestamp at which the directory entry was last modified.
@@ -116,7 +116,7 @@ func (d *Dirent) SetLastModifiedAt(t time.Time) error {
 	if t.Before(fatEpoch) {
 		return disko.NewDriverError(syscall.ERANGE)
 	}
-	d.Stat.Mtim = TimeToTimespec(t)
+	d.Stat.LastModified = t
 	return nil
 }
 
@@ -126,7 +126,7 @@ func (d *Dirent) GetCreatedAt() (time.Time, error) {
 	if d.isDeleted {
 		return time.Unix(0, 0), disko.NewDriverError(syscall.ENOENT)
 	}
-	return time.Unix(d.Stat.Ctim.Sec, d.Stat.Ctim.Nsec), nil
+	return d.Stat.CreatedAt, nil
 }
 
 // SetCreatedAt sets the timestamp at which the directory entry was created.
@@ -139,7 +139,7 @@ func (d *Dirent) SetCreatedAt(t time.Time) error {
 		return disko.NewDriverError(syscall.ENOENT)
 	}
 
-	d.Stat.Ctim = TimeToTimespec(t)
+	d.Stat.CreatedAt = t
 	return nil
 }
 
@@ -151,7 +151,7 @@ func (d *Dirent) GetDeletedAt() (time.Time, error) {
 	if !d.isDeleted {
 		return time.Unix(0, 0), disko.NewDriverError(syscall.EINVAL)
 	}
-	return time.Unix(d.Stat.Ctim.Sec, d.Stat.Ctim.Nsec), nil
+	return d.Stat.DeletedAt, nil
 }
 
 // SetDeletedAt sets the time at which a directory entry was deleted, marking it as deleted
@@ -273,23 +273,23 @@ func NewDirentFromRaw(bootSector *FATBootSector, rawDirent *RawDirent) (Dirent, 
 
 	dirent := Dirent{
 		DirectoryEntry: disko.DirectoryEntry{
-			Stat: syscall.Stat_t{
+			Stat: disko.FileStat{
 				Dev: 0,
 				// FAT systems have no concept of inodes but a quick way to see if two
 				// directory entries point to the same thing is to see if the first cluster
 				// is the same. Thus, we'll sorta cheat and use that as a file ID.
-				Ino:     uint64(firstCluster),
-				Nlink:   1,
-				Mode:    mode,
-				Uid:     0,
-				Gid:     0,
-				Rdev:    0,
-				Size:    size,
-				Blksize: int64(bootSector.BytesPerCluster),
-				Blocks:  sizeInClusters,
-				Atim:    TimeToTimespec(DateFromInt(rawDirent.LastAccessedDate)),
-				Mtim:    TimeToTimespec(lastModified),
-				Ctim:    TimeToTimespec(createdAt),
+				Ino:          uint64(firstCluster),
+				Nlink:        1,
+				Mode:         mode,
+				Uid:          0,
+				Gid:          0,
+				Rdev:         0,
+				Size:         size,
+				Blksize:      int64(bootSector.BytesPerCluster),
+				Blocks:       sizeInClusters,
+				LastAccessed: DateFromInt(rawDirent.LastAccessedDate),
+				LastModified: lastModified,
+				CreatedAt:    createdAt,
 			},
 		},
 		AttributeFlags: int(rawDirent.AttributeFlags),

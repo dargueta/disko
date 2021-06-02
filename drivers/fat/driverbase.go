@@ -360,10 +360,10 @@ func (drv *FATDriver) ReadFile(path string) ([]byte, error) {
 }
 
 // Stat returns information about the file or directory at the given path.
-func (drv *FATDriver) Stat(path string) (syscall.Stat_t, error) {
+func (drv *FATDriver) Stat(path string) (disko.FileStat, error) {
 	dirent, err := drv.resolvePathToDirent(path)
 	if err != nil {
-		return syscall.Stat_t{}, err
+		return disko.FileStat{}, err
 	}
 
 	return dirent.Stat, nil
@@ -373,7 +373,7 @@ func (drv *FATDriver) Stat(path string) (syscall.Stat_t, error) {
 //
 // Since FAT file systems have no concept of links, this behaves exactly the same as
 // Stat.
-func (drv *FATDriver) Lstat(path string) (syscall.Stat_t, error) {
+func (drv *FATDriver) Lstat(path string) (disko.FileStat, error) {
 	return drv.Stat(path)
 }
 

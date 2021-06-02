@@ -12,7 +12,6 @@ import (
 	"encoding/binary"
 	"io"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/dargueta/disko"
@@ -133,16 +132,16 @@ func NewDirent(stream *io.Reader) (LBRDirent, error) {
 
 	newEntry := LBRDirent{
 		DirectoryEntry: disko.DirectoryEntry{
-			Stat: syscall.Stat_t{
-				Nlink:   1,
-				Mode:    0o777,
-				Uid:     0,
-				Gid:     0,
-				Size:    int64(raw.SizeInSectors)*128 - int64(raw.PadCount),
-				Blksize: 128,
-				Blocks:  int64(raw.SizeInSectors),
-				Mtim:    syscall.Timespec{Sec: lastModifiedTimestamp.Unix()},
-				Ctim:    syscall.Timespec{Sec: createdTimestamp.Unix()},
+			Stat: disko.FileStat{
+				Nlink:        1,
+				Mode:         0o777,
+				Uid:          0,
+				Gid:          0,
+				Size:         int64(raw.SizeInSectors)*128 - int64(raw.PadCount),
+				Blksize:      128,
+				Blocks:       int64(raw.SizeInSectors),
+				LastModified: lastModifiedTimestamp,
+				CreatedAt:    createdTimestamp,
 			},
 		},
 		name: fullName,

@@ -6,6 +6,25 @@ import (
 	"time"
 )
 
+// FileStat is a platform-independent form of syscall.Stat_t.
+type FileStat struct {
+	Dev          uint64
+	Ino          uint64
+	Nlink        uint64
+	Mode         uint32
+	Uid          uint32
+	Gid          uint32
+	Rdev         uint64
+	Size         int64
+	Blksize      int64
+	Blocks       int64
+	CreatedAt    time.Time
+	LastChanged  time.Time
+	LastAccessed time.Time
+	LastModified time.Time
+	DeletedAt    time.Time
+}
+
 // OpeningDriver is the interface for drivers implementing the POSIX open(3) function.
 //
 // Drivers need not implement all functionality for valid flags. For example, read-only
@@ -28,11 +47,11 @@ type ReadingDriver interface {
 	// If a file system doesn't support a particular feature, drivers should use a
 	// reasonable default value. For most of these 0 is fine, but for compatibility
 	// drivers should use 1 for `Nlink` and 0o777 for `Mode`.
-	Stat(path string) (syscall.Stat_t, error)
+	Stat(path string) (FileStat, error)
 	// Lstat returns the same information as Stat but follows symbolic links. On file
 	// systems that don't support symbolic links, the behavior is exactly the same as
 	// Stat.
-	Lstat(path string) (syscall.Stat_t, error)
+	Lstat(path string) (FileStat, error)
 }
 
 // WritingDriver is the interface for drivers supporting write operations.
@@ -83,7 +102,7 @@ type Driver interface {
 type DirectoryEntry struct {
 	os.FileInfo
 	name string
-	Stat syscall.Stat_t
+	Stat FileStat
 }
 
 // Name returns the base name of the directory entry on the file system.
@@ -93,7 +112,7 @@ func (d *DirectoryEntry) Name() string {
 
 // ModTime returns the timestamp of the DirectoryEntry.
 func (d *DirectoryEntry) ModTime() time.Time {
-	return time.Unix(d.Stat.Mtim.Sec, d.Stat.Mtim.Nsec)
+	return d.Stat.LastModified
 }
 
 // Mode returns the file system mode of the directory as an os.FileMode. If you need more
@@ -107,7 +126,7 @@ func (d *DirectoryEntry) IsDir() bool {
 	return (d.Stat.Mode & syscall.S_IFDIR) != 0
 }
 
-// Sys returns a copy of the syscall.Stat_t object backing this directory entry.
-func (d *DirectoryEntry) Sys() interface{} {
+// Sys returns a copy of the FileStat object backing this directory entry.
+func (d *DirectoryEntry) Sys() FileStat {
 	return d.Stat
 }
