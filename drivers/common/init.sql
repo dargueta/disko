@@ -49,7 +49,9 @@ CREATE TRIGGER trg_decrement_nlinks
 AFTER DELETE ON dirents
 BEGIN
     UPDATE inodes
-    SET nlinks = nlinks - 1,
+    SET
+        -- Decrement the reference count
+        nlinks = nlinks - 1,
         -- Automatically set the deleted timestamp if the reference count is
         -- about to drop to zero (or negative). Otherwise, it leaves the column
         -- unmodified.
