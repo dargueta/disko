@@ -5,14 +5,14 @@ import (
 	"io"
 )
 
-type Reader struct {
+type RLE90Reader struct {
 	io.ReadCloser
 	stream               io.ByteReader
 	lastByte             byte
 	remainingRepeatCount int
 }
 
-type Writer struct {
+type RLE90Writer struct {
 	io.WriteCloser
 	stream            io.Writer
 	lastByte          int
@@ -20,12 +20,12 @@ type Writer struct {
 }
 
 // NewReader returns an io.Reader which decompresses RLE90-encoded data from rd.
-func NewReader(rd io.ByteReader) (Reader, error) {
-	return Reader{stream: rd}, nil
+func NewRLE90Reader(rd io.ByteReader) (RLE90Reader, error) {
+	return RLE90Reader{stream: rd}, nil
 }
 
 // BUG(dargueta): This should fail if a stream starts with 90H followed by a non-zero byte.
-func (reader *Reader) Read(p []byte) (int, error) {
+func (reader *RLE90Reader) Read(p []byte) (int, error) {
 	var writeSize int
 	var sliceToWrite []byte
 	numBytesRead := 0
@@ -49,7 +49,7 @@ func (reader *Reader) Read(p []byte) (int, error) {
 		if err == io.EOF {
 			// If we hit EOF at the beginning of the loop then this isn't an error.
 			// It's only an error if we hit EOF immediately after a 0x90 byte.
-			return numBytesRead, nil
+			return numBytesRead, io.EOF
 		} else if err != nil {
 			// Didn't hit EOF, must've been an I/O error.
 			return numBytesRead, err
@@ -71,13 +71,19 @@ func (reader *Reader) Read(p []byte) (int, error) {
 
 		repeatCount := int(repeatCountByte)
 		if repeatCount == 0 {
+			// Escape sequence 0x90 0x00 gives 0x90
 			p[numBytesRead] = '\x90'
+			reader.lastByte = '\x90'
+			numBytesRead++
 		} else {
 			remainingSpace := len(p) - numBytesRead
 			if remainingSpace < repeatCount {
+				// Buffer doesn't have enough space for the remaining duplicated
+				// bytes.
 				writeSize = remainingSpace
 				reader.remainingRepeatCount = repeatCount - remainingSpace
 			} else {
+				// Buffer has enough space for the repeated byte count.
 				writeSize = repeatCount
 				reader.remainingRepeatCount = 0
 			}
@@ -86,8 +92,6 @@ func (reader *Reader) Read(p []byte) (int, error) {
 			copy(p[numBytesRead:numBytesRead+writeSize], sliceToWrite)
 			numBytesRead += writeSize
 		}
-
-		reader.lastByte = nextByte
 	}
 
 	if numBytesRead < len(p) {
@@ -98,7 +102,7 @@ func (reader *Reader) Read(p []byte) (int, error) {
 
 // ReadAll unpacks the remainder of the data in the reader and returns it as a
 // byte array.
-func (reader *Reader) ReadAll() ([]byte, error) {
+func (reader *RLE90Reader) ReadAll() ([]byte, error) {
 	fullContents := new(bytes.Buffer)
 	var intermediateBuffer [512]byte
 
@@ -115,16 +119,16 @@ func (reader *Reader) ReadAll() ([]byte, error) {
 	}
 }
 
-func (reader *Reader) Close() error {
+func (reader *RLE90Reader) Close() error {
 	return nil
 }
 
-func NewWriter(stream io.Writer) (Writer, error) {
-	return Writer{stream: stream, lastByte: -1}, nil
+func NewWriter(stream io.Writer) (RLE90Writer, error) {
+	return RLE90Writer{stream: stream, lastByte: -1}, nil
 }
 
 // Write writes the byte slice to the underlying reader.
-func (writer *Writer) Write(p []byte) (int, error) {
+func (writer *RLE90Writer) Write(p []byte) (int, error) {
 	numWritten := 0
 
 	for _, nextByte := range p {
@@ -148,7 +152,7 @@ func (writer *Writer) Write(p []byte) (int, error) {
 	return numWritten, nil
 }
 
-func (writer *Writer) writeDuplicatedByte(value byte, count int) error {
+func (writer *RLE90Writer) writeDuplicatedByte(value byte, count int) error {
 	for count > 3 {
 		var nextWriteCount int
 		if count > 254 {
@@ -173,7 +177,7 @@ func (writer *Writer) writeDuplicatedByte(value byte, count int) error {
 	return nil
 }
 
-func (writer *Writer) Flush() error {
+func (writer *RLE90Writer) Flush() error {
 	err := writer.writeDuplicatedByte(byte(writer.lastByte), writer.lastByteRunLength+1)
 	if err != nil {
 		return err
@@ -187,7 +191,7 @@ type Flusher interface {
 	Flush() error
 }
 
-func (writer *Writer) Close() error {
+func (writer *RLE90Writer) Close() error {
 	// TODO (dargueta): How do we flush the underlying stream?
 	return writer.Flush()
 }
@@ -209,7 +213,7 @@ func DecompressBytes(packed []byte) ([]byte, error) {
 	var packedCopy []byte
 	copy(packedCopy, packed)
 	stream := bytes.NewReader(packedCopy)
-	reader, err := NewReader(stream)
+	reader, err := NewRLE90Reader(stream)
 	if err != nil {
 		return nil, err
 	}
