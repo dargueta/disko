@@ -2,12 +2,11 @@ package disko
 
 import (
 	"fmt"
-	"syscall"
 )
 
 // DriverError is a wrapper around system errno codes, with a customizable error message.
 type DriverError struct {
-	ErrnoCode syscall.Errno
+	ErrnoCode Errno
 	message   string
 }
 
@@ -17,23 +16,23 @@ func (e DriverError) Error() string {
 	if e.message != "" {
 		return e.message
 	}
-	return e.ErrnoCode.Error()
+	return StrError(e.ErrnoCode)
 }
 
 // NewDriverError creates a new DriverError with a default message derived from the
 // system's error code.
-func NewDriverError(errnoCode syscall.Errno) *DriverError {
+func NewDriverError(errnoCode Errno) *DriverError {
 	return &DriverError{
 		ErrnoCode: errnoCode,
-		message:   errnoCode.Error(),
+		message:   StrError(errnoCode),
 	}
 }
 
 // NewDriverErrorWithMessage creates a new DriverError from a system error code with a
 // custom message.
-func NewDriverErrorWithMessage(errnoCode syscall.Errno, message string) *DriverError {
+func NewDriverErrorWithMessage(errnoCode Errno, message string) *DriverError {
 	return &DriverError{
 		ErrnoCode: errnoCode,
-		message:   fmt.Sprintf("%s: %s", errnoCode.Error(), message),
+		message:   fmt.Sprintf("%s: %s", StrError(errnoCode), message),
 	}
 }

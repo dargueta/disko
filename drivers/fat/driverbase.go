@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"syscall"
 	"time"
 
 	disko "github.com/dargueta/disko"
@@ -14,9 +13,6 @@ import (
 
 // This file defines the driver interface and delegates to the underlying version-specific
 // drivers.
-
-type ClusterID uint32
-type SectorID uint32
 
 type FATDriverCommon interface {
 	GetBootSector() *FATBootSector
@@ -84,7 +80,7 @@ func (drv *FATDriver) readSectorsInCluster(cluster ClusterID, index uint, numSec
 	bootSector := drv.fs.GetBootSector()
 	if (index + numSectors) >= uint(bootSector.SectorsPerCluster) {
 		return nil, disko.NewDriverErrorWithMessage(
-			syscall.ERANGE,
+			disko.ERANGE,
 			fmt.Sprintf(
 				"cannot read %d sectors from index %d: read would exceed cluster size",
 				index,
@@ -102,7 +98,7 @@ func (drv *FATDriver) readSectorsInCluster(cluster ClusterID, index uint, numSec
 func (drv *FATDriver) listClusters(chainStart ClusterID) ([]ClusterID, error) {
 	if !drv.fs.IsValidCluster(chainStart) {
 		return nil, disko.NewDriverErrorWithMessage(
-			syscall.EINVAL,
+			disko.EINVAL,
 			fmt.Sprintf("invalid cluster 0x%x cannot start a cluster chain", chainStart))
 	}
 
@@ -122,7 +118,7 @@ func (drv *FATDriver) listClusters(chainStart ClusterID) ([]ClusterID, error) {
 			// Hit an invalid cluster. This is not the same as EOF, and usually indicates
 			// corruption of some sort.
 			return chain, disko.NewDriverErrorWithMessage(
-				syscall.EUCLEAN,
+				disko.EUCLEAN,
 				fmt.Sprintf(
 					"cluster %d followed by invalid cluster 0x%x at index %d in chain from %d",
 					currentCluster,
@@ -154,7 +150,7 @@ func (drv *FATDriver) getClusterInChain(firstCluster ClusterID, index uint) (Clu
 		if drv.fs.IsEndOfChain(nextCluster) {
 			// Hit EOF
 			return 0, disko.NewDriverErrorWithMessage(
-				syscall.EINVAL,
+				disko.EINVAL,
 				fmt.Sprintf(
 					"cluster index %d out of bounds -- chain from 0x%x has %d clusters",
 					index,
@@ -164,7 +160,7 @@ func (drv *FATDriver) getClusterInChain(firstCluster ClusterID, index uint) (Clu
 			// Hit an invalid cluster. This is not the same as EOF, and usually indicates
 			// corruption of some sort.
 			return 0, disko.NewDriverErrorWithMessage(
-				syscall.EINVAL,
+				disko.EINVAL,
 				fmt.Sprintf(
 					"cluster %d followed by invalid cluster 0x%x at index %d in chain from %d",
 					currentCluster,
@@ -200,7 +196,7 @@ func (drv *FATDriver) resolvePathToDirent(path string) (Dirent, error) {
 	if len(pathParts) == 0 {
 		// Caller gave us an empty path after components were resolved.
 		return Dirent{}, disko.NewDriverErrorWithMessage(
-			syscall.EINVAL, fmt.Sprintf("file path \"%s\" resolves to empty path", path))
+			disko.EINVAL, fmt.Sprintf("file path \"%s\" resolves to empty path", path))
 	}
 
 	// Get a listing for the root directory. We need to call a separate function because
@@ -232,7 +228,7 @@ func (drv *FATDriver) resolvePathToDirent(path string) (Dirent, error) {
 // including the `.` and `..` entries.
 func (drv *FATDriver) readDirFromDirent(directoryDirent *Dirent) ([]Dirent, error) {
 	if !directoryDirent.IsDir() {
-		return nil, disko.NewDriverError(syscall.ENOTDIR)
+		return nil, disko.NewDriverError(disko.ENOTDIR)
 	}
 
 	bootSector := drv.fs.GetBootSector()
@@ -271,7 +267,7 @@ func (drv *FATDriver) readDirFromDirent(directoryDirent *Dirent) ([]Dirent, erro
 // Readlink is unsupported on FAT file systems, so calling this function will return an
 // error.
 func (drv *FATDriver) Readlink(path string) (string, error) {
-	return "", disko.NewDriverError(syscall.ENOTSUP)
+	return "", disko.NewDriverError(disko.ENOTSUP)
 }
 
 // SameFile determines if two FileInfos reference the same file.
@@ -293,7 +289,7 @@ func (drv *FATDriver) Readdir(path string) ([]os.FileInfo, error) {
 
 	if !dirent.IsDir() {
 		// TODO: Provide the path in the error message
-		return nil, disko.NewDriverError(syscall.ENOTDIR)
+		return nil, disko.NewDriverError(disko.ENOTDIR)
 	}
 
 	dirContents, err := drv.readDirFromDirent(&dirent)
@@ -317,7 +313,7 @@ func (drv *FATDriver) ReadFile(path string) ([]byte, error) {
 	}
 
 	if dirent.IsDir() {
-		return nil, disko.NewDriverError(syscall.EISDIR)
+		return nil, disko.NewDriverError(disko.EISDIR)
 	}
 
 	allClusters, err := drv.listClusters(dirent.FirstCluster)
@@ -406,7 +402,7 @@ func (drv *FATDriver) Chmod(path string, mode os.FileMode) error {
 // Chown is unsupported on FAT file systems since they have no concept of ownership.
 // This function does nothing, only returns an error.
 func (drv *FATDriver) Chown(path string, uid, gid int) error {
-	return disko.NewDriverError(syscall.ENOSYS)
+	return disko.NewDriverError(disko.ENOSYS)
 }
 
 // Chtimes changes the last accessed and last modified timestamps of a directory entry.
@@ -424,12 +420,12 @@ func (drv *FATDriver) Chtimes(path string, atime, mtime time.Time) error {
 // Lchown is unsupported on FAT file systems since they have no concept of ownership.
 // This function does nothing, only returns an error.
 func (drv *FATDriver) Lchown(path string, uid, gid int) error {
-	return disko.NewDriverError(syscall.ENOTSUP)
+	return disko.NewDriverError(disko.ENOTSUP)
 }
 
 // Link does nothing and returns an error since links are unsupported on FAT file systems.
 func (drv *FATDriver) Link(oldpath, newpath string) error {
-	return disko.NewDriverError(syscall.ENOTSUP)
+	return disko.NewDriverError(disko.ENOTSUP)
 }
 
 // TODO: Mkdir
@@ -444,7 +440,7 @@ func (drv *FATDriver) Remove(path string) error {
 	}
 
 	if dirent.IsDir() {
-		return disko.NewDriverError(syscall.EISDIR)
+		return disko.NewDriverError(disko.EISDIR)
 	}
 
 	parentDirent, err := drv.resolvePathToDirent(filepath.Dir(path))
@@ -486,7 +482,7 @@ func (drv *FATDriver) Remove(path string) error {
 // Symlink does nothing and returns an error since links are unsupported on FAT file
 // systems.
 func (drv *FATDriver) Symlink(oldpath, newpath string) error {
-	return disko.NewDriverError(syscall.ENOTSUP)
+	return disko.NewDriverError(disko.ENOTSUP)
 }
 
 // TODO: Truncate

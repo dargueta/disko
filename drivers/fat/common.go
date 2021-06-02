@@ -5,10 +5,12 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"syscall"
 
 	disko "github.com/dargueta/disko"
 )
+
+type SectorID uint32
+type ClusterID uint32
 
 // RawFATBootSectorWithBPB is the on-disk representation of the boot sector.
 //
@@ -71,13 +73,13 @@ func NewFATBootSectorFromStream(reader io.Reader) (*FATBootSector, error) {
 
 	err := binary.Read(reader, binary.LittleEndian, &rawHeader)
 	if err != nil {
-		return nil, disko.NewDriverErrorWithMessage(syscall.EIO, err.Error())
+		return nil, disko.NewDriverErrorWithMessage(disko.EIO, err.Error())
 	}
 
 	var sectorsPerFAT32 uint32
 	err = binary.Read(reader, binary.LittleEndian, &sectorsPerFAT32)
 	if err != nil {
-		return nil, disko.NewDriverErrorWithMessage(syscall.EIO, err.Error())
+		return nil, disko.NewDriverErrorWithMessage(disko.EIO, err.Error())
 	}
 
 	var sectorsPerFAT uint
@@ -113,7 +115,7 @@ func NewFATBootSectorFromStream(reader io.Reader) (*FATBootSector, error) {
 		message := fmt.Sprintf(
 			"corruption detected: BytesPerSector must be 512, 1024, 2048, or 4096, got %d",
 			rawHeader.BytesPerSector)
-		return nil, disko.NewDriverErrorWithMessage(syscall.EUCLEAN, message)
+		return nil, disko.NewDriverErrorWithMessage(disko.EUCLEAN, message)
 	}
 
 	// SectorsPerCluster must be 2^x with x in [0, 8)
@@ -130,7 +132,7 @@ func NewFATBootSectorFromStream(reader io.Reader) (*FATBootSector, error) {
 		message := fmt.Sprintf(
 			"corruption detected: SectorsPerCluster must be a power of 2 in 1-128, got %d",
 			rawHeader.SectorsPerCluster)
-		return nil, disko.NewDriverErrorWithMessage(syscall.EUCLEAN, message)
+		return nil, disko.NewDriverErrorWithMessage(disko.EUCLEAN, message)
 	}
 
 	fatVersion := DetermineFATVersion(totalClusters)
@@ -139,7 +141,7 @@ func NewFATBootSectorFromStream(reader io.Reader) (*FATBootSector, error) {
 			"corruption detected: RootDirectorySectors is nonzero for a FAT32 disk: %d",
 			rootDirSectors)
 
-		return nil, disko.NewDriverErrorWithMessage(syscall.EUCLEAN, message)
+		return nil, disko.NewDriverErrorWithMessage(disko.EUCLEAN, message)
 
 	}
 
@@ -149,7 +151,7 @@ func NewFATBootSectorFromStream(reader io.Reader) (*FATBootSector, error) {
 			"corruption detected: BytesPerCluster cannot exceed 32,768 but got %d",
 			bytesPerCluster)
 
-		return nil, disko.NewDriverErrorWithMessage(syscall.EUCLEAN, message)
+		return nil, disko.NewDriverErrorWithMessage(disko.EUCLEAN, message)
 	}
 
 	processedHeader := FATBootSector{
