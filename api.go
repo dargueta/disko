@@ -2,7 +2,6 @@ package disko
 
 import (
 	"os"
-	"syscall"
 	"time"
 )
 
@@ -23,6 +22,46 @@ type FileStat struct {
 	LastAccessed time.Time
 	LastModified time.Time
 	DeletedAt    time.Time
+}
+
+// FSStat is a platform-independent form of syscall.Statfs_t.
+type FSStat struct {
+	BlockSize       int64
+	TotalBlocks     uint64
+	BlocksFree      uint64
+	BlocksAvailable uint64
+	Files           uint64
+	FilesFree       uint64
+	FileSystemID    uint64
+	MaxNameLength   int64
+	Flags           int64
+	Label           string
+}
+
+// Driver is the bare minimum interface for all drivers.
+type Driver interface {
+	// Mount initializes the driver with a file for the disk image. This must be
+	// called before using the driver. Drivers should ignore subsequent calls to
+	// Mount() before an Unmount().
+	//
+	// `flags` is any combination of os.O_* flags. Drivers should ignore anything
+	// they don't recognize, but reject flags they explicitly don't support. For
+	// example, a driver that doesn't support creating new empty images should
+	// fail if os.O_CREATE is passed in.
+	Mount(flags int) error
+
+	// Unmount flushes all pending changes to the disk image. The driver must
+	// not be used after this function is called. This must fail with EBUSY if
+	// any resources are still in use, such as open files.
+	Unmount() error
+
+	// GetFSInfo returns basic information about the file system. It must not be
+	// called before the file system is mounted.
+	GetFSInfo() (FSStat, error)
+}
+
+type FormattingDriver interface {
+	Format(information FSStat) error
 }
 
 // OpeningDriver is the interface for drivers implementing the POSIX open(3) function.
@@ -70,27 +109,8 @@ type WritingDriver interface {
 	Truncate(path string, size int64) error
 	Create(path string) (*os.File, error)
 	WriteFile(filepath string, data []byte, perm os.FileMode) error
-}
-
-// Driver is the interface for drivers implementing all driver capabilities.
-type Driver interface {
-	OpeningDriver
-	ReadingDriver
-	WritingDriver
-
-	// Mount initializes the driver with a file for the disk image. This must not be
-	// called more than once, and it must be called before using the driver. Drivers must
-	// return an error in these cases, but the state of the driver after a second call
-	// is undefined.
-	Mount(file interface{}) error
-
-	// Flush writes all changes to the disk image. Read-only drivers must ignore this
-	// and should not return an error.
+	// Flush writes all changes to the disk image.
 	Flush() error
-
-	// Unmount flushes all changes to the disk image and frees all resources. The driver
-	// must not be used after this function is called.
-	Unmount() error
 }
 
 // DirectoryEntry represents a file, directory, device, or other entity encountered on
@@ -123,7 +143,7 @@ func (d *DirectoryEntry) Mode() os.FileMode {
 
 // IsDir returns true if it's a directory.
 func (d *DirectoryEntry) IsDir() bool {
-	return (d.Stat.Mode & syscall.S_IFDIR) != 0
+	return (d.Stat.Mode & S_IFDIR) != 0
 }
 
 // Sys returns a copy of the FileStat object backing this directory entry.
