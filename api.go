@@ -5,6 +5,20 @@ import (
 	"time"
 )
 
+type MountFlags int
+
+const (
+	MountFlagsAllowRead       = MountFlags(1 << iota)
+	MountFlagsAllowWrite      = MountFlags(1 << iota)
+	MountFlagsAllowInsert     = MountFlags(1 << iota)
+	MountFlagsAllowDelete     = MountFlags(1 << iota)
+	MountFlagsAllowAdminister = MountFlags(1 << iota)
+	MountFlagsCustomStart     = MountFlags(1 << iota)
+)
+
+const MountFlagsAllowAll = MountFlagsCustomStart - 1
+const MountFlagsMask = MountFlagsAllowAll
+
 // FileStat is a platform-independent form of syscall.Stat_t.
 type FileStat struct {
 	Dev          uint64
@@ -26,16 +40,31 @@ type FileStat struct {
 
 // FSStat is a platform-independent form of syscall.Statfs_t.
 type FSStat struct {
-	BlockSize       int64
-	TotalBlocks     uint64
-	BlocksFree      uint64
+	// BlockSize is the size of a logical block on the file system, in bytes.
+	BlockSize int64
+	// TotalBlocks is the total number of blocks on the disk image.
+	TotalBlocks uint64
+	// BlocksFree is the number of unallocated blocks on the image.
+	BlocksFree uint64
+	// BlocksAvailable is the number of blocks available for use by user data.
+	// This should always be less than or equal to BlocksFree.
 	BlocksAvailable uint64
-	Files           uint64
-	FilesFree       uint64
-	FileSystemID    uint64
-	MaxNameLength   int64
-	Flags           int64
-	Label           string
+	// Files is the total number of used directory entries on the file system.
+	// Drivers should set this to 0 if the information is not available.
+	Files uint64
+	// FilesFree is the number of remaining directory entries available for use.
+	// Drivers should set this to 0 for file systems that have no limit on the
+	// maximum directory entries.
+	FilesFree uint64
+	// FileSystemID is the serial number for the disk image, if available.
+	FileSystemID uint64
+	// MaxNameLength is the longest possible name for a directory entry, in bytes.
+	// Drivers should set this to 0 if there is no limit.
+	MaxNameLength int64
+	// Flags is
+	Flags int64
+	// Label is the volume label, if available.
+	Label string
 }
 
 // Driver is the bare minimum interface for all drivers.
@@ -43,12 +72,7 @@ type Driver interface {
 	// Mount initializes the driver with a file for the disk image. This must be
 	// called before using the driver. Drivers should ignore subsequent calls to
 	// Mount() before an Unmount().
-	//
-	// `flags` is any combination of os.O_* flags. Drivers should ignore anything
-	// they don't recognize, but reject flags they explicitly don't support. For
-	// example, a driver that doesn't support creating new empty images should
-	// fail if os.O_CREATE is passed in.
-	Mount(flags int) error
+	Mount(flags MountFlags) error
 
 	// Unmount flushes all pending changes to the disk image. The driver must
 	// not be used after this function is called. This must fail with EBUSY if
@@ -60,6 +84,8 @@ type Driver interface {
 	GetFSInfo() (FSStat, error)
 }
 
+// FormattingDriver is the interface for drivers capable of creating new disk
+// images.
 type FormattingDriver interface {
 	Format(information FSStat) error
 }
