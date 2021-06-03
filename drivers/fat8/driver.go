@@ -19,6 +19,10 @@ type FAT8Driver struct {
 	stat            disko.FSStat
 }
 
+// Format creates a new empty disk image using the given disk information.
+//
+// This driver only requires the TotalBlocks field to be set in `information`. It
+// must either be 2002 for a floppy image, or 720 for a minifloppy image.
 func (driver *FAT8Driver) Format(information disko.FSStat) error {
 	if information.TotalBlocks == 2002 {
 		driver.sectorsPerTrack = 26
@@ -46,39 +50,56 @@ func (driver *FAT8Driver) Format(information disko.FSStat) error {
 
 	// There are two clusters per track, so the size of the FAT is one byte per
 	// cluster plus some padding bytes to get to a multiple of the sector size.
-	fatSize := int(driver.totalTracks * 2)
-	if fatSize%128 != 0 {
-		fatSize += 128 - (fatSize % 128)
+	fatSizeInBytes := int(driver.totalTracks * 2)
+	if fatSizeInBytes%128 != 0 {
+		fatSizeInBytes += 128 - (fatSizeInBytes % 128)
 	}
 
 	// Construct a single copy of the FAT, and mark the directory track as
 	// reserved by putting 0xFE in the cluster entry. (It's always the middle
 	// track.)
-	fat := bytes.Repeat([]byte{0xff}, fatSize)
+	fat := bytes.Repeat([]byte{0xff}, fatSizeInBytes)
 	fat[directoryTrackNumber*2] = 0xfe
 	fat[directoryTrackNumber*2+1] = 0xfe
 
-	fatStart := directoryTrackStart + trackSize - (3 * fatSize)
+	// Write the FATs
+	fatStart := directoryTrackStart + trackSize - (3 * fatSizeInBytes)
 	driver.image.Seek(int64(fatStart), 0)
-
 	_, err := driver.image.Write(bytes.Repeat(fat, 3))
-	return err
-}
 
-func FormatMinifloppyImage(image *os.File) error {
-	image.Seek(0, 0)
-	image.Truncate(0)
-	image.Write(bytes.Repeat([]byte{0}, 92160))
+	if err != nil {
+		return err
+	}
+
+	// We reserve one track for the directory, so the total number of available
+	// blocks is one track's worth of blocks fewer.
+	availableBlocks := information.TotalBlocks - uint64(driver.sectorsPerTrack)
+
+	// The maximum number of files is:
+	// (SectorsPerTrack - 1 - (FatSizeInSectors * 3)) * DirentsPerSector
+	// A directory entry is 16 bytes, so there are 8 dirents per sector
+	direntSectors := driver.sectorsPerTrack - 1 - ((fatSizeInBytes * 3) / 128)
+	totalDirents := direntSectors * 8
+
+	driver.stat = disko.FSStat{
+		BlockSize:       128,
+		TotalBlocks:     information.TotalBlocks,
+		BlocksFree:      availableBlocks,
+		BlocksAvailable: availableBlocks,
+		Files:           0,
+		FilesFree:       uint64(totalDirents),
+		// This isn't completely accurate; names are 6.3 format so the longest
+		// bare name is six characters, plus an extra three for the extension,
+		// plus one more for the ".". Problem is, "ABCDEFGHI" is interpreted as
+		// "ABCDEF.GHI" because of the implicit period.
+		MaxNameLength: 10,
+	}
 
 	return nil
 }
 
-func FormatFloppyImage(image *os.File) error {
-	image.Seek(0, 0)
-	image.Truncate(0)
-	image.Write(bytes.Repeat([]byte{0}, 256256))
-
-	return nil
+func (driver *FAT8Driver) GetFSInfo() disko.FSStat {
+	return driver.stat
 }
 
 /*
