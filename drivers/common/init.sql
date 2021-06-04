@@ -16,7 +16,7 @@ CREATE TABLE inodes (
 
 CREATE TABLE dirents (
     id INTEGER PRIMARY KEY,
-    inode_id INTEGER NOT NULL REFERENCES inodes(id),
+    inode_id INTEGER NOT NULL REFERENCES inodes(id) ON DELETE CASCADE,
     "name" TEXT NOT NULL,
     -- Only directory entries in the root directory are allowed to have this null,
     -- and only on certain file systems like FAT8/12/16. It's up to individual
@@ -33,9 +33,10 @@ CREATE TABLE dirents (
 -- can use that unique constraint for a partial index search.
 
 
-CREATE TABLE blocks (
+CREATE TABLE allocated_blocks (
     id INTEGER PRIMARY KEY,
-    inode_id INTEGER REFERENCES inodes(id),
+    inode_id INTEGER REFERENCES inodes(id) ON DELETE CASCADE,
+    block_id INTEGER NOT NULL,
     sequence_number INTEGER,
     UNIQUE(inode_id, sequence_number)
 );
@@ -68,5 +69,5 @@ END;
 CREATE TRIGGER trg_deallocate_blocks
 AFTER UPDATE OF nlinks ON inodes WHEN nlinks <= 0
 BEGIN
-    UPDATE blocks SET inode_id = NULL WHERE inode_id = OLD.id;
+    DELETE FROM allocated_blocks WHERE inode_id = OLD.id;
 END;
