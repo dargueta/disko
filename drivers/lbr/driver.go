@@ -133,12 +133,12 @@ func NewDirent(stream *io.Reader) (LBRDirent, error) {
 	newEntry := LBRDirent{
 		DirectoryEntry: disko.DirectoryEntry{
 			Stat: disko.FileStat{
-				Nlink:        1,
-				Mode:         0o777,
+				Nlinks:       1,
+				ModeFlags:    0o777,
 				Uid:          0,
 				Gid:          0,
 				Size:         int64(raw.SizeInSectors)*128 - int64(raw.PadCount),
-				Blksize:      128,
+				BlockSize:    128,
 				Blocks:       int64(raw.SizeInSectors),
 				LastModified: lastModifiedTimestamp,
 				CreatedAt:    createdTimestamp,

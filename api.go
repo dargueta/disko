@@ -7,29 +7,44 @@ import (
 
 type MountFlags int
 
+// TODO (dargueta): These permissions are too granular and don't make a lot of sense.
 const (
-	MountFlagsAllowRead       = MountFlags(1 << iota)
-	MountFlagsAllowWrite      = MountFlags(1 << iota)
-	MountFlagsAllowInsert     = MountFlags(1 << iota)
-	MountFlagsAllowDelete     = MountFlags(1 << iota)
+	// MountFlagsAllowRead indicates to Driver.Mount() that the image should be
+	// mounted with read permissions.
+	MountFlagsAllowRead = MountFlags(1 << iota)
+	// MountFlagsAllowWrite indicates to Driver.Mount() that the image should be
+	// mounted with write permissions. Existing files can be modified, but
+	// nothing can be created or deleted.
+	MountFlagsAllowWrite = MountFlags(1 << iota)
+	// MountFlagsAllowInsert indicates to Driver.Mount() that the image should
+	// be mounted with insert permissions. New files and directories can be
+	// created and modified, but existing files cannot be touched unless
+	// MountFlagsAllowWrite is also specified.
+	MountFlagsAllowInsert = MountFlags(1 << iota)
+	// MountFlagsAllowDelete indicates to Driver.Mount() that the image should
+	// be mounted with permissions to delete files and directories.
+	MountFlagsAllowDelete = MountFlags(1 << iota)
+	// MountFlagsAllowAdminister indicates to Driver.Mount() that the image
+	// should be mounted with the ability to change file permissions.
 	MountFlagsAllowAdminister = MountFlags(1 << iota)
 	MountFlagsCustomStart     = MountFlags(1 << iota)
 )
 
 const MountFlagsAllowAll = MountFlagsCustomStart - 1
+const MountFlagsAllowReadWrite = MountFlagsAllowRead | MountFlagsAllowWrite
 const MountFlagsMask = MountFlagsAllowAll
 
 // FileStat is a platform-independent form of syscall.Stat_t.
 type FileStat struct {
-	Dev          uint64
-	Ino          uint64
-	Nlink        uint64
-	Mode         uint32
+	DeviceID     uint64
+	InodeNumber  uint64
+	Nlinks       uint64
+	ModeFlags    uint32
 	Uid          uint32
 	Gid          uint32
 	Rdev         uint64
 	Size         int64
-	Blksize      int64
+	BlockSize    int64
 	Blocks       int64
 	CreatedAt    time.Time
 	LastChanged  time.Time
@@ -164,12 +179,12 @@ func (d *DirectoryEntry) ModTime() time.Time {
 // Mode returns the file system mode of the directory as an os.FileMode. If you need more
 // detailed information, see DirectoryEntry.Stat.
 func (d *DirectoryEntry) Mode() os.FileMode {
-	return os.FileMode(d.Stat.Mode & 0x1ff)
+	return os.FileMode(d.Stat.ModeFlags & 0x1ff)
 }
 
 // IsDir returns true if it's a directory.
 func (d *DirectoryEntry) IsDir() bool {
-	return (d.Stat.Mode & S_IFDIR) != 0
+	return (d.Stat.ModeFlags & S_IFDIR) != 0
 }
 
 // Sys returns a copy of the FileStat object backing this directory entry.

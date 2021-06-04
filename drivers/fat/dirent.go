@@ -274,18 +274,18 @@ func NewDirentFromRaw(bootSector *FATBootSector, rawDirent *RawDirent) (Dirent, 
 	dirent := Dirent{
 		DirectoryEntry: disko.DirectoryEntry{
 			Stat: disko.FileStat{
-				Dev: 0,
+				DeviceID: 0,
 				// FAT systems have no concept of inodes but a quick way to see if two
 				// directory entries point to the same thing is to see if the first cluster
 				// is the same. Thus, we'll sorta cheat and use that as a file ID.
-				Ino:          uint64(firstCluster),
-				Nlink:        1,
-				Mode:         mode,
+				InodeNumber:  uint64(firstCluster),
+				Nlinks:       1,
+				ModeFlags:    mode,
 				Uid:          0,
 				Gid:          0,
 				Rdev:         0,
 				Size:         size,
-				Blksize:      int64(bootSector.BytesPerCluster),
+				BlockSize:    int64(bootSector.BytesPerCluster),
 				Blocks:       sizeInClusters,
 				LastAccessed: DateFromInt(rawDirent.LastAccessedDate),
 				LastModified: lastModified,

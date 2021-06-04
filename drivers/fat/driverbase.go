@@ -391,9 +391,9 @@ func (drv *FATDriver) Chmod(path string, mode os.FileMode) error {
 	// anything beyond that.
 	if (mode & 0b010010010) == 0 {
 		// No one has write access
-		dirent.Stat.Mode &= ^uint32(0b010010010)
+		dirent.Stat.ModeFlags &= ^uint32(0b010010010)
 	} else {
-		dirent.Stat.Mode |= 0b010010010
+		dirent.Stat.ModeFlags |= 0b010010010
 	}
 
 	return drv.fs.UpdateDirent(&dirent)
