@@ -116,7 +116,6 @@ type OpeningDriver interface {
 
 // ReadingDriver is the interface for drivers supporting read operations.
 type ReadingDriver interface {
-	Readlink(path string) (string, error)
 	SameFile(fi1, fi2 os.FileInfo) bool
 	Open(path string) (*os.File, error)
 	ReadDir(path string) ([]os.FileInfo, error)
@@ -126,11 +125,16 @@ type ReadingDriver interface {
 	//
 	// If a file system doesn't support a particular feature, drivers should use a
 	// reasonable default value. For most of these 0 is fine, but for compatibility
-	// drivers should use 1 for `Nlink` and 0o777 for `Mode`.
+	// drivers should use 1 for `Nlinks` and 0o777 for `ModeFlags`.
 	Stat(path string) (FileStat, error)
-	// Lstat returns the same information as Stat but follows symbolic links. On file
-	// systems that don't support symbolic links, the behavior is exactly the same as
-	// Stat.
+}
+
+// ReadingLinkingDriver provides a read-only interface for linking features on
+// file systems that support links.
+type ReadingLinkingDriver interface {
+	Readlink(path string) (string, error)
+
+	// Lstat returns the same information as Stat but follows symbolic links.
 	Lstat(path string) (FileStat, error)
 }
 
@@ -139,14 +143,11 @@ type WritingDriver interface {
 	Chmod(path string, mode os.FileMode) error
 	Chown(path string, uid, gid int) error
 	Chtimes(path string, atime time.Time, mtime time.Time) error
-	Lchown(path string, uid, gid int) error
-	Link(oldpath, newpath string) error
 	Mkdir(path string, perm os.FileMode) error
 	MkdirAll(path string, perm os.FileMode) error
 	Remove(path string) error
 	RemoveAll(path string) error
 	Repath(oldpath, newpath string) error
-	Symlink(oldpath, newpath string) error
 	Truncate(path string, size int64) error
 	Create(path string) (*os.File, error)
 	WriteFile(filepath string, data []byte, perm os.FileMode) error
@@ -154,12 +155,21 @@ type WritingDriver interface {
 	Flush() error
 }
 
-// DirectoryEntry represents a file, directory, device, or other entity encountered on
-// the file system. It must implement the os.FileInfo interface but only needs to fill
-// values in Stat for the features it supports. (As far as the os.FileInfo interface goes,
-// drivers only need to implement Name(); all others have default implementations.)
+// WritingLinkingDriver provides a writing interface to linking features on file
+// systems that support links.
+type WritingLinkingDriver interface {
+	Lchown(path string, uid, gid int) error
+	Link(oldpath, newpath string) error
+	Symlink(oldpath, newpath string) error
+}
+
+// DirectoryEntry represents a file, directory, device, or other entity
+// encountered on the file system. It must implement the os.FileInfo interface
+// but only needs to fill values in Stat for the features it supports. (As far
+// as the os.FileInfo interface goes, drivers only need to implement Name(); all
+// others have default implementations.)
 //
-// For recommendations for how to fill the fields in Stat, see Driver.Stat().
+// For recommendations for how to fill the fields in Stat, see ReadingDriver.Stat().
 type DirectoryEntry struct {
 	os.FileInfo
 	name string
@@ -176,8 +186,8 @@ func (d *DirectoryEntry) ModTime() time.Time {
 	return d.Stat.LastModified
 }
 
-// Mode returns the file system mode of the directory as an os.FileMode. If you need more
-// detailed information, see DirectoryEntry.Stat.
+// Mode returns the file system mode of the directory as an os.FileMode. If you
+// need more detailed information, see DirectoryEntry.Stat.
 func (d *DirectoryEntry) Mode() os.FileMode {
 	return os.FileMode(d.Stat.ModeFlags & 0x1ff)
 }
