@@ -12,12 +12,66 @@ type FAT8Driver struct {
 	disko.ReadingDriver
 	disko.WritingDriver
 	disko.FormattingDriver
-	sectorsPerTrack int
-	totalTracks     int
-	infoSectorIndex int
-	image           *os.File
-	stat            disko.FSStat
+	sectorsPerTrack      int
+	totalTracks          int
+	infoSectorIndex      int
+	image                *os.File
+	stat                 disko.FSStat
+	isMounted            bool
+	defaultFileAttrFlags uint8
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// General utility functions
+
+func (driver *FAT8Driver) readSectors(track, sector, count uint) ([]byte, error) {
+	return nil, disko.NewDriverError(disko.ENOSYS)
+}
+
+func (driver *FAT8Driver) writeSectors(track, startSector uint, data []byte) error {
+	return disko.NewDriverError(disko.ENOSYS)
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Implementing Driver interface
+
+func (driver *FAT8Driver) Mount(flags disko.MountFlags) error {
+	// Ignore attempts to mount the drive multiple times.
+	if driver.isMounted {
+		return disko.NewDriverError(disko.EALREADY)
+	}
+
+	offset, err := driver.image.Seek(0, 2)
+	if err != nil {
+		return err
+	}
+
+	if offset == 256256 {
+		driver.sectorsPerTrack = 26
+		driver.totalTracks = 77
+		driver.infoSectorIndex = 19
+	} else if offset == 92160 {
+		driver.sectorsPerTrack = 18
+		driver.totalTracks = 40
+		driver.infoSectorIndex = 12
+	} else {
+		message := fmt.Sprintf(
+			"invalid disk image size; expected 256256 or 92160, got %d",
+			offset)
+		return disko.NewDriverErrorWithMessage(disko.EMEDIUMTYPE, message)
+	}
+
+	// TODO (dargueta): Extract FAT
+
+	return nil
+}
+
+func (driver *FAT8Driver) GetFSInfo() disko.FSStat {
+	return driver.stat
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Implementing FormattingDriver interface
 
 // Format creates a new empty disk image using the given disk information.
 //
@@ -96,10 +150,6 @@ func (driver *FAT8Driver) Format(information disko.FSStat) error {
 	}
 
 	return nil
-}
-
-func (driver *FAT8Driver) GetFSInfo() disko.FSStat {
-	return driver.stat
 }
 
 /*
