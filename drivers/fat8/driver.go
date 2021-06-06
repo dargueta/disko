@@ -12,24 +12,100 @@ type FAT8Driver struct {
 	disko.ReadingDriver
 	disko.WritingDriver
 	disko.FormattingDriver
-	sectorsPerTrack      int
-	totalTracks          int
-	infoSectorIndex      int
+	// image is a file object for the file the disk image is for.
 	image                *os.File
-	stat                 disko.FSStat
-	isMounted            bool
+	// sectorsPerTrack defines the number of sectors in a single track for the
+	// current disk geometry.
+	sectorsPerTrack      uint
+	// totalTracks gives the number of tracks for the current disk geometry.
+	totalTracks          uint
+	// infoSectorIndex is the zero-based index of the "information sector" of a
+	// FAT8 image.
+	//
+	// To my knowledge the FAT8 standard only defines the first byte of this
+	// sector, which is the default attribute byte to use for new files.
+	infoSectorIndex      uint
 	defaultFileAttrFlags uint8
+	stat                 disko.FSStat
+	// freeClusters is an array of the indexes of all unallocated clusters. This
+	// will never be more than 189 entries long.
+	freeClusters         []uint8
+	// fat is the FAT as represented on the disk. It's always a multiple of 128
+	// in length, but only the first totalTracks*2 entries are valid. Anything
+	// beyond that must not be modified.
+	fat                  []uint8
+	// isMounted indicates if the drive is currently mounted.
+	isMounted            bool
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // General utility functions
 
-func (driver *FAT8Driver) readSectors(track, sector, count uint) ([]byte, error) {
-	return nil, disko.NewDriverError(disko.ENOSYS)
+func (driver *FAT8Driver) trackAndSectorToFileOffset(track, sector uint) (int64, error) {
+	if track >= driver.totalTracks {
+		return -1,
+			disko.NewDriverErrorWithMessage(
+				disko.EINVAL,
+				fmt.Sprintf(
+					"invalid track number: %d not in [0, %d)",
+					track,
+					driver.totalTracks,
+				),
+			)
+	}
+	if sector >= driver.sectorsPerTrack {
+		return -1,
+			disko.NewDriverErrorWithMessage(
+				disko.EINVAL,
+				fmt.Sprintf(
+					"invalid sector number: %d not in [0, %d)",
+					sector,
+					driver.sectorsPerTrack,
+				),
+			)
+	}
+
+	absoluteSector := (track * driver.sectorsPerTrack) + sector
+	return int64(absoluteSector * 128), nil
 }
 
-func (driver *FAT8Driver) writeSectors(track, startSector uint, data []byte) error {
-	return disko.NewDriverError(disko.ENOSYS)
+func (driver *FAT8Driver) readSectors(track, sector, count uint) ([]byte, error) {
+	offset, err := driver.trackAndSectorToFileOffset(track, sector)
+	if err != nil {
+		return nil, err
+	}
+
+	buffer := make([]byte, 128*count)
+
+	driver.image.ReadAt(buffer, offset)
+	_, err = driver.image.Read(buffer)
+	if err != nil {
+		return nil, err
+	}
+	return buffer, nil
+}
+
+func (driver *FAT8Driver) writeSectors(track, sector uint, data []byte) error {
+	offset, err := driver.trackAndSectorToFileOffset(track, sector)
+	if err != nil {
+		return err
+	}
+
+	imageSize := driver.stat.TotalBlocks * 128
+	if uint64(offset)+uint64(len(data)) >= imageSize {
+		return disko.NewDriverErrorWithMessage(
+			disko.EINVAL,
+			fmt.Sprintf(
+				"can't write %d bytes at track %d, sector %d: extends past end of image",
+				len(data),
+				track,
+				sector,
+			),
+		)
+	}
+
+	_, err = driver.image.WriteAt(data, offset)
+	return err
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -61,10 +137,74 @@ func (driver *FAT8Driver) Mount(flags disko.MountFlags) error {
 		return disko.NewDriverErrorWithMessage(disko.EMEDIUMTYPE, message)
 	}
 
-	// TODO (dargueta): Extract FAT
+	// Each track is two clusters, so the number of entries in the FAT is two
+	// times the number of tracks. Each entry is one byte, so if we do a ceiling
+	// division of the number of bytes in a FAT by 128, we'll get the FAT size
+	// in sectors.
+	//
+	totalClusters := int(driver.totalTracks * 2)
+	fatSizeInSectors := uint((totalClusters + (-totalClusters % 128)) / 128)
+	directoryTrack := driver.totalTracks / 2
+
+	// There are three copies of the FAT at the end of the directory track. Read
+	// each one and ensure they're all identical. If they're not, that's likely
+	// an indicator of disk corruption.
+	firstFAT, err := driver.readSectors(
+		directoryTrack,
+		driver.sectorsPerTrack-(fatSizeInSectors*3),
+		fatSizeInSectors)
+	if err != nil {
+		return err
+	}
+
+	secondFAT, err := driver.readSectors(
+		directoryTrack,
+		driver.sectorsPerTrack-(fatSizeInSectors*3),
+		fatSizeInSectors)
+	if err != nil {
+		return err
+	}
+
+	thirdFAT, err := driver.readSectors(
+		directoryTrack,
+		driver.sectorsPerTrack-(fatSizeInSectors*3),
+		fatSizeInSectors)
+	if err != nil {
+		return err
+	}
+
+	if !bytes.Equal(firstFAT, secondFAT) {
+		return disko.NewDriverErrorWithMessage(
+			disko.EUCLEAN,
+			"disk corruption detected: FAT copy 1 differs from FAT copy 2")
+	} else if !bytes.Equal(firstFAT, thirdFAT) {
+		return disko.NewDriverErrorWithMessage(
+			disko.EUCLEAN,
+			"disk corruption detected: FAT copy 1 differs from FAT copy 3")
+	}
+
+	// All FATs are identical, so we only need to store the first one.
+	driver.fat = firstFAT
+
+	// Build a list of all currently free clusters.
+	for i, clusterNumber := range firstFAT {
+		if clusterNumber == 0xff {
+			driver.freeClusters = append(driver.freeClusters, uint8(i))
+		}
+	}
+
+	// Get the info sector. The first byte of the info sector tells us what the
+	// default attributes should be for new files; the rest is undefined.
+	infoSector, err := driver.readSectors(directoryTrack, driver.infoSectorIndex, 1)
+	if err != nil {
+		return err
+	}
+	driver.defaultFileAttrFlags = infoSector[0]
 
 	return nil
 }
+
+// TODO (dargueta): Unmount()
 
 func (driver *FAT8Driver) GetFSInfo() disko.FSStat {
 	return driver.stat
@@ -95,31 +235,29 @@ func (driver *FAT8Driver) Format(information disko.FSStat) error {
 	// Create a blank image filled with null bytes
 	driver.image.Seek(0, 0)
 	driver.image.Truncate(0)
-	driver.image.Write(bytes.Repeat([]byte{0}, int(128*driver.sectorsPerTrack*driver.totalTracks)))
-	trackSize := 128 * driver.sectorsPerTrack
-
-	// The directory track is in the middle of the disk.
-	directoryTrackNumber := driver.totalTracks / 2
-	directoryTrackStart := trackSize * directoryTrackNumber
+	driver.image.Write(
+		bytes.Repeat([]byte{0}, int(128*driver.sectorsPerTrack*driver.totalTracks)))
 
 	// There are two clusters per track, so the size of the FAT is one byte per
 	// cluster plus some padding bytes to get to a multiple of the sector size.
-	fatSizeInBytes := int(driver.totalTracks * 2)
-	if fatSizeInBytes%128 != 0 {
-		fatSizeInBytes += 128 - (fatSizeInBytes % 128)
-	}
+	totalClusters := int(driver.totalTracks * 2)
+	fatSizeInSectors := (totalClusters + (-totalClusters % -128)) / 128
+
+	// The directory track is in the middle of the disk.
+	directoryTrackNumber := driver.totalTracks / 2
 
 	// Construct a single copy of the FAT, and mark the directory track as
 	// reserved by putting 0xFE in the cluster entry. (It's always the middle
 	// track.)
-	fat := bytes.Repeat([]byte{0xff}, fatSizeInBytes)
+	fat := bytes.Repeat([]byte{0xff}, fatSizeInSectors*128)
 	fat[directoryTrackNumber*2] = 0xfe
 	fat[directoryTrackNumber*2+1] = 0xfe
 
+	allFATs := bytes.Repeat(fat, 3)
+
 	// Write the FATs
-	fatStart := directoryTrackStart + trackSize - (3 * fatSizeInBytes)
-	driver.image.Seek(int64(fatStart), 0)
-	_, err := driver.image.Write(bytes.Repeat(fat, 3))
+	fatStart := driver.sectorsPerTrack - uint(fatSizeInSectors*3)
+	err := driver.writeSectors(directoryTrackNumber, fatStart, allFATs)
 
 	if err != nil {
 		return err
@@ -131,8 +269,9 @@ func (driver *FAT8Driver) Format(information disko.FSStat) error {
 
 	// The maximum number of files is:
 	// (SectorsPerTrack - 1 - (FatSizeInSectors * 3)) * DirentsPerSector
-	// A directory entry is 16 bytes, so there are 8 dirents per sector
-	direntSectors := driver.sectorsPerTrack - 1 - ((fatSizeInBytes * 3) / 128)
+	//   * We subtract one for the information sector.
+	//   * A directory entry is 16 bytes, so there are 8 dirents per sector.
+	direntSectors := driver.sectorsPerTrack - 1 - uint(fatSizeInSectors*3)
 	totalDirents := direntSectors * 8
 
 	driver.stat = disko.FSStat{
