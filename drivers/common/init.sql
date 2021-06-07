@@ -9,8 +9,7 @@ CREATE TABLE inodes (
     t_deleted DATETIME,
 	uid INTEGER,
 	gid INTEGER,
-	mode_flags INTEGER,
-    unix_flags INTEGER
+	mode_flags INTEGER
 );
 
 
