@@ -118,7 +118,7 @@ type OpeningDriver interface {
 type ReadingDriver interface {
 	SameFile(fi1, fi2 os.FileInfo) bool
 	Open(path string) (*os.File, error)
-	ReadDir(path string) ([]os.FileInfo, error)
+	ReadDir(path string) ([]DirectoryEntry, error)
 	// ReadFile return the contents of the file at the given path.
 	ReadFile(path string) ([]byte, error)
 	// Stat returns information about the directory entry at the given path.
@@ -172,13 +172,7 @@ type WritingLinkingDriver interface {
 // For recommendations for how to fill the fields in Stat, see ReadingDriver.Stat().
 type DirectoryEntry struct {
 	os.FileInfo
-	name string
 	Stat FileStat
-}
-
-// Name returns the base name of the directory entry on the file system.
-func (d *DirectoryEntry) Name() string {
-	return d.name
 }
 
 // ModTime returns the timestamp of the DirectoryEntry.
