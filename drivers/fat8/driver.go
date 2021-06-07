@@ -335,7 +335,6 @@ func (driver *FAT8Driver) SameFile(fi1, fi2 os.FileInfo) bool {
 // TODO(dargueta): Open(path string) (*os.File, error)
 // TODO(dargueta): ReadDir(path string) ([]DirectoryEntry, error)
 // TODO(dargueta): ReadFile(path string) ([]byte, error)
-// TODO(dargueta): Stat(path string) (FileStat, error)
 
 func (driver *FAT8Driver) Stat(path string) (disko.FileStat, error) {
 	normalizedPath := strings.ToUpper(path)
@@ -349,17 +348,33 @@ func (driver *FAT8Driver) Stat(path string) (disko.FileStat, error) {
 		return disko.FileStat{}, disko.NewDriverError(disko.ENOENT)
 	}
 
+	// Cluster size is fixed at two clusters per track. Since we know the number
+	// of sectors per track, we can determine the number of sectors used by the
+	// whole clusters. Keep in mind, though, that the last cluster may only be
+	// partially used.
+	clusterSectorsUsed := uint(len(info.clusters)) * driver.sectorsPerTrack / 2
+	totalSectors := clusterSectorsUsed - info.UnusedSectorsInLastCluster
+
+	// If the file is binary, then the size is totalSectors because binary files
+	// by definition must be a multiple of the sector size.
+
+	var size int64
+	if info.IsBinary {
+		size = int64(totalSectors) * 128
+	} else {
+		// TODO(dargueta): Handle text files
+		err := disko.NewDriverErrorWithMessage(disko.ENOSYS, "text files not supported yet")
+		return disko.FileStat{}, err
+	}
+
 	return disko.FileStat{
 		DeviceID:    0,
-		InodeNumber: uint(info.index),
+		InodeNumber: uint64(info.index),
 		Nlinks:      1,
-		// TODO: ModeFlags
-		Uid:  0,
-		Gid:  0,
-		Rdev: 0,
-		// TODO: Size
-		BlockSize: 128,
-		// TODO: Blocks
+		ModeFlags:   0o777,
+		Size:        size,
+		BlockSize:   128,
+		Blocks:      int64(clusterSectorsUsed - info.UnusedSectorsInLastCluster),
 	}, nil
 }
 
@@ -367,9 +382,6 @@ func (driver *FAT8Driver) Stat(path string) (disko.FileStat, error) {
 
 // FormattingDriver is the interface for drivers capable of creating new disk
 // images.
-type FormattingDriver interface {
-	Format(information FSStat) error
-}
 
 // OpeningDriver is the interface for drivers implementing the POSIX open(3) function.
 //
