@@ -178,7 +178,7 @@ func (driver *FAT8Driver) readFATs() ([]byte, error) {
 
 	secondFAT, err := driver.readSectors(
 		directoryTrack,
-		driver.sectorsPerTrack-(fatSizeInSectors*3),
+		driver.sectorsPerTrack-(fatSizeInSectors*2),
 		fatSizeInSectors)
 	if err != nil {
 		return nil, err
@@ -186,7 +186,7 @@ func (driver *FAT8Driver) readFATs() ([]byte, error) {
 
 	thirdFAT, err := driver.readSectors(
 		directoryTrack,
-		driver.sectorsPerTrack-(fatSizeInSectors*3),
+		driver.sectorsPerTrack-fatSizeInSectors,
 		fatSizeInSectors)
 	if err != nil {
 		return nil, err
