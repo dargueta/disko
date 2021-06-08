@@ -1,12 +1,14 @@
+PRAGMA foreign_keys = ON;
+
 CREATE TABLE inodes (
 	id INTEGER PRIMARY KEY,
 	size BIGINT DEFAULT 0,
 	nlinks INTEGER DEFAULT 1,
-    t_created DATETIME,
-	t_accessed DATETIME,
-	t_modified DATETIME,
-    t_changed DATETIME,
-    t_deleted DATETIME,
+	t_created TEXT,
+	t_accessed TEXT,
+	t_modified TEXT,
+	t_changed TEXT,
+	t_deleted TEXT,
 	uid INTEGER,
 	gid INTEGER,
 	mode_flags INTEGER
