@@ -32,6 +32,8 @@ type FAT8Driver struct {
 	sectorsPerTrack uint
 	// totalTracks gives the number of tracks for the current disk geometry.
 	totalTracks uint
+	// bytesPerCluster gives the number of bytes in a single cluster.
+	bytesPerCluster uint
 	// infoSectorIndex is the zero-based index of the "information sector" of a
 	// FAT8 image.
 	//
@@ -99,6 +101,17 @@ func (driver *FAT8Driver) readSectors(track, sector, count uint) ([]byte, error)
 	return buffer, nil
 }
 
+func (driver *FAT8Driver) ReadCluster(clusterID uint) ([]byte, error) {
+	if (clusterID < 1) || (clusterID >= 0xc0) {
+		return nil,
+			fmt.Errorf("bad cluster number: %#x not in [1, 0xc0)", clusterID)
+	}
+	track := (clusterID - 1) / 2
+	trackCluster := (clusterID - 1) % 2
+	startingSector := trackCluster * driver.sectorsPerTrack / 2
+	return driver.readSectors(track, startingSector, driver.sectorsPerTrack/2)
+}
+
 func (driver *FAT8Driver) writeSectors(track, sector uint, data []byte) error {
 	offset, err := driver.trackAndSectorToFileOffset(track, sector)
 	if err != nil {
@@ -120,6 +133,25 @@ func (driver *FAT8Driver) writeSectors(track, sector uint, data []byte) error {
 
 	_, err = driver.image.WriteAt(data, offset)
 	return err
+}
+
+// WriteCluster writes bytes to the given cluster. `data` must be exactly the
+// size of a cluster.
+func (driver *FAT8Driver) WriteCluster(clusterID uint, data []byte) error {
+	if (clusterID < 1) || (clusterID >= 0xc0) {
+		return fmt.Errorf("bad cluster number: %#x not in [1, 0xc0)", clusterID)
+	}
+	if len(data) != int(driver.bytesPerCluster) {
+		return fmt.Errorf(
+			"data to write is the wrong size: expected %d, got %d",
+			driver.bytesPerCluster,
+			len(data))
+	}
+
+	track := (clusterID - 1) / 2
+	trackCluster := (clusterID - 1) % 2
+	startingSector := trackCluster * driver.sectorsPerTrack / 2
+	return driver.writeSectors(track, startingSector, data)
 }
 
 func (driver *FAT8Driver) readFATs() ([]byte, error) {
@@ -201,6 +233,8 @@ func (driver *FAT8Driver) Mount(flags disko.MountFlags) error {
 			offset)
 		return disko.NewDriverErrorWithMessage(disko.EMEDIUMTYPE, message)
 	}
+
+	driver.bytesPerCluster = driver.sectorsPerTrack * 64
 
 	// All FATs are identical, so we only need to store the first one.
 	fat, err := driver.readFATs()
