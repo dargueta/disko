@@ -7,9 +7,11 @@ import (
 	"github.com/dargueta/disko"
 )
 
-func (driver *Driver) trackAndSectorToFileOffset(track, sector uint) (int64, error) {
+// BLOCK-LEVEL ACCESS ==========================================================
+
+func (driver *Driver) TrackAndSectorToBlock(track uint, sector PhysicalBlock) (PhysicalBlock, error) {
 	if track >= driver.totalTracks {
-		return -1,
+		return 0,
 			disko.NewDriverErrorWithMessage(
 				disko.EINVAL,
 				fmt.Sprintf(
@@ -19,8 +21,8 @@ func (driver *Driver) trackAndSectorToFileOffset(track, sector uint) (int64, err
 				),
 			)
 	}
-	if sector >= driver.sectorsPerTrack {
-		return -1,
+	if uint(sector) >= driver.sectorsPerTrack {
+		return 0,
 			disko.NewDriverErrorWithMessage(
 				disko.EINVAL,
 				fmt.Sprintf(
@@ -31,65 +33,83 @@ func (driver *Driver) trackAndSectorToFileOffset(track, sector uint) (int64, err
 			)
 	}
 
-	absoluteSector := (track * driver.sectorsPerTrack) + sector
-	return int64(absoluteSector * 128), nil
+	return PhysicalBlock(track*driver.sectorsPerTrack) + sector, nil
 }
 
-func (driver *Driver) readSectors(track, sector, count uint) ([]byte, error) {
-	offset, err := driver.trackAndSectorToFileOffset(track, sector)
-	if err != nil {
-		return nil, err
+func (driver *Driver) ReadDiskBlocks(start PhysicalBlock, count uint) ([]byte, error) {
+	if (uint(start) + count) >= uint(driver.stat.TotalBlocks) {
+		return nil, fmt.Errorf(
+			"refusing to read past end of image: %d blocks at %d exceeds limit of %d",
+			start,
+			count,
+			driver.stat.TotalBlocks,
+		)
 	}
 
 	buffer := make([]byte, 128*count)
-
-	driver.image.ReadAt(buffer, offset)
-	_, err = driver.image.Read(buffer)
+	_, err := driver.image.ReadAt(buffer, int64(start)*128)
 	if err != nil {
 		return nil, err
 	}
 	return buffer, nil
 }
 
-func (driver *Driver) ReadCluster(clusterID uint) ([]byte, error) {
-	if (clusterID < 1) || (clusterID >= 0xc0) {
-		return nil,
-			fmt.Errorf("bad cluster number: %#x not in [1, 0xc0)", clusterID)
-	}
-	track := (clusterID - 1) / 2
-	trackCluster := (clusterID - 1) % 2
-	startingSector := trackCluster * driver.sectorsPerTrack / 2
-	return driver.readSectors(track, startingSector, driver.sectorsPerTrack/2)
-}
-
-func (driver *Driver) writeSectors(track, sector uint, data []byte) error {
-	offset, err := driver.trackAndSectorToFileOffset(track, sector)
-	if err != nil {
-		return err
-	}
-
-	imageSize := driver.stat.TotalBlocks * 128
-	if uint64(offset)+uint64(len(data)) >= imageSize {
+func (driver *Driver) WriteDiskBlocks(start PhysicalBlock, data []byte) error {
+	if len(data)%128 != 0 {
 		return disko.NewDriverErrorWithMessage(
-			disko.EINVAL,
+			disko.EIO,
+			fmt.Sprintf("data buffer must be a multiple of 128 bytes, got %d", len(data)),
+		)
+	}
+
+	numBlocksToWrite := uint64(len(data) / 128)
+	if uint64(start)+numBlocksToWrite >= driver.stat.TotalBlocks {
+		return disko.NewDriverErrorWithMessage(
+			disko.EIO,
 			fmt.Sprintf(
-				"can't write %d bytes at track %d, sector %d: extends past end of image",
-				len(data),
-				track,
-				sector,
+				"refusing to write past end of image: %d blocks at %d exceeds limit of %d",
+				numBlocksToWrite,
+				start,
+				driver.stat.TotalBlocks,
 			),
 		)
 	}
 
-	_, err = driver.image.WriteAt(data, offset)
+	_, err := driver.image.WriteAt(data, int64(start)*128)
 	return err
 }
 
-// WriteCluster writes bytes to the given cluster. `data` must be exactly the
-// size of a cluster.
-func (driver *Driver) WriteCluster(clusterID uint, data []byte) error {
-	if (clusterID < 1) || (clusterID >= 0xc0) {
-		return fmt.Errorf("bad cluster number: %#x not in [1, 0xc0)", clusterID)
+// CLUSTER-LEVEL ACCESS ========================================================
+
+// IsValidCluster returns a boolean indicating whether the given cluster number
+// is valid for this disk image.
+func (driver *Driver) IsValidCluster(clusterID PhysicalCluster) bool {
+	return (clusterID >= 1) && (uint(clusterID) <= driver.totalTracks*2)
+}
+
+func MakeInvalidClusterError(cluster PhysicalCluster, totalTracks uint) error {
+	return fmt.Errorf(
+		"bad cluster number: %#02x not in range [1, %#02x]",
+		cluster,
+		totalTracks*2)
+}
+
+// ReadAbsoluteCluster reads the given cluster from the disk. `clusterID` must
+// be valid, as determined by IsValidCluster().
+func (driver *Driver) ReadAbsoluteCluster(clusterID PhysicalCluster) ([]byte, error) {
+	if !driver.IsValidCluster(clusterID) {
+		return nil, MakeInvalidClusterError(clusterID, driver.totalTracks)
+	}
+	sectorsPerCluster := driver.sectorsPerTrack / 2
+	block := uint(clusterID) * sectorsPerCluster
+	return driver.ReadDiskBlocks(PhysicalBlock(block), sectorsPerCluster)
+}
+
+// WriteAbsoluteCluster writes bytes to the given cluster. `data` must be exactly
+// the size of a cluster.
+func (driver *Driver) WriteAbsoluteCluster(clusterID PhysicalCluster, data []byte) error {
+	if !driver.IsValidCluster(clusterID) {
+		return MakeInvalidClusterError(clusterID, driver.totalTracks)
 	}
 	if len(data) != int(driver.bytesPerCluster) {
 		return fmt.Errorf(
@@ -98,46 +118,30 @@ func (driver *Driver) WriteCluster(clusterID uint, data []byte) error {
 			len(data))
 	}
 
-	track := (clusterID - 1) / 2
-	trackCluster := (clusterID - 1) % 2
-	startingSector := trackCluster * driver.sectorsPerTrack / 2
-	return driver.writeSectors(track, startingSector, data)
+	physicalBlock := uint(clusterID) * driver.sectorsPerTrack
+	return driver.WriteDiskBlocks(PhysicalBlock(physicalBlock), data)
 }
 
-func (driver *Driver) readFATs() ([]byte, error) {
-	// The directory track is always the middle one in the disk.
-	directoryTrack := driver.totalTracks / 2
-
-	// Each track is two clusters, so the number of entries in the FAT is two
-	// times the number of tracks. Each entry is one byte, so if we do a ceiling
-	// division of the number of bytes in a FAT by 128, we'll get the FAT size
-	// in sectors.
-	totalClusters := int(driver.totalTracks * 2)
-	fatSizeInSectors := uint((totalClusters + (-totalClusters % 128)) / 128)
-
+func (driver *Driver) GetFAT() ([]byte, error) {
 	// There are three copies of the FAT at the end of the directory track. Read
 	// each one and ensure they're all identical. If they're not, that's likely
 	// an indicator of disk corruption.
-	firstFAT, err := driver.readSectors(
-		directoryTrack,
-		driver.sectorsPerTrack-(fatSizeInSectors*3),
-		fatSizeInSectors)
+	firstFAT, err := driver.ReadDiskBlocks(
+		driver.fatsStart, driver.fatSizeInSectors)
 	if err != nil {
 		return nil, err
 	}
 
-	secondFAT, err := driver.readSectors(
-		directoryTrack,
-		driver.sectorsPerTrack-(fatSizeInSectors*2),
-		fatSizeInSectors)
+	secondFAT, err := driver.ReadDiskBlocks(
+		driver.fatsStart+PhysicalBlock(driver.fatSizeInSectors),
+		driver.fatSizeInSectors)
 	if err != nil {
 		return nil, err
 	}
 
-	thirdFAT, err := driver.readSectors(
-		directoryTrack,
-		driver.sectorsPerTrack-fatSizeInSectors,
-		fatSizeInSectors)
+	thirdFAT, err := driver.ReadDiskBlocks(
+		driver.fatsStart+PhysicalBlock(2*driver.fatSizeInSectors),
+		driver.fatSizeInSectors)
 	if err != nil {
 		return nil, err
 	}
@@ -153,4 +157,21 @@ func (driver *Driver) readFATs() ([]byte, error) {
 	}
 
 	return firstFAT, nil
+}
+
+// FILE-LEVEL ACCESS ===========================================================
+
+func (driver *Driver) ReadFileCluster(dirent *DirectoryEntry, cluster LogicalCluster) ([]byte, error) {
+	if int(cluster) >= len(dirent.clusters) {
+		return nil, fmt.Errorf(
+			"cluster index out of bounds: %d not in [0, %d)",
+			cluster,
+			len(dirent.clusters),
+		)
+	}
+
+	physicalCluster := dirent.clusters[cluster]
+	sectorsPerCluster := driver.sectorsPerTrack / 2
+	physicalBlock := PhysicalBlock(uint(physicalCluster) * sectorsPerCluster)
+	return driver.ReadDiskBlocks(physicalBlock, sectorsPerCluster)
 }

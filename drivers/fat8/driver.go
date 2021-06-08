@@ -7,10 +7,15 @@ import (
 	"github.com/dargueta/disko"
 )
 
+type LogicalBlock uint
+type PhysicalBlock uint
+type LogicalCluster uint
+type PhysicalCluster uint
+
 type DirectoryEntry struct {
 	disko.DirectoryEntry
 	name                       string
-	clusters                   []uint8
+	clusters                   []PhysicalCluster
 	index                      uint
 	IsBinary                   bool
 	IsEBCDIC                   bool
@@ -37,7 +42,11 @@ type Driver struct {
 	//
 	// To my knowledge the FAT8 standard only defines the first byte of this
 	// sector, which is the default attribute byte to use for new files.
-	infoSectorIndex      uint
+	infoSectorStart      PhysicalBlock
+	directoryTrackStart  PhysicalBlock
+	fatsStart            PhysicalBlock
+	fatSizeInSectors     uint
+	totalClusters        uint
 	defaultFileAttrFlags uint8
 	stat                 disko.FSStat
 	// freeClusters is an array of the indexes of all unallocated clusters. This
@@ -50,6 +59,38 @@ type Driver struct {
 	// isMounted indicates if the drive is currently mounted.
 	isMounted bool
 	dirents   map[string]DirectoryEntry
+}
+
+func (driver *Driver) defineGeometry(totalBlocks uint) error {
+	if totalBlocks == 256256 {
+		driver.sectorsPerTrack = 26
+		driver.totalTracks = 77
+	} else if totalBlocks == 92160 {
+		driver.sectorsPerTrack = 18
+		driver.totalTracks = 40
+	} else {
+		message := fmt.Sprintf(
+			"invalid disk image size; expected 256256 or 92160, got %d",
+			totalBlocks,
+		)
+		return disko.NewDriverErrorWithMessage(disko.EMEDIUMTYPE, message)
+	}
+
+	// There are two clusters per track, so the size of the FAT is one byte per
+	// cluster plus some padding bytes to get to a multiple of the sector size.
+	totalClusters := int(driver.totalTracks * 2)
+	fatSizeInSectors := uint((totalClusters + (-totalClusters % 128)) / 128)
+
+	directoryTrackStart := driver.totalTracks / 2 * driver.sectorsPerTrack
+	fatsStart := uint(driver.directoryTrackStart) + driver.sectorsPerTrack - fatSizeInSectors
+
+	driver.directoryTrackStart = PhysicalBlock(directoryTrackStart)
+	driver.fatSizeInSectors = fatSizeInSectors
+	driver.fatsStart = PhysicalBlock(fatsStart)
+	driver.infoSectorStart = driver.fatsStart - 1
+	driver.totalClusters = uint(totalClusters)
+	driver.bytesPerCluster = (driver.sectorsPerTrack / 2) * 128
+	return nil
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -66,25 +107,10 @@ func (driver *Driver) Mount(flags disko.MountFlags) error {
 		return err
 	}
 
-	if offset == 256256 {
-		driver.sectorsPerTrack = 26
-		driver.totalTracks = 77
-		driver.infoSectorIndex = 19
-	} else if offset == 92160 {
-		driver.sectorsPerTrack = 18
-		driver.totalTracks = 40
-		driver.infoSectorIndex = 12
-	} else {
-		message := fmt.Sprintf(
-			"invalid disk image size; expected 256256 or 92160, got %d",
-			offset)
-		return disko.NewDriverErrorWithMessage(disko.EMEDIUMTYPE, message)
-	}
-
-	driver.bytesPerCluster = driver.sectorsPerTrack * 64
+	driver.defineGeometry(uint(offset))
 
 	// All FATs are identical, so we only need to store the first one.
-	fat, err := driver.readFATs()
+	fat, err := driver.GetFAT()
 	if err != nil {
 		return err
 	}
@@ -97,13 +123,10 @@ func (driver *Driver) Mount(flags disko.MountFlags) error {
 		}
 	}
 
-	// The directory track is always the middle one in the disk.
-	directoryTrack := driver.totalTracks / 2
-
-	// Get the info sector, which is always at a fixed location in the directory
-	// track. The first byte of the info sector tells us what the default
-	// attributes should be for new files; the rest is not defined by the standard.
-	infoSector, err := driver.readSectors(directoryTrack, driver.infoSectorIndex, 1)
+	// Get the info sector, which always immediately precedes the FATs. The first
+	// byte of the info sector tells us what the default attributes should be for
+	// new files; the rest is not defined by the standard.
+	infoSector, err := driver.ReadDiskBlocks(driver.infoSectorStart, 1)
 	if err != nil {
 		return err
 	}

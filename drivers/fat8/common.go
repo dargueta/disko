@@ -1,16 +1,17 @@
 package fat8
 
 import (
+	"bytes"
 	"fmt"
 	"strings"
 
 	"github.com/dargueta/disko"
 )
 
-// SerializeName converts a filename string to its on-disk representation. The
+// FilenameToBytes converts a filename string to its on-disk representation. The
 // returned name will be normalized to uppercase.
-// TODO(dargueta): Add validation to ensure the filename has no invalid characters.
-func SerializeName(name string) ([]byte, error) {
+// TODO(dargueta): Ensure the filename has no invalid characters.
+func FilenameToBytes(name string) ([]byte, error) {
 	parts := strings.SplitN(name, ".", 1)
 
 	// Unless we got an empty string, this will always have at least one element,
@@ -43,4 +44,19 @@ func SerializeName(name string) ([]byte, error) {
 	}
 
 	return []byte(strings.ToUpper(paddedName)), nil
+}
+
+// BytesToFilename converts the on-disk representation of a filename into its
+// user-friendly form.
+func BytesToFilename(rawName []byte) string {
+	stem := bytes.TrimRight(rawName[:6], " ")
+	extension := bytes.TrimRight(rawName[6:], " ")
+
+	var name string
+	if len(extension) > 0 {
+		name = string(stem) + "." + string(extension)
+	} else {
+		name = string(stem)
+	}
+	return strings.ToUpper(name)
 }

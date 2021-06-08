@@ -2,7 +2,6 @@ package fat8
 
 import (
 	"bytes"
-	"fmt"
 
 	"github.com/dargueta/disko"
 )
@@ -21,18 +20,9 @@ func (driver *Driver) Format(information disko.FSStat) error {
 			"image must be unmounted before it can be formatted")
 	}
 
-	if information.TotalBlocks == 2002 {
-		driver.sectorsPerTrack = 26
-		driver.totalTracks = 77
-		driver.infoSectorIndex = 19
-	} else if information.TotalBlocks == 720 {
-		driver.sectorsPerTrack = 18
-		driver.totalTracks = 40
-		driver.infoSectorIndex = 12
-	} else {
-		return fmt.Errorf(
-			"invalid format configuration: TotalBlocks must be 2002 or 720, got %d",
-			information.TotalBlocks)
+	err := driver.defineGeometry(uint(information.TotalBlocks))
+	if err != nil {
+		return err
 	}
 
 	// Create a blank image filled with null bytes
@@ -41,26 +31,18 @@ func (driver *Driver) Format(information disko.FSStat) error {
 	driver.image.Truncate(int64(fileSize))
 	driver.image.Write(bytes.Repeat([]byte{0}, int(fileSize)))
 
-	// There are two clusters per track, so the size of the FAT is one byte per
-	// cluster plus some padding bytes to get to a multiple of the sector size.
-	totalClusters := int(driver.totalTracks * 2)
-	fatSizeInSectors := (totalClusters + (-totalClusters % -128)) / 128
-
-	// The directory track is in the middle of the disk.
-	directoryTrackNumber := driver.totalTracks / 2
-
 	// Construct a single copy of the FAT, and mark the directory track as
 	// reserved by putting 0xFE in the cluster entry. (It's always the middle
 	// track.)
-	fat := bytes.Repeat([]byte{0xff}, fatSizeInSectors*128)
+	directoryTrackNumber := (driver.totalTracks / 2) - 1
+	fat := bytes.Repeat([]byte{0xff}, int(driver.fatSizeInSectors)*128)
 	fat[directoryTrackNumber*2] = 0xfe
 	fat[directoryTrackNumber*2+1] = 0xfe
 
 	allFATs := bytes.Repeat(fat, 3)
 
 	// Write the FATs
-	fatStart := driver.sectorsPerTrack - uint(fatSizeInSectors*3)
-	err := driver.writeSectors(directoryTrackNumber, fatStart, allFATs)
+	err = driver.WriteDiskBlocks(driver.fatsStart, allFATs)
 
 	if err != nil {
 		return err
@@ -74,7 +56,7 @@ func (driver *Driver) Format(information disko.FSStat) error {
 	// (SectorsPerTrack - 1 - (FatSizeInSectors * 3)) * DirentsPerSector
 	//   * We subtract one for the information sector.
 	//   * A directory entry is 16 bytes, so there are 8 dirents per sector.
-	direntSectors := driver.sectorsPerTrack - 1 - uint(fatSizeInSectors*3)
+	direntSectors := driver.sectorsPerTrack - 1 - (driver.fatSizeInSectors * 3)
 	totalDirents := direntSectors * 8
 
 	driver.stat = disko.FSStat{
