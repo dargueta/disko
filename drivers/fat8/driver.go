@@ -9,7 +9,7 @@ import (
 	"github.com/dargueta/disko"
 )
 
-type FAT8FileInfo struct {
+type DirectoryEntry struct {
 	disko.DirectoryEntry
 	name                       string
 	clusters                   []uint8
@@ -21,7 +21,7 @@ type FAT8FileInfo struct {
 	UnusedSectorsInLastCluster uint
 }
 
-type FAT8Driver struct {
+type Driver struct {
 	disko.ReadingDriver
 	disko.WritingDriver
 	disko.FormattingDriver
@@ -51,13 +51,13 @@ type FAT8Driver struct {
 	fat []uint8
 	// isMounted indicates if the drive is currently mounted.
 	isMounted bool
-	dirents   map[string]FAT8FileInfo
+	dirents   map[string]DirectoryEntry
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // General utility functions
 
-func (driver *FAT8Driver) trackAndSectorToFileOffset(track, sector uint) (int64, error) {
+func (driver *Driver) trackAndSectorToFileOffset(track, sector uint) (int64, error) {
 	if track >= driver.totalTracks {
 		return -1,
 			disko.NewDriverErrorWithMessage(
@@ -85,7 +85,7 @@ func (driver *FAT8Driver) trackAndSectorToFileOffset(track, sector uint) (int64,
 	return int64(absoluteSector * 128), nil
 }
 
-func (driver *FAT8Driver) readSectors(track, sector, count uint) ([]byte, error) {
+func (driver *Driver) readSectors(track, sector, count uint) ([]byte, error) {
 	offset, err := driver.trackAndSectorToFileOffset(track, sector)
 	if err != nil {
 		return nil, err
@@ -101,7 +101,7 @@ func (driver *FAT8Driver) readSectors(track, sector, count uint) ([]byte, error)
 	return buffer, nil
 }
 
-func (driver *FAT8Driver) ReadCluster(clusterID uint) ([]byte, error) {
+func (driver *Driver) ReadCluster(clusterID uint) ([]byte, error) {
 	if (clusterID < 1) || (clusterID >= 0xc0) {
 		return nil,
 			fmt.Errorf("bad cluster number: %#x not in [1, 0xc0)", clusterID)
@@ -112,7 +112,7 @@ func (driver *FAT8Driver) ReadCluster(clusterID uint) ([]byte, error) {
 	return driver.readSectors(track, startingSector, driver.sectorsPerTrack/2)
 }
 
-func (driver *FAT8Driver) writeSectors(track, sector uint, data []byte) error {
+func (driver *Driver) writeSectors(track, sector uint, data []byte) error {
 	offset, err := driver.trackAndSectorToFileOffset(track, sector)
 	if err != nil {
 		return err
@@ -137,7 +137,7 @@ func (driver *FAT8Driver) writeSectors(track, sector uint, data []byte) error {
 
 // WriteCluster writes bytes to the given cluster. `data` must be exactly the
 // size of a cluster.
-func (driver *FAT8Driver) WriteCluster(clusterID uint, data []byte) error {
+func (driver *Driver) WriteCluster(clusterID uint, data []byte) error {
 	if (clusterID < 1) || (clusterID >= 0xc0) {
 		return fmt.Errorf("bad cluster number: %#x not in [1, 0xc0)", clusterID)
 	}
@@ -154,7 +154,7 @@ func (driver *FAT8Driver) WriteCluster(clusterID uint, data []byte) error {
 	return driver.writeSectors(track, startingSector, data)
 }
 
-func (driver *FAT8Driver) readFATs() ([]byte, error) {
+func (driver *Driver) readFATs() ([]byte, error) {
 	// The directory track is always the middle one in the disk.
 	directoryTrack := driver.totalTracks / 2
 
@@ -208,7 +208,7 @@ func (driver *FAT8Driver) readFATs() ([]byte, error) {
 ////////////////////////////////////////////////////////////////////////////////
 // Implementing Driver interface
 
-func (driver *FAT8Driver) Mount(flags disko.MountFlags) error {
+func (driver *Driver) Mount(flags disko.MountFlags) error {
 	// Ignore attempts to mount the drive multiple times.
 	if driver.isMounted {
 		return disko.NewDriverError(disko.EALREADY)
@@ -267,7 +267,7 @@ func (driver *FAT8Driver) Mount(flags disko.MountFlags) error {
 
 // TODO (dargueta): Unmount()
 
-func (driver *FAT8Driver) GetFSInfo() disko.FSStat {
+func (driver *Driver) GetFSInfo() disko.FSStat {
 	return driver.stat
 }
 
@@ -278,7 +278,7 @@ func (driver *FAT8Driver) GetFSInfo() disko.FSStat {
 //
 // This driver only requires the TotalBlocks field to be set in `information`.
 // It must either be 2002 for a floppy image, or 720 for a minifloppy image.
-func (driver *FAT8Driver) Format(information disko.FSStat) error {
+func (driver *Driver) Format(information disko.FSStat) error {
 	if driver.isMounted {
 		return disko.NewDriverErrorWithMessage(
 			disko.EBUSY,
@@ -359,10 +359,10 @@ func (driver *FAT8Driver) Format(information disko.FSStat) error {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Implementing FormattingDriver interface
+// Implementing ReadingDriver interface
 
 // SameFile determines if two files are the same, given basic file information.
-func (driver *FAT8Driver) SameFile(fi1, fi2 os.FileInfo) bool {
+func (driver *Driver) SameFile(fi1, fi2 os.FileInfo) bool {
 	return strings.EqualFold(fi1.Name(), fi2.Name())
 }
 
@@ -370,7 +370,7 @@ func (driver *FAT8Driver) SameFile(fi1, fi2 os.FileInfo) bool {
 // TODO(dargueta): ReadDir(path string) ([]DirectoryEntry, error)
 // TODO(dargueta): ReadFile(path string) ([]byte, error)
 
-func (driver *FAT8Driver) Stat(path string) (disko.FileStat, error) {
+func (driver *Driver) Stat(path string) (disko.FileStat, error) {
 	normalizedPath := strings.ToUpper(path)
 
 	// We don't really care if there's a leading "/" or not, since there are no
