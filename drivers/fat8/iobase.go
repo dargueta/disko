@@ -175,3 +175,16 @@ func (driver *Driver) ReadFileCluster(dirent *DirectoryEntry, cluster LogicalClu
 	physicalBlock := PhysicalBlock(uint(physicalCluster) * sectorsPerCluster)
 	return driver.ReadDiskBlocks(physicalBlock, sectorsPerCluster)
 }
+
+func (driver *Driver) WriteFileCluster(dirent *DirectoryEntry, cluster LogicalCluster, data []byte) error {
+	if int(cluster) >= len(dirent.clusters) {
+		return fmt.Errorf(
+			"cluster index out of bounds: %d not in [0, %d)",
+			cluster,
+			len(dirent.clusters),
+		)
+	}
+
+	physicalCluster := dirent.clusters[cluster]
+	return driver.WriteAbsoluteCluster(physicalCluster, data)
+}
