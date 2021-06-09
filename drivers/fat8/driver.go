@@ -61,16 +61,20 @@ type Driver struct {
 	dirents   map[string]DirectoryEntry
 }
 
+func NewDriverFromFile(stream *os.File) Driver {
+	return Driver{image: stream}
+}
+
 func (driver *Driver) defineGeometry(totalBlocks uint) error {
-	if totalBlocks == 256256 {
+	if totalBlocks == 2002 {
 		driver.sectorsPerTrack = 26
 		driver.totalTracks = 77
-	} else if totalBlocks == 92160 {
+	} else if totalBlocks == 720 {
 		driver.sectorsPerTrack = 18
 		driver.totalTracks = 40
 	} else {
 		message := fmt.Sprintf(
-			"invalid disk image size; expected 256256 or 92160, got %d",
+			"invalid disk image size; expected 2002 or 720, got %d",
 			totalBlocks,
 		)
 		return disko.NewDriverErrorWithMessage(disko.EMEDIUMTYPE, message)
@@ -134,7 +138,9 @@ func (driver *Driver) Mount(flags disko.MountFlags) error {
 	return nil
 }
 
-// TODO (dargueta): Unmount()
+func (driver *Driver) Unmount() error {
+	return driver.writeFAT()
+}
 
 func (driver *Driver) GetFSInfo() disko.FSStat {
 	return driver.stat

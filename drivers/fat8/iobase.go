@@ -9,33 +9,6 @@ import (
 
 // BLOCK-LEVEL ACCESS ==========================================================
 
-func (driver *Driver) TrackAndSectorToBlock(track uint, sector PhysicalBlock) (PhysicalBlock, error) {
-	if track >= driver.totalTracks {
-		return 0,
-			disko.NewDriverErrorWithMessage(
-				disko.EINVAL,
-				fmt.Sprintf(
-					"invalid track number: %d not in [0, %d)",
-					track,
-					driver.totalTracks,
-				),
-			)
-	}
-	if uint(sector) >= driver.sectorsPerTrack {
-		return 0,
-			disko.NewDriverErrorWithMessage(
-				disko.EINVAL,
-				fmt.Sprintf(
-					"invalid sector number: %d not in [0, %d)",
-					sector,
-					driver.sectorsPerTrack,
-				),
-			)
-	}
-
-	return PhysicalBlock(track*driver.sectorsPerTrack) + sector, nil
-}
-
 func (driver *Driver) ReadDiskBlocks(start PhysicalBlock, count uint) ([]byte, error) {
 	if (uint(start) + count) >= uint(driver.stat.TotalBlocks) {
 		return nil, fmt.Errorf(
@@ -157,6 +130,20 @@ func (driver *Driver) GetFAT() ([]byte, error) {
 	}
 
 	return firstFAT, nil
+}
+
+func (driver *Driver) writeFAT() error {
+	err := driver.WriteDiskBlocks(driver.fatsStart, driver.fat)
+	if err != nil {
+		return err
+	}
+
+	err = driver.WriteDiskBlocks(driver.fatsStart+PhysicalBlock(driver.fatSizeInSectors), driver.fat)
+	if err != nil {
+		return err
+	}
+
+	return driver.WriteDiskBlocks(driver.fatsStart+PhysicalBlock(2*driver.fatSizeInSectors), driver.fat)
 }
 
 // FILE-LEVEL ACCESS ===========================================================
