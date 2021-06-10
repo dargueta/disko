@@ -35,7 +35,7 @@ func (driver *Driver) Stat(path string) (disko.FileStat, error) {
 	// of sectors per track, we can determine the number of sectors used by the
 	// whole clusters. Keep in mind, though, that the last cluster may only be
 	// partially used.
-	clusterSectorsUsed := uint(len(info.clusters)) * driver.sectorsPerTrack / 2
+	clusterSectorsUsed := uint(len(info.clusters)) * driver.geometry.SectorsPerCluster
 	totalSectors := clusterSectorsUsed - info.UnusedSectorsInLastCluster
 
 	// If the file is binary, then the size is totalSectors because binary files

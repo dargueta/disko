@@ -57,7 +57,7 @@ func (driver *Driver) WriteDiskBlocks(start PhysicalBlock, data []byte) error {
 // IsValidCluster returns a boolean indicating whether the given cluster number
 // is valid for this disk image.
 func (driver *Driver) IsValidCluster(clusterID PhysicalCluster) bool {
-	return (clusterID >= 1) && (uint(clusterID) <= driver.totalTracks*2)
+	return (clusterID >= 1) && (uint(clusterID) <= driver.geometry.TotalClusters)
 }
 
 func MakeInvalidClusterError(cluster PhysicalCluster, totalTracks uint) error {
@@ -71,27 +71,26 @@ func MakeInvalidClusterError(cluster PhysicalCluster, totalTracks uint) error {
 // be valid, as determined by IsValidCluster().
 func (driver *Driver) ReadAbsoluteCluster(clusterID PhysicalCluster) ([]byte, error) {
 	if !driver.IsValidCluster(clusterID) {
-		return nil, MakeInvalidClusterError(clusterID, driver.totalTracks)
+		return nil, MakeInvalidClusterError(clusterID, driver.geometry.TotalTracks)
 	}
-	sectorsPerCluster := driver.sectorsPerTrack / 2
-	block := uint(clusterID) * sectorsPerCluster
-	return driver.ReadDiskBlocks(PhysicalBlock(block), sectorsPerCluster)
+	block := uint(clusterID) * driver.geometry.SectorsPerCluster
+	return driver.ReadDiskBlocks(PhysicalBlock(block), driver.geometry.SectorsPerCluster)
 }
 
 // WriteAbsoluteCluster writes bytes to the given cluster. `data` must be exactly
 // the size of a cluster.
 func (driver *Driver) WriteAbsoluteCluster(clusterID PhysicalCluster, data []byte) error {
 	if !driver.IsValidCluster(clusterID) {
-		return MakeInvalidClusterError(clusterID, driver.totalTracks)
+		return MakeInvalidClusterError(clusterID, driver.geometry.TotalTracks)
 	}
-	if len(data) != int(driver.bytesPerCluster) {
+	if len(data) != int(driver.geometry.BytesPerCluster) {
 		return fmt.Errorf(
 			"data to write is the wrong size: expected %d, got %d",
-			driver.bytesPerCluster,
+			driver.geometry.BytesPerCluster,
 			len(data))
 	}
 
-	physicalBlock := uint(clusterID) * driver.sectorsPerTrack
+	physicalBlock := uint(clusterID) * driver.geometry.SectorsPerTrack
 	return driver.WriteDiskBlocks(PhysicalBlock(physicalBlock), data)
 }
 
@@ -100,21 +99,21 @@ func (driver *Driver) GetFAT() ([]byte, error) {
 	// each one and ensure they're all identical. If they're not, that's likely
 	// an indicator of disk corruption.
 	firstFAT, err := driver.ReadDiskBlocks(
-		driver.fatsStart, driver.fatSizeInSectors)
+		driver.geometry.FATsStart, driver.geometry.SectorsPerFAT)
 	if err != nil {
 		return nil, err
 	}
 
 	secondFAT, err := driver.ReadDiskBlocks(
-		driver.fatsStart+PhysicalBlock(driver.fatSizeInSectors),
-		driver.fatSizeInSectors)
+		driver.geometry.FATsStart+PhysicalBlock(driver.geometry.SectorsPerFAT),
+		driver.geometry.SectorsPerFAT)
 	if err != nil {
 		return nil, err
 	}
 
 	thirdFAT, err := driver.ReadDiskBlocks(
-		driver.fatsStart+PhysicalBlock(2*driver.fatSizeInSectors),
-		driver.fatSizeInSectors)
+		driver.geometry.FATsStart+PhysicalBlock(2*driver.geometry.SectorsPerFAT),
+		driver.geometry.SectorsPerFAT)
 	if err != nil {
 		return nil, err
 	}
@@ -133,17 +132,7 @@ func (driver *Driver) GetFAT() ([]byte, error) {
 }
 
 func (driver *Driver) writeFAT() error {
-	err := driver.WriteDiskBlocks(driver.fatsStart, driver.fat)
-	if err != nil {
-		return err
-	}
-
-	err = driver.WriteDiskBlocks(driver.fatsStart+PhysicalBlock(driver.fatSizeInSectors), driver.fat)
-	if err != nil {
-		return err
-	}
-
-	return driver.WriteDiskBlocks(driver.fatsStart+PhysicalBlock(2*driver.fatSizeInSectors), driver.fat)
+	return driver.WriteDiskBlocks(driver.geometry.FATsStart, bytes.Repeat(driver.fat, 3))
 }
 
 // FILE-LEVEL ACCESS ===========================================================
@@ -158,9 +147,8 @@ func (driver *Driver) ReadFileCluster(dirent *DirectoryEntry, cluster LogicalClu
 	}
 
 	physicalCluster := dirent.clusters[cluster]
-	sectorsPerCluster := driver.sectorsPerTrack / 2
-	physicalBlock := PhysicalBlock(uint(physicalCluster) * sectorsPerCluster)
-	return driver.ReadDiskBlocks(physicalBlock, sectorsPerCluster)
+	physicalBlock := PhysicalBlock(uint(physicalCluster) * driver.geometry.SectorsPerCluster)
+	return driver.ReadDiskBlocks(physicalBlock, driver.geometry.SectorsPerCluster)
 }
 
 func (driver *Driver) WriteFileCluster(dirent *DirectoryEntry, cluster LogicalCluster, data []byte) error {

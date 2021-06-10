@@ -20,7 +20,7 @@ func (driver *Driver) Format(information disko.FSStat) error {
 			"image must be unmounted before it can be formatted")
 	}
 
-	err := driver.defineGeometry(uint(information.TotalBlocks))
+	geo, err := GetGeometry(uint(information.TotalBlocks))
 	if err != nil {
 		return err
 	}
@@ -34,21 +34,21 @@ func (driver *Driver) Format(information disko.FSStat) error {
 	// According to the documentation, a newly formatted image must have the
 	// directory entries filled with 0xFF.
 	sectorFill := bytes.Repeat([]byte{0xff}, 128)
-	for i := driver.directoryTrackStart; i < driver.infoSectorStart; i++ {
+	for i := geo.DirectoryTrackStart; i < geo.InfoSectorStart; i++ {
 		driver.WriteDiskBlocks(i, sectorFill)
 	}
 
 	// Construct a single copy of the FAT, and mark the directory track as
 	// reserved by putting 0xFE in the cluster entry. (It's always the middle
 	// track.)
-	directoryCluster := uint(driver.directoryTrackStart) / driver.sectorsPerTrack
-	fat := bytes.Repeat([]byte{0xff}, int(driver.fatSizeInSectors)*128)
+	directoryCluster := uint(geo.DirectoryTrackStart) / geo.SectorsPerTrack
+	fat := bytes.Repeat([]byte{0xff}, int(geo.SectorsPerFAT)*128)
 	fat[directoryCluster*2] = 0xfe
 	fat[directoryCluster*2+1] = 0xfe
 
 	// Write the FATs
 	allFATs := bytes.Repeat(fat, 3)
-	err = driver.WriteDiskBlocks(driver.fatsStart, allFATs)
+	err = driver.WriteDiskBlocks(geo.FATsStart, allFATs)
 
 	if err != nil {
 		return err
@@ -56,13 +56,13 @@ func (driver *Driver) Format(information disko.FSStat) error {
 
 	// We reserve one track for the directory, so the total number of available
 	// blocks is one track's worth of blocks fewer.
-	availableBlocks := information.TotalBlocks - uint64(driver.sectorsPerTrack)
+	availableBlocks := information.TotalBlocks - uint64(geo.SectorsPerTrack)
 
 	// The maximum number of files is:
 	// (SectorsPerTrack - 1 - (FatSizeInSectors * 3)) * DirentsPerSector
 	//   * We subtract one for the information sector.
 	//   * A directory entry is 16 bytes, so there are 8 dirents per sector.
-	direntSectors := driver.sectorsPerTrack - 1 - (driver.fatSizeInSectors * 3)
+	direntSectors := geo.SectorsPerTrack - 1 - (geo.SectorsPerFAT * 3)
 	totalDirents := direntSectors * 8
 
 	driver.stat = disko.FSStat{

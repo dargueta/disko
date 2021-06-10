@@ -8,6 +8,52 @@ import (
 	"github.com/dargueta/disko"
 )
 
+type Geometry struct {
+	TotalTracks          uint
+	TrueTotalTracks      uint
+	TotalClusters        uint
+	SectorsPerTrack      uint
+	SectorsPerFAT        uint
+	SectorsPerCluster    uint
+	BytesPerCluster      uint
+	DirectoryTrackNumber uint
+	DirectoryTrackStart  PhysicalBlock
+	InfoSectorStart      PhysicalBlock
+	FATsStart            PhysicalBlock
+}
+
+func GetGeometry(totalBlocks uint) (Geometry, error) {
+	var geo Geometry
+	if totalBlocks == 2002 {
+		geo = Geometry{
+			TotalTracks:          73,
+			TrueTotalTracks:      77,
+			SectorsPerTrack:      26,
+			DirectoryTrackNumber: 35,
+		}
+	} else if totalBlocks == 720 {
+		geo = Geometry{
+			TotalTracks:          40,
+			TrueTotalTracks:      40,
+			DirectoryTrackNumber: 18,
+		}
+	} else {
+		return geo, fmt.Errorf("bad number of blocks; expected 2002 or 720, got %d", totalBlocks)
+	}
+
+	geo.SectorsPerCluster = geo.SectorsPerTrack / 2
+	geo.BytesPerCluster = geo.SectorsPerCluster * 128
+	geo.DirectoryTrackStart = PhysicalBlock((geo.DirectoryTrackNumber - 1) * geo.SectorsPerTrack)
+	geo.TotalClusters = geo.TotalTracks * 2
+	geo.SectorsPerFAT = uint((geo.TotalClusters + (-geo.TotalClusters % 128)) / 128)
+
+	fatsStart := (geo.DirectoryTrackNumber * geo.SectorsPerTrack) - (geo.SectorsPerFAT * 3)
+	geo.FATsStart = PhysicalBlock(fatsStart)
+	geo.InfoSectorStart = geo.FATsStart - 1
+
+	return geo, nil
+}
+
 // FilenameToBytes converts a filename string to its on-disk representation. The
 // returned name will be normalized to uppercase.
 // TODO(dargueta): Ensure the filename has no invalid characters.
