@@ -45,7 +45,7 @@ func ValidateImage(t *testing.T, totalBlocks, sectorsPerTrack uint, expectedImag
 	driver.Format(disko.FSStat{TotalBlocks: uint64(totalBlocks)})
 
 	imageContents := make([]byte, totalBytes)
-	bytesRead, err := tmpFile.ReadAt(imageContents[:], 0)
+	bytesRead, err := tmpFile.ReadAt(imageContents, 0)
 	if err != nil {
 		t.Errorf("Failed to read image file: %v", err)
 	}
@@ -64,8 +64,8 @@ func ValidateImage(t *testing.T, totalBlocks, sectorsPerTrack uint, expectedImag
 				"Images not equal in absolute sector %d (track: %d, sector: %d);"+
 					" first differing byte at index %d; expected %#02x, got %#02x",
 				i/128,
-				track,
-				trackSector,
+				track+1,
+				trackSector+1,
 				diffAt,
 				expectedSector[diffAt],
 				imageSector[diffAt],

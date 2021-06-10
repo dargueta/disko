@@ -31,17 +31,23 @@ func (driver *Driver) Format(information disko.FSStat) error {
 	driver.image.Truncate(int64(fileSize))
 	driver.image.Write(bytes.Repeat([]byte{0}, int(fileSize)))
 
+	// According to the documentation, a newly formatted image must have the
+	// directory entries filled with 0xFF.
+	sectorFill := bytes.Repeat([]byte{0xff}, 128)
+	for i := driver.directoryTrackStart; i < driver.infoSectorStart; i++ {
+		driver.WriteDiskBlocks(i, sectorFill)
+	}
+
 	// Construct a single copy of the FAT, and mark the directory track as
 	// reserved by putting 0xFE in the cluster entry. (It's always the middle
 	// track.)
-	directoryTrackNumber := (driver.totalTracks / 2) - 1
+	directoryCluster := uint(driver.directoryTrackStart) / driver.sectorsPerTrack
 	fat := bytes.Repeat([]byte{0xff}, int(driver.fatSizeInSectors)*128)
-	fat[directoryTrackNumber*2] = 0xfe
-	fat[directoryTrackNumber*2+1] = 0xfe
-
-	allFATs := bytes.Repeat(fat, 3)
+	fat[directoryCluster*2] = 0xfe
+	fat[directoryCluster*2+1] = 0xfe
 
 	// Write the FATs
+	allFATs := bytes.Repeat(fat, 3)
 	err = driver.WriteDiskBlocks(driver.fatsStart, allFATs)
 
 	if err != nil {

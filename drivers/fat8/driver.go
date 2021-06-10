@@ -66,12 +66,25 @@ func NewDriverFromFile(stream *os.File) Driver {
 }
 
 func (driver *Driver) defineGeometry(totalBlocks uint) error {
+	var directoryTrackStart uint
+	var totalClusters int
+
 	if totalBlocks == 2002 {
 		driver.sectorsPerTrack = 26
+		// 77 tracks is kinduva a lie; there are 73 data tracks, 1 index track,
+		// 2 spare tracks, and 1 reserved track, for a total of 77. Thus, the
+		// image will be 77 tracks in size but only the first 73 are usable. This
+		// is why totalClusters isn't totalTracks * 2.
 		driver.totalTracks = 77
+		totalClusters = 146
+		// Track 35 (counting from 1)
+		directoryTrackStart = 884
 	} else if totalBlocks == 720 {
 		driver.sectorsPerTrack = 18
 		driver.totalTracks = 40
+		totalClusters = 80
+		// Track 18 (counting from 1)
+		directoryTrackStart = 306
 	} else {
 		message := fmt.Sprintf(
 			"invalid disk image size; expected 2002 or 720, got %d",
@@ -82,11 +95,8 @@ func (driver *Driver) defineGeometry(totalBlocks uint) error {
 
 	// There are two clusters per track, so the size of the FAT is one byte per
 	// cluster plus some padding bytes to get to a multiple of the sector size.
-	totalClusters := int(driver.totalTracks * 2)
 	fatSizeInSectors := uint((totalClusters + (-totalClusters % 128)) / 128)
-
-	directoryTrackStart := driver.totalTracks / 2 * driver.sectorsPerTrack
-	fatsStart := uint(driver.directoryTrackStart) + driver.sectorsPerTrack - fatSizeInSectors
+	fatsStart := directoryTrackStart + driver.sectorsPerTrack - fatSizeInSectors
 
 	driver.directoryTrackStart = PhysicalBlock(directoryTrackStart)
 	driver.fatSizeInSectors = fatSizeInSectors
