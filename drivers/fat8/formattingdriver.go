@@ -25,38 +25,9 @@ func (driver *Driver) Format(information disko.FSStat) error {
 		return err
 	}
 
-	// Create a blank image filled with null bytes
-	fileSize := 128 * information.TotalBlocks
-	driver.image.Seek(0, 0)
-	driver.image.Truncate(int64(fileSize))
-	driver.image.Write(bytes.Repeat([]byte{0}, int(fileSize)))
-
-	// According to the documentation, a newly formatted image must have the
-	// directory entries filled with 0xFF.
-	sectorFill := bytes.Repeat([]byte{0xff}, 128)
-	for i := geo.DirectoryTrackStart; i < geo.InfoSectorStart; i++ {
-		driver.WriteDiskBlocks(i, sectorFill)
-	}
-
-	// Construct a single copy of the FAT, and mark the directory track as
-	// reserved by putting 0xFE in the cluster entry. (It's always the middle
-	// track.)
-	directoryCluster := uint(geo.DirectoryTrackStart) / geo.SectorsPerTrack
-	fat := bytes.Repeat([]byte{0xff}, int(geo.SectorsPerFAT)*128)
-	fat[directoryCluster*2] = 0xfe
-	fat[directoryCluster*2+1] = 0xfe
-
-	// Write the FATs
-	allFATs := bytes.Repeat(fat, 3)
-	err = driver.WriteDiskBlocks(geo.FATsStart, allFATs)
-
-	if err != nil {
-		return err
-	}
-
 	// We reserve one track for the directory, so the total number of available
 	// blocks is one track's worth of blocks fewer.
-	availableBlocks := information.TotalBlocks - uint64(geo.SectorsPerTrack)
+	availableBlocks := uint64((geo.TotalTracks - 1) * geo.SectorsPerTrack)
 
 	// The maximum number of files is:
 	// (SectorsPerTrack - 1 - (FatSizeInSectors * 3)) * DirentsPerSector
@@ -65,6 +36,7 @@ func (driver *Driver) Format(information disko.FSStat) error {
 	direntSectors := geo.SectorsPerTrack - 1 - (geo.SectorsPerFAT * 3)
 	totalDirents := direntSectors * 8
 
+	driver.geometry = geo
 	driver.stat = disko.FSStat{
 		BlockSize:       128,
 		TotalBlocks:     information.TotalBlocks,
@@ -79,5 +51,29 @@ func (driver *Driver) Format(information disko.FSStat) error {
 		MaxNameLength: 10,
 	}
 
-	return nil
+	// Create a blank image filled with null bytes
+	fileSize := 128 * geo.TrueTotalTracks * geo.SectorsPerTrack
+	driver.image.Truncate(int64(fileSize))
+
+	// According to the documentation, a newly formatted image must have the
+	// directory entries filled with 0xFF.
+	sectorFill := bytes.Repeat([]byte{0xff}, 128)
+	for i := geo.DirectoryTrackStart; i < geo.InfoSectorStart; i++ {
+		err := driver.WriteDiskBlocks(i, sectorFill)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Construct a single copy of the FAT, and mark the directory track as
+	// reserved by putting 0xFE in the cluster entry. (It's always the middle
+	// track.)
+	directoryCluster := uint(geo.DirectoryTrackStart) / geo.SectorsPerTrack
+	fat := bytes.Repeat([]byte{0xff}, int(geo.SectorsPerFAT)*128)
+	fat[directoryCluster*2] = 0xfe
+	fat[directoryCluster*2+1] = 0xfe
+
+	// Write the FATs
+	allFATs := bytes.Repeat(fat, 3)
+	return driver.WriteDiskBlocks(geo.FATsStart, allFATs)
 }

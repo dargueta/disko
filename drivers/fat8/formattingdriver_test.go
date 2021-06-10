@@ -2,7 +2,7 @@ package fat8
 
 import (
 	_ "embed"
-	"io/ioutil"
+	"os"
 	"testing"
 
 	"github.com/dargueta/disko"
@@ -36,18 +36,22 @@ func ValidateImage(t *testing.T, totalBlocks, sectorsPerTrack uint, expectedImag
 		)
 	}
 
-	tmpFile, err := ioutil.TempFile("", "image.bin")
+	tmpFile, err := os.CreateTemp("", "")
 	if err != nil {
 		t.Errorf("Failed to create temporary file: %v", err)
 	}
 
 	driver := NewDriverFromFile(tmpFile)
-	driver.Format(disko.FSStat{TotalBlocks: uint64(totalBlocks)})
+	err = driver.Format(disko.FSStat{TotalBlocks: uint64(totalBlocks)})
+	if err != nil {
+		t.Errorf("Formatting failed: %s", err.Error())
+		return
+	}
 
 	imageContents := make([]byte, totalBytes)
 	bytesRead, err := tmpFile.ReadAt(imageContents, 0)
 	if err != nil {
-		t.Errorf("Failed to read image file: %v", err)
+		t.Errorf("Failed to read image file: %s", err.Error())
 	}
 	if uint(bytesRead) != totalBytes {
 		t.Errorf("Image size is wrong; expected %d, got %d", totalBytes, bytesRead)
