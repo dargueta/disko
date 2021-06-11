@@ -9,10 +9,10 @@ import (
 	"github.com/dargueta/disko"
 )
 
-//go:embed test-data/empty-floppy.img
+//go:embed testdata/empty-floppy.img
 var emptyFloppyImage []byte
 
-//go:embed test-data/empty-minifloppy.img
+//go:embed testdata/empty-minifloppy.img
 var emptyMinifloppyImage []byte
 
 func FirstDifference(left, right []byte) int {
