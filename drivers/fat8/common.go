@@ -30,14 +30,22 @@ func GetGeometry(totalBlocks uint) (Geometry, error) {
 		geo.TrueTotalTracks = 40
 		geo.SectorsPerTrack = 16
 		geo.DirectoryTrackNumber = 18
+	case 1898:
+		geo.TotalTracks = 73
+		geo.TrueTotalTracks = 77
+		geo.SectorsPerTrack = 26
+		geo.DirectoryTrackNumber = 35
 	case 2002:
+		// 2002 (77 tracks * 26 sectors/track) is an alias for 1898. This is
+		// because, while the IBM 3070 disk technically has 77 tracks, only 73
+		// of those can hold data.
 		geo.TotalTracks = 73
 		geo.TrueTotalTracks = 77
 		geo.SectorsPerTrack = 26
 		geo.DirectoryTrackNumber = 35
 	default:
 		return geo,
-			fmt.Errorf("bad number of blocks; expected 2002 or 640, got %d", totalBlocks)
+			fmt.Errorf("bad number of blocks; expected 2002, 1898, or 640, got %d", totalBlocks)
 	}
 
 	geo.TotalClusters = geo.TotalTracks * 2
