@@ -65,6 +65,12 @@ func (driver *Driver) Format(information disko.FSStat) error {
 		}
 	}
 
+	// Write nulls to the info sector
+	err = driver.WriteDiskBlocks(geo.InfoSectorStart, bytes.Repeat([]byte{0}, 128))
+	if err != nil {
+		return err
+	}
+
 	// Construct a single copy of the FAT, and mark the directory track as
 	// reserved by putting 0xFE in the cluster entry. (It's always the middle
 	// track.)
