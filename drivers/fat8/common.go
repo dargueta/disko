@@ -57,7 +57,7 @@ func GetGeometry(totalBlocks uint) (Geometry, error) {
 // returned name will be normalized to uppercase.
 // TODO(dargueta): Ensure the filename has no invalid characters.
 func FilenameToBytes(name string) ([]byte, error) {
-	parts := strings.SplitN(name, ".", 1)
+	parts := strings.SplitN(name, ".", 2)
 
 	// Unless we got an empty string, this will always have at least one element,
 	// the stem of the filename. This cannot be longer than 6 characters.
@@ -93,7 +93,8 @@ func FilenameToBytes(name string) ([]byte, error) {
 
 // BytesToFilename converts the on-disk representation of a filename into its
 // user-friendly form.
-func BytesToFilename(rawName []byte) string {
+// TODO(dargueta): Validate binary data
+func BytesToFilename(rawName []byte) (string, error) {
 	stem := bytes.TrimRight(rawName[:6], " ")
 	extension := bytes.TrimRight(rawName[6:], " ")
 
@@ -103,5 +104,5 @@ func BytesToFilename(rawName []byte) string {
 	} else {
 		name = string(stem)
 	}
-	return strings.ToUpper(name)
+	return strings.ToUpper(name), nil
 }
