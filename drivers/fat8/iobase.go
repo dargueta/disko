@@ -36,7 +36,7 @@ func (driver *Driver) WriteDiskBlocks(start PhysicalBlock, data []byte) error {
 	}
 
 	numBlocksToWrite := uint64(len(data) / 128)
-	if uint64(start)+numBlocksToWrite >= driver.stat.TotalBlocks {
+	if uint64(start)+numBlocksToWrite > driver.stat.TotalBlocks {
 		return disko.NewDriverErrorWithMessage(
 			disko.EIO,
 			fmt.Sprintf(

@@ -24,31 +24,30 @@ type Geometry struct {
 
 func GetGeometry(totalBlocks uint) (Geometry, error) {
 	var geo Geometry
-	if totalBlocks == 2002 {
-		geo = Geometry{
-			TotalTracks:          73,
-			TrueTotalTracks:      77,
-			SectorsPerTrack:      26,
-			DirectoryTrackNumber: 35,
-		}
-	} else if totalBlocks == 720 {
-		geo = Geometry{
-			TotalTracks:          40,
-			TrueTotalTracks:      40,
-			DirectoryTrackNumber: 18,
-		}
-	} else {
-		return geo, fmt.Errorf("bad number of blocks; expected 2002 or 720, got %d", totalBlocks)
+	switch totalBlocks {
+	case 640:
+		geo.TotalTracks = 40
+		geo.TrueTotalTracks = 40
+		geo.SectorsPerTrack = 16
+		geo.DirectoryTrackNumber = 18
+	case 2002:
+		geo.TotalTracks = 73
+		geo.TrueTotalTracks = 77
+		geo.SectorsPerTrack = 26
+		geo.DirectoryTrackNumber = 35
+	default:
+		return geo,
+			fmt.Errorf("bad number of blocks; expected 2002 or 640, got %d", totalBlocks)
 	}
 
+	geo.TotalClusters = geo.TotalTracks * 2
 	geo.SectorsPerCluster = geo.SectorsPerTrack / 2
 	geo.BytesPerCluster = geo.SectorsPerCluster * 128
-	geo.DirectoryTrackStart = PhysicalBlock((geo.DirectoryTrackNumber - 1) * geo.SectorsPerTrack)
-	geo.TotalClusters = geo.TotalTracks * 2
-	geo.SectorsPerFAT = uint((geo.TotalClusters + (-geo.TotalClusters % 128)) / 128)
+	geo.SectorsPerFAT = (geo.TotalClusters + (-geo.TotalClusters % 128)) / 128
 
-	fatsStart := (geo.DirectoryTrackNumber * geo.SectorsPerTrack) - (geo.SectorsPerFAT * 3)
-	geo.FATsStart = PhysicalBlock(fatsStart)
+	directoryTrackStart := (geo.DirectoryTrackNumber - 1) * geo.SectorsPerTrack
+	geo.DirectoryTrackStart = PhysicalBlock(directoryTrackStart)
+	geo.FATsStart = PhysicalBlock(directoryTrackStart + geo.SectorsPerTrack - (geo.SectorsPerFAT * 3))
 	geo.InfoSectorStart = geo.FATsStart - 1
 
 	return geo, nil

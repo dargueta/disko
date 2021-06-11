@@ -2,6 +2,7 @@ package fat8
 
 import (
 	_ "embed"
+	"io"
 	"os"
 	"testing"
 
@@ -10,6 +11,9 @@ import (
 
 //go:embed test-data/empty-floppy.img
 var emptyFloppyImage []byte
+
+//go:embed test-data/empty-minifloppy.img
+var emptyMinifloppyImage []byte
 
 func FirstDifference(left, right []byte) int {
 	if len(left) > len(right) {
@@ -29,7 +33,7 @@ func FirstDifference(left, right []byte) int {
 func ValidateImage(t *testing.T, totalBlocks, sectorsPerTrack uint, expectedImage []byte) {
 	totalBytes := totalBlocks * 128
 	if len(expectedImage) != int(totalBytes) {
-		t.Errorf(
+		t.Fatalf(
 			"Embedded test data is wrong: image should be %d bytes, got %d",
 			totalBytes,
 			len(expectedImage),
@@ -38,23 +42,22 @@ func ValidateImage(t *testing.T, totalBlocks, sectorsPerTrack uint, expectedImag
 
 	tmpFile, err := os.CreateTemp("", "")
 	if err != nil {
-		t.Errorf("Failed to create temporary file: %v", err)
+		t.Fatalf("Failed to create temporary file: %v", err)
 	}
 
 	driver := NewDriverFromFile(tmpFile)
 	err = driver.Format(disko.FSStat{TotalBlocks: uint64(totalBlocks)})
 	if err != nil {
-		t.Errorf("Formatting failed: %s", err.Error())
-		return
+		t.Fatalf("Formatting failed: %s", err.Error())
 	}
 
 	imageContents := make([]byte, totalBytes)
 	bytesRead, err := tmpFile.ReadAt(imageContents, 0)
-	if err != nil {
-		t.Errorf("Failed to read image file: %s", err.Error())
+	if err != nil && err != io.EOF {
+		t.Fatalf("Failed to read image file: %s", err.Error())
 	}
 	if uint(bytesRead) != totalBytes {
-		t.Errorf("Image size is wrong; expected %d, got %d", totalBytes, bytesRead)
+		t.Fatalf("Image size is wrong; expected %d, got %d", totalBytes, bytesRead)
 	}
 
 	for i := uint(0); i < totalBytes; i += 128 {
@@ -82,7 +85,6 @@ func TestFormattingFloppy(t *testing.T) {
 	ValidateImage(t, 2002, 26, emptyFloppyImage)
 }
 
-// TODO
 func TestFormattingMiniFloppy(t *testing.T) {
-	//ValidateImage(t, 720, 13, emptyFloppyImage)
+	ValidateImage(t, 640, 16, emptyMinifloppyImage)
 }
