@@ -15,12 +15,17 @@ and want to be able to play around with old systems.
 =========== ================ ==== ==================== ================ ============
 File System Format New Image Read Write Existing Files Create New Files Delete Files
 ----------- ---------------- ---- -------------------- ---------------- ------------
+CP/M 1.4
+CP/M 2.2
+CP/M 3.1
+CP/M 4.1
 FAT 8       ✅ [#]_           ✅
 FAT 12
 FAT 16
 FAT 32
-Unix v1
-Unix v6
+Unix V1FS
+Unix V6FS
+Unix V7FS
 =========== ================ ==== ==================== ================ ============
 
 
