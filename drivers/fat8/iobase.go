@@ -73,7 +73,7 @@ func (driver *Driver) ReadAbsoluteCluster(clusterID PhysicalCluster) ([]byte, er
 	if !driver.IsValidCluster(clusterID) {
 		return nil, MakeInvalidClusterError(clusterID, driver.geometry.TotalTracks)
 	}
-	block := uint(clusterID) * driver.geometry.SectorsPerCluster
+	block := uint(clusterID-1) * driver.geometry.SectorsPerCluster
 	return driver.ReadDiskBlocks(PhysicalBlock(block), driver.geometry.SectorsPerCluster)
 }
 
@@ -90,7 +90,7 @@ func (driver *Driver) WriteAbsoluteCluster(clusterID PhysicalCluster, data []byt
 			len(data))
 	}
 
-	physicalBlock := uint(clusterID) * driver.geometry.SectorsPerTrack
+	physicalBlock := uint(clusterID-1) * driver.geometry.SectorsPerTrack
 	return driver.WriteDiskBlocks(PhysicalBlock(physicalBlock), data)
 }
 
