@@ -23,6 +23,7 @@ FAT 8       ✅ [#]_           ✅
 FAT 12
 FAT 16
 FAT 32
+MINIX
 Unix V1FS
 Unix V6FS
 Unix V7FS
