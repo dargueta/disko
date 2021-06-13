@@ -1,6 +1,7 @@
 package fat8
 
 import (
+	"io"
 	"os"
 
 	"github.com/dargueta/disko"
@@ -57,7 +58,7 @@ func (driver *Driver) Mount(flags disko.MountFlags) error {
 		return disko.NewDriverError(disko.EALREADY)
 	}
 
-	offset, err := driver.image.Seek(0, 2)
+	offset, err := driver.image.Seek(0, io.SeekEnd)
 	if err != nil {
 		return err
 	}
@@ -90,11 +91,17 @@ func (driver *Driver) Mount(flags disko.MountFlags) error {
 		return err
 	}
 	driver.defaultFileAttrFlags = infoSector[0]
+	driver.isMounted = true
 	return nil
 }
 
 func (driver *Driver) Unmount() error {
-	return driver.writeFAT()
+	err := driver.writeFAT()
+	if err != nil {
+		return err
+	}
+	driver.isMounted = false
+	return nil
 }
 
 func (driver *Driver) GetFSInfo() disko.FSStat {
