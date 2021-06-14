@@ -45,7 +45,7 @@ type FileStat struct {
 	Rdev         uint64
 	Size         int64
 	BlockSize    int64
-	Blocks       int64
+	NumBlocks    int64
 	CreatedAt    time.Time
 	LastChanged  time.Time
 	LastAccessed time.Time

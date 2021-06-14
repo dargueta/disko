@@ -57,6 +57,6 @@ func (driver *Driver) Stat(path string) (disko.FileStat, error) {
 		ModeFlags:   0o777,
 		Size:        size,
 		BlockSize:   128,
-		Blocks:      int64(clusterSectorsUsed - info.UnusedSectorsInLastCluster),
+		NumBlocks:   int64(clusterSectorsUsed - info.UnusedSectorsInLastCluster),
 	}, nil
 }

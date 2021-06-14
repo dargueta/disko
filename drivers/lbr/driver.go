@@ -139,7 +139,7 @@ func NewDirent(stream *io.Reader) (LBRDirent, error) {
 				Gid:          0,
 				Size:         int64(raw.SizeInSectors)*128 - int64(raw.PadCount),
 				BlockSize:    128,
-				Blocks:       int64(raw.SizeInSectors),
+				NumBlocks:    int64(raw.SizeInSectors),
 				LastModified: lastModifiedTimestamp,
 				CreatedAt:    createdTimestamp,
 			},
