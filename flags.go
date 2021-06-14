@@ -1,22 +1,22 @@
 package disko
 
 const (
-	S_IXOTH = 1 << iota // 00001
-	S_IWOTH = 1 << iota // 00002
+	S_IXOTH = 1 << iota
+	S_IWOTH = 1 << iota
 	S_IROTH = 1 << iota
 	S_IXGRP = 1 << iota
-	S_IWGRP = 1 << iota // 00010
+	S_IWGRP = 1 << iota
 	S_IRGRP = 1 << iota
 	S_IXUSR = 1 << iota
 	S_IWUSR = 1 << iota
-	S_IRUSR = 1 << iota // 00100
+	S_IRUSR = 1 << iota
 	S_ISVTX = 1 << iota
 	S_ISGID = 1 << iota
 	S_ISUID = 1 << iota
-	S_IFIFO = 1 << iota // 01000
-	S_IFCHR = 1 << iota // 02000
-	S_IFDIR = 1 << iota // 04000
-	S_IFREG = 1 << iota // 08000
+	S_IFIFO = 1 << iota
+	S_IFCHR = 1 << iota
+	S_IFDIR = 1 << iota
+	S_IFREG = 1 << iota
 )
 
 const S_IEXEC = S_IXUSR
@@ -31,3 +31,39 @@ const S_IFMT = 0xf000
 const S_IRWXO = S_IXOTH | S_IWOTH | S_IROTH
 const S_IRWXG = S_IXGRP | S_IWGRP | S_IRGRP
 const S_IRWXU = S_IXUSR | S_IWUSR | S_IRUSR
+
+////////////////////////////////////////////////////////////////////////////////
+
+const MS_RDONLY = 0x00000001
+const MS_NOSUID = 0x00000002
+const MS_NODEV = 0x00000004
+const MS_NOEXEC = 0x00000008
+const MS_SYNCHRONOUS = 0x00000010
+const MS_REMOUNT = 0x00000020
+const MS_MANDLOCK = 0x00000040
+const MS_DIRSYNC = 0x00000080
+const MS_NOSYMFOLLOW = 0x00000100
+const MS_NOATIME = 0x00000400
+const MS_NODIRATIME = 0x00000800
+const MS_BIND = 0x00001000
+const MS_MOVE = 0x00002000
+const MS_REC = 0x00004000
+const MS_SILENT = 0x00008000
+const MS_POSIXACL = 0x00010000
+const MS_UNBINDABLE = 0x00020000
+const MS_PRIVATE = 0x00040000
+const MS_SLAVE = 0x00080000
+const MS_SHARED = 0x00100000
+const MS_RELATIME = 0x00200000
+const MS_KERNMOUNT = 0x00400000
+const MS_I_VERSION = 0x00800000
+const MS_STRICTATIME = 0x01000000
+const MS_LAZYTIME = 0x02000000
+const MS_RMT_MASK = 0x02800051
+const MS_SUBMOUNT = 0x04000000
+const MS_NOREMOTELOCK = 0x08000000
+const MS_NOSEC = 0x10000000
+const MS_BORN = 0x20000000
+const MS_ACTIVE = 0x40000000
+const MS_MGC_MSK = 0xffff0000
+const MS_MGC_VAL = 0xc0ed0000
