@@ -25,6 +25,9 @@ const FlagOwnerWrite = 0o000004        // S_IWUSR
 const FlagNonOwnerRead = 0o000002      // S_IROTH | S_IRGRP
 const FlagNonOwnerWrite = 0o000001     // S_IWOTH | S_IWGRP
 
+const DefaultDirectoryPermissions = FlagFileAllocated | FlagIsDirectory | FlagIsModified |
+	FlagOwnerRead | FlagOwnerWrite | FlagNonOwnerRead | FlagNonOwnerWrite
+
 var fsEpoch time.Time = time.Date(1971, 1, 1, 0, 0, 0, 0, nil)
 
 type RawInode struct {
@@ -36,6 +39,11 @@ type RawInode struct {
 	CreatedTime      uint32
 	LastModifiedTime uint32
 	Unused           uint16
+}
+
+type RawDirent struct {
+	INumber INumber
+	Name    [8]byte
 }
 
 type Inode struct {

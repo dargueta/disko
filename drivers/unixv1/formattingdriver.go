@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"time"
 
 	bitmap "github.com/boljen/go-bitmap"
 	"github.com/dargueta/disko"
@@ -111,16 +112,42 @@ func (driver *Driver) Format(stat disko.FSStat) error {
 	// new disk, all of it is zeroes.
 	driver.image.Write(bytes.Repeat([]byte{0}, 20))
 
-	// Write inode list
+	firstDataBlock := 2 + (inodeBitmapSize / 2)
+
+	// Write inode list. The root directory's inode always goes first.
+	nowTs := SerializeTimestamp(time.Now())
+	rootDirectoryInode := RawInode{
+		Flags:            DefaultDirectoryPermissions,
+		Nlinks:           1,
+		UserID:           0,
+		Size:             16, // Two directory entries, "." and ".."
+		Blocks:           [8]PhysicalBlock{0, 0, 0, 0, 0, 0, 0, 0},
+		CreatedTime:      nowTs,
+		LastModifiedTime: nowTs,
+	}
+	rootDirectoryInode.Blocks[0] = PhysicalBlock(firstDataBlock)
+	binary.Write(driver.image, binary.LittleEndian, &rootDirectoryInode)
+
+	// Subsequent inodes go here
 	inode := RawInode{Flags: FlagIsModified}
-	for i := 0; i < int(inodeBitmapSize)*8; i++ {
+	for i := 1; i < int(inodeBitmapSize)*8; i++ {
 		err := binary.Write(driver.image, binary.LittleEndian, &inode)
 		if err != nil {
 			return err
 		}
 	}
 
-	// TODO (dargueta): Create the root directory
+	// The ilist has been completely written out. Seek into the first data block
+	// and write the "." and ".." entries for the root directory.
+	driver.image.Seek(stat.BlockSize*int64(firstDataBlock), io.SeekStart)
+	binary.Write(
+		driver.image,
+		binary.LittleEndian,
+		RawDirent{INumber: 41, Name: [8]byte{'.'}})
+	binary.Write(
+		driver.image,
+		binary.LittleEndian,
+		RawDirent{INumber: 41, Name: [8]byte{'.', '.'}})
 
 	return nil
 }
