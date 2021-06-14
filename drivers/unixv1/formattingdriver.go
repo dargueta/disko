@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"time"
 
 	bitmap "github.com/boljen/go-bitmap"
 	"github.com/dargueta/disko"
@@ -100,7 +99,7 @@ func (driver *Driver) Format(stat disko.FSStat) error {
 	// Write free block bitmap
 	driver.image.Write(blockBitmap.Data(false))
 
-	// Write size of inode bitmaps
+	// Write size of inode bitmap
 	binary.LittleEndian.PutUint16(wbuf[:], uint16(inodeBitmapSize))
 	driver.image.Write(wbuf[:])
 
@@ -108,18 +107,20 @@ func (driver *Driver) Format(stat disko.FSStat) error {
 	// all null bytes.
 	driver.image.Write(bytes.Repeat([]byte{0}, int(inodeBitmapSize)))
 
-	// Write the timestamp of the last cold boot (we'll just call it now)
-	var dwbuf [4]byte
-	now := time.Now()
-	binary.LittleEndian.PutUint32(dwbuf[:], SerializeTimestamp(now))
-	driver.image.Write(dwbuf[:])
-
-	// Write miscellaneous disk statistics, a total of 16 bytes. Since this is a
+	// Write miscellaneous disk statistics, a total of 20 bytes. Since this is a
 	// new disk, all of it is zeroes.
-	driver.image.Write(bytes.Repeat([]byte{0}, 16))
+	driver.image.Write(bytes.Repeat([]byte{0}, 20))
 
-	// Write inode list: 32 bytes per inode, all nulls is fine
-	driver.image.WriteAt(bytes.Repeat([]byte{0}, int(stat.Files)*32), 1024)
+	// Write inode list
+	inode := RawInode{Flags: FlagIsModified}
+	for i := 0; i < int(inodeBitmapSize)*8; i++ {
+		err := binary.Write(driver.image, binary.LittleEndian, &inode)
+		if err != nil {
+			return err
+		}
+	}
+
+	// TODO (dargueta): Create the root directory
 
 	return nil
 }

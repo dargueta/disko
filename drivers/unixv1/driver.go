@@ -100,7 +100,8 @@ func (driver *Driver) Mount(flags disko.MountFlags) error {
 
 	if (blockBitmapSize + inodeBitmapSize) > 1000 {
 		message := fmt.Sprintf(
-			"Inode and block bitmaps shouldn't exceed 1000 bytes together, got %d",
+			"corruption detected: Inode and block bitmaps can't exceed 1000"+
+				" bytes together, got %d",
 			blockBitmapSize+inodeBitmapSize)
 		return disko.NewDriverErrorWithMessage(disko.EUCLEAN, message)
 	}
@@ -117,6 +118,10 @@ func (driver *Driver) Mount(flags disko.MountFlags) error {
 	return nil
 }
 
+// ConvertFSFlagsToStandard takes inode flags found in the on-disk representation
+// of an inode and converts them to their standardized Unix equivalents. For
+// example, `FlagNonOwnerRead` is converted to `S_IRGRP | S_IROTH`. Unrecognized
+// flags are ignored.
 func ConvertFSFlagsToStandard(rawFlags uint16) uint32 {
 	stdFlags := uint32(0)
 
@@ -144,6 +149,9 @@ func ConvertFSFlagsToStandard(rawFlags uint16) uint32 {
 
 	return stdFlags
 }
+
+// ConvertStandardFlagsToFS is the inverse of ConvertFSFlagsToStandard; it takes
+// Unix mode flags and converts them to their on-disk representation.
 func ConvertStandardFlagsToFS(flags uint32) uint16 {
 	rawFlags := uint16(0)
 
