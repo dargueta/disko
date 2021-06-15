@@ -109,7 +109,8 @@ func (driver *Driver) Format(stat disko.FSStat) error {
 	driver.image.Write(bytes.Repeat([]byte{0}, int(inodeBitmapSize)))
 
 	// Write miscellaneous disk statistics, a total of 20 bytes. Since this is a
-	// new disk, all of it is zeroes.
+	// new disk, all of it is zeroes. That makes the last cold boot timestamp be
+	// the Unix epoch (midnight UTC 1970-01-01) but how much do we really care?
 	driver.image.Write(bytes.Repeat([]byte{0}, 20))
 
 	firstDataBlock := 2 + (inodeBitmapSize / 2)
