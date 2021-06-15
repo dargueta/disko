@@ -31,8 +31,11 @@ const FlagNonOwnerWrite = 0o000001     // S_IWOTH | S_IWGRP
 // exception that I added in `FlagIsModified`. The file system documentation
 // clearly states that `FlagIsModified` is always set, so I think that may be a
 // bug in their code (unless I misread it and it's set elsewhere).
-const DefaultDirectoryPermissions = FlagFileAllocated | FlagIsDirectory | FlagIsModified |
-	FlagOwnerRead | FlagOwnerWrite | FlagNonOwnerRead
+const RawDefaultDirectoryPermissions = FlagFileAllocated | FlagIsDirectory |
+	FlagIsModified | FlagOwnerRead | FlagOwnerWrite | FlagNonOwnerRead
+
+const CanonicalDefaultDirectoryPermissions = disko.S_IFDIR | disko.S_IRUSR |
+	disko.S_IWUSR | disko.S_IRGRP | disko.S_IROTH
 
 var fsEpoch time.Time = time.Date(1971, 1, 1, 0, 0, 0, 0, nil)
 
@@ -140,7 +143,8 @@ func ConvertFSFlagsToStandard(rawFlags uint16) uint32 {
 	stdFlags := uint32(0)
 
 	if rawFlags&FlagIsDirectory != 0 {
-		stdFlags |= disko.S_IFDIR
+		// N.B. directories must be marked executable on modern *NIX systems.
+		stdFlags |= disko.S_IFDIR | disko.S_IXUSR | disko.S_IXGRP | disko.S_IXOTH
 	}
 	if rawFlags&FlagSetUIDOnExecution != 0 {
 		stdFlags |= disko.S_ISUID
@@ -175,9 +179,6 @@ func ConvertStandardFlagsToFS(flags uint32) uint16 {
 	if flags&disko.S_ISUID != 0 {
 		rawFlags |= FlagSetUIDOnExecution
 	}
-	if flags&disko.S_IXUSR != 0 {
-		rawFlags |= FlagIsExecutable
-	}
 	if flags&disko.S_IRUSR != 0 {
 		rawFlags |= FlagOwnerRead
 	}
@@ -189,6 +190,12 @@ func ConvertStandardFlagsToFS(flags uint32) uint16 {
 	}
 	if flags&(disko.S_IWGRP|disko.S_IWOTH) != 0 {
 		rawFlags |= FlagNonOwnerWrite
+	}
+
+	// Only mark a dirent as executable if it's got execution permissions AND
+	// isn't a directory.
+	if flags&(disko.S_IXUSR|disko.S_IFDIR) == disko.S_IXUSR {
+		rawFlags |= FlagIsExecutable
 	}
 	return rawFlags
 }

@@ -117,7 +117,7 @@ func (driver *Driver) Format(stat disko.FSStat) error {
 	// Write inode list. The root directory's inode always goes first.
 	nowTs := SerializeTimestamp(time.Now())
 	rootDirectoryInode := RawInode{
-		Flags:            DefaultDirectoryPermissions,
+		Flags:            RawDefaultDirectoryPermissions,
 		Nlinks:           1,
 		UserID:           0,
 		Size:             16, // Two directory entries, "." and ".."
