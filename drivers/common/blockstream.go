@@ -8,13 +8,13 @@ import (
 type BlockID uint
 type BlockData []byte
 
-// BlockDevice is an abstraction layer around a stream to make it look like a
+// BlockStream is an abstraction layer around a stream to make it look like a
 // block stream, e.g. a file that can only be read from or written to in
 // multiples of its fundamental unit, a "block".
 //
 // The exposed fields are for informational purposes only and should never be
 // changed.
-type BlockDevice struct {
+type BlockStream struct {
 	// BlockSize gives the size of a block on this device, in bytes. All reads
 	// and writes must be done in integer multiples of this size.
 	BlockSize uint
@@ -27,8 +27,8 @@ type BlockDevice struct {
 	stream      *io.Seeker
 }
 
-func NewBlockDevice(stream *io.Seeker, totalBlocks uint, blockSize uint, startOffset int64) BlockDevice {
-	return BlockDevice{
+func NewBlockDevice(stream *io.Seeker, totalBlocks uint, blockSize uint, startOffset int64) BlockStream {
+	return BlockStream{
 		StartOffset: startOffset,
 		BlockSize:   blockSize,
 		TotalBlocks: totalBlocks,
@@ -38,11 +38,11 @@ func NewBlockDevice(stream *io.Seeker, totalBlocks uint, blockSize uint, startOf
 
 // NewSectorDevice is a constructor that creates a new BlockDevice with 512-byte
 // blocks and starts from an offset of 0.
-func NewSectorDevice(stream *io.Seeker, totalBlocks uint) BlockDevice {
+func NewSectorDevice(stream *io.Seeker, totalBlocks uint) BlockStream {
 	return NewBlockDevice(stream, totalBlocks, 512, 0)
 }
 
-func (device *BlockDevice) BlockIDToFileOffset(blockID BlockID) (int64, error) {
+func (device *BlockStream) BlockIDToFileOffset(blockID BlockID) (int64, error) {
 	if uint(blockID) >= device.TotalBlocks {
 		return -1,
 			fmt.Errorf(
@@ -53,7 +53,7 @@ func (device *BlockDevice) BlockIDToFileOffset(blockID BlockID) (int64, error) {
 	return device.StartOffset + (int64(blockID) * int64(device.BlockSize)), nil
 }
 
-func (device *BlockDevice) CheckIOBounds(blockID BlockID, dataLength uint) error {
+func (device *BlockStream) CheckIOBounds(blockID BlockID, dataLength uint) error {
 	if uint(blockID) >= device.TotalBlocks {
 		return fmt.Errorf(
 			"invalid block ID %d: not in range [0, %d)",
@@ -80,7 +80,7 @@ func (device *BlockDevice) CheckIOBounds(blockID BlockID, dataLength uint) error
 	return nil
 }
 
-func (device *BlockDevice) seekToBlock(blockID BlockID) error {
+func (device *BlockStream) seekToBlock(blockID BlockID) error {
 	offset, err := device.BlockIDToFileOffset(blockID)
 	if err != nil {
 		return err
@@ -89,7 +89,7 @@ func (device *BlockDevice) seekToBlock(blockID BlockID) error {
 	return err
 }
 
-func (device *BlockDevice) Read(blockID BlockID, count uint) ([]byte, error) {
+func (device *BlockStream) Read(blockID BlockID, count uint) ([]byte, error) {
 	stream := (*device.stream).(io.ReadSeeker)
 
 	err := device.CheckIOBounds(blockID, count*device.BlockSize)
@@ -113,7 +113,7 @@ func (device *BlockDevice) Read(blockID BlockID, count uint) ([]byte, error) {
 
 // Write writes data to the block device. `data` must be a multiple of the block
 // size.
-func (device *BlockDevice) Write(blockID BlockID, data []byte) error {
+func (device *BlockStream) Write(blockID BlockID, data []byte) error {
 	stream := (*device.stream).(io.WriteSeeker)
 
 	err := device.CheckIOBounds(blockID, uint(len(data)))
