@@ -25,8 +25,14 @@ const FlagOwnerWrite = 0o000004        // S_IWUSR
 const FlagNonOwnerRead = 0o000002      // S_IROTH | S_IRGRP
 const FlagNonOwnerWrite = 0o000001     // S_IWOTH | S_IWGRP
 
+// DefaultDirectoryPermissions is the default value for RawInode.Flags.
+//
+// This value is taken directly from the Unix v1 source code, with the single
+// exception that I added in `FlagIsModified`. The file system documentation
+// clearly states that `FlagIsModified` is always set, so I think that may be a
+// bug in their code (unless I misread it and it's set elsewhere).
 const DefaultDirectoryPermissions = FlagFileAllocated | FlagIsDirectory | FlagIsModified |
-	FlagOwnerRead | FlagOwnerWrite | FlagNonOwnerRead | FlagNonOwnerWrite
+	FlagOwnerRead | FlagOwnerWrite | FlagNonOwnerRead
 
 var fsEpoch time.Time = time.Date(1971, 1, 1, 0, 0, 0, 0, nil)
 
