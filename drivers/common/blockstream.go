@@ -15,9 +15,9 @@ type BlockData []byte
 // The exposed fields are for informational purposes only and should never be
 // changed.
 type BlockStream struct {
-	// BlockSize gives the size of a block on this device, in bytes. All reads
+	// BytesPerBlock gives the size of a block on this device, in bytes. All reads
 	// and writes must be done in integer multiples of this size.
-	BlockSize uint
+	BytesPerBlock uint
 	// TotalBlocksThe total number of blocks in this stream.
 	TotalBlocks uint
 	// StartOffset is an offset from the beginning of the stream, in bytes, that
@@ -29,10 +29,10 @@ type BlockStream struct {
 
 func NewBlockDevice(stream *io.Seeker, totalBlocks uint, blockSize uint, startOffset int64) BlockStream {
 	return BlockStream{
-		StartOffset: startOffset,
-		BlockSize:   blockSize,
-		TotalBlocks: totalBlocks,
-		stream:      stream,
+		StartOffset:   startOffset,
+		BytesPerBlock: blockSize,
+		TotalBlocks:   totalBlocks,
+		stream:        stream,
 	}
 }
 
@@ -50,7 +50,7 @@ func (device *BlockStream) BlockIDToFileOffset(blockID BlockID) (int64, error) {
 				blockID,
 				device.TotalBlocks)
 	}
-	return device.StartOffset + (int64(blockID) * int64(device.BlockSize)), nil
+	return device.StartOffset + (int64(blockID) * int64(device.BytesPerBlock)), nil
 }
 
 func (device *BlockStream) CheckIOBounds(blockID BlockID, dataLength uint) error {
@@ -61,15 +61,15 @@ func (device *BlockStream) CheckIOBounds(blockID BlockID, dataLength uint) error
 			device.TotalBlocks)
 	}
 
-	if dataLength%device.BlockSize != 0 {
+	if dataLength%device.BytesPerBlock != 0 {
 		return fmt.Errorf(
 			"data must be a multiple of the block size (%d B), got %d (remainder %d)",
-			device.BlockSize,
+			device.BytesPerBlock,
 			dataLength,
-			dataLength%device.BlockSize)
+			dataLength%device.BytesPerBlock)
 	}
 
-	dataSizeInBlocks := dataLength / device.BlockSize
+	dataSizeInBlocks := dataLength / device.BytesPerBlock
 	if uint(blockID)+dataSizeInBlocks >= device.TotalBlocks {
 		return fmt.Errorf(
 			"block %d plus %d blocks of data extends past end of image",
@@ -92,7 +92,7 @@ func (device *BlockStream) seekToBlock(blockID BlockID) error {
 func (device *BlockStream) Read(blockID BlockID, count uint) ([]byte, error) {
 	stream := (*device.stream).(io.ReadSeeker)
 
-	err := device.CheckIOBounds(blockID, count*device.BlockSize)
+	err := device.CheckIOBounds(blockID, count*device.BytesPerBlock)
 	if err != nil {
 		return nil, err
 	}
@@ -102,8 +102,8 @@ func (device *BlockStream) Read(blockID BlockID, count uint) ([]byte, error) {
 		return nil, err
 	}
 
-	readSize := device.BlockSize * count
-	buffer := make([]byte, device.BlockSize*count)
+	readSize := device.BytesPerBlock * count
+	buffer := make([]byte, device.BytesPerBlock*count)
 	bytesRead, err := stream.Read(buffer)
 	if bytesRead < int(readSize) || err != nil {
 		return nil, err

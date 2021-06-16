@@ -29,7 +29,7 @@ func NewClusterStream(
 		FirstBlock:        firstBlock,
 		FirstValidCluster: firstValidCluster,
 		LastValidCluster:  lastValidCluster,
-		bytesPerCluster:   blocksPerCluster * blockStream.BlockSize,
+		bytesPerCluster:   blocksPerCluster * blockStream.BytesPerBlock,
 	}, nil
 }
 
@@ -50,7 +50,8 @@ func (stream *ClusterStream) ClusterIDToBlock(clusterID ClusterID) (BlockID, err
 	if err != nil {
 		return 0, err
 	}
-	return stream.FirstBlock + (BlockID(uint(clusterID) * stream.BlocksPerCluster)), nil
+	normalizedCluster := uint(clusterID - stream.FirstValidCluster)
+	return stream.FirstBlock + (BlockID(normalizedCluster * stream.BlocksPerCluster)), nil
 }
 
 func (stream *ClusterStream) CheckIOBounds(cluster ClusterID, dataLength uint) error {
