@@ -58,6 +58,15 @@ Against my better judgement I'm making this open-source for anyone to use at the
 peril. This is released under the terms of the BSD 3-Clause License. Please see
 LICENSE.txt in this repository for the legal text.
 
+Acknowledgments
+---------------
+
+This project uses the following third-party packages in accordance with their
+licenses. A project's appearance in this list does not imply endorsement by or
+affiliation with the author.
+
+* `go-bitmap <https://github.com/boljen/go-bitmap>`_ by Bol Christophe
+
 
 Footnotes
 ---------
