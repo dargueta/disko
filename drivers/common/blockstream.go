@@ -27,7 +27,9 @@ type BlockStream struct {
 	stream      *io.Seeker
 }
 
-func NewBlockDevice(stream *io.Seeker, totalBlocks uint, blockSize uint, startOffset int64) BlockStream {
+func NewBlockStream(
+	stream *io.Seeker, totalBlocks uint, blockSize uint, startOffset int64,
+) BlockStream {
 	return BlockStream{
 		StartOffset:   startOffset,
 		BytesPerBlock: blockSize,
@@ -36,12 +38,22 @@ func NewBlockDevice(stream *io.Seeker, totalBlocks uint, blockSize uint, startOf
 	}
 }
 
-// NewSectorDevice is a constructor that creates a new BlockDevice with 512-byte
-// blocks and starts from an offset of 0.
-func NewSectorDevice(stream *io.Seeker, totalBlocks uint) BlockStream {
-	return NewBlockDevice(stream, totalBlocks, 512, 0)
+func DetermineBlockCount(stream *io.Seeker, blockSize uint) (uint, error) {
+	offset, err := (*stream).Seek(0, io.SeekEnd)
+	if err != nil {
+		return 0, err
+	}
+	return uint(offset / int64(blockSize)), nil
 }
 
+// NewSectorDevice is a constructor that creates a new BlockDevice with 512-byte
+// blocks and starts from an offset of 0.
+func NewBasicBlockStream(stream *io.Seeker, totalBlocks uint) BlockStream {
+	return NewBlockStream(stream, totalBlocks, 512, 0)
+}
+
+// BlockIDToFileOffset converts a block ID into a byte offset into the backing
+// I/O stream.
 func (device *BlockStream) BlockIDToFileOffset(blockID BlockID) (int64, error) {
 	if uint(blockID) >= device.TotalBlocks {
 		return -1,
@@ -53,6 +65,7 @@ func (device *BlockStream) BlockIDToFileOffset(blockID BlockID) (int64, error) {
 	return device.StartOffset + (int64(blockID) * int64(device.BytesPerBlock)), nil
 }
 
+// CheckIOBounds checks to see
 func (device *BlockStream) CheckIOBounds(blockID BlockID, dataLength uint) error {
 	if uint(blockID) >= device.TotalBlocks {
 		return fmt.Errorf(
@@ -89,6 +102,7 @@ func (device *BlockStream) seekToBlock(blockID BlockID) error {
 	return err
 }
 
+// Read reads one or more blocks starting from `blockID`.
 func (device *BlockStream) Read(blockID BlockID, count uint) ([]byte, error) {
 	stream := (*device.stream).(io.ReadSeeker)
 
