@@ -8,6 +8,7 @@ import (
 
 	"github.com/boljen/go-bitmap"
 	"github.com/dargueta/disko"
+	"github.com/dargueta/disko/drivers/common"
 )
 
 type PhysicalBlock uint16
@@ -65,28 +66,30 @@ type Driver struct {
 	BlockFreeMap bitmap.Bitmap
 	Inodes       []Inode
 	isMounted    bool
-	image        *os.File
+	rawStream    *os.File
+	image        common.BlockStream
 }
 
 const TimestampResolution time.Duration = time.Second / 60
 
 func NewDriverFromFile(file *os.File) (Driver, error) {
-	driver := Driver{image: file}
-	// TODO
+	totalBlocks, err := common.DetermineBlockCount(file, 512)
+	if err != nil {
+		return Driver{}, err
+	}
 
+	driver := Driver{
+		rawStream: file,
+		image:     common.NewBasicBlockStream(file, totalBlocks)}
 	return driver, nil
 }
 
 func SerializeTimestamp(tstamp time.Time) uint32 {
-	delta := tstamp.Sub(fsEpoch)
-
-	// Timestamps are represented on disk in sixtieths of a second, so sixty
-	// temporal units on disk are 1E9 units here.
-	return uint32(delta / TimestampResolution)
+	return uint32(tstamp.Unix())
 }
 
 func DeserializeTimestamp(tstamp uint32) time.Time {
-	return fsEpoch.Add(time.Duration(tstamp) * TimestampResolution)
+	return time.Unix(int64(tstamp), 0)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -98,19 +101,19 @@ func (driver *Driver) Mount(flags disko.MountFlags) error {
 	}
 
 	var blockBitmapSize uint16
-	err := binary.Read(driver.image, binary.LittleEndian, &blockBitmapSize)
+	err := binary.Read(driver.rawStream, binary.LittleEndian, &blockBitmapSize)
 	if err != nil {
 		return err
 	}
 
 	blockBitmap := make([]byte, blockBitmapSize)
-	_, err = driver.image.Read(blockBitmap)
+	_, err = driver.rawStream.Read(blockBitmap)
 	if err != nil {
 		return err
 	}
 
 	var inodeBitmapSize uint16
-	err = binary.Read(driver.image, binary.LittleEndian, &inodeBitmapSize)
+	err = binary.Read(driver.rawStream, binary.LittleEndian, &inodeBitmapSize)
 	if err != nil {
 		return err
 	}
@@ -124,7 +127,13 @@ func (driver *Driver) Mount(flags disko.MountFlags) error {
 	}
 
 	inodeBitmap := make([]byte, inodeBitmapSize)
-	_, err = driver.image.Read(inodeBitmap)
+	_, err = driver.rawStream.Read(inodeBitmap)
+	if err != nil {
+		return err
+	}
+
+	rawInodes := make([]RawInode, inodeBitmapSize*8)
+	err = binary.Read(driver.rawStream, binary.LittleEndian, rawInodes[:])
 	if err != nil {
 		return err
 	}

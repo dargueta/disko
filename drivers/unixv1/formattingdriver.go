@@ -81,14 +81,14 @@ func (driver *Driver) Format(stat disko.FSStat) error {
 		return disko.NewDriverErrorWithMessage(disko.EINVAL, msg)
 	}
 
-	driver.image.Truncate(int64(stat.TotalBlocks) * 512)
-	driver.image.Seek(0, io.SeekStart)
+	driver.rawStream.Truncate(int64(stat.TotalBlocks) * 512)
+	driver.rawStream.Seek(0, io.SeekStart)
 
 	var wbuf [2]byte
 
 	// Write free block bitmap size
 	binary.LittleEndian.PutUint16(wbuf[:], uint16(blockBitmapSize))
-	driver.image.Write(wbuf[:])
+	driver.rawStream.Write(wbuf[:])
 
 	blockBitmap := bitmap.New(int(stat.TotalBlocks))
 	for i := 0; i < int(stat.TotalBlocks); i++ {
@@ -98,20 +98,20 @@ func (driver *Driver) Format(stat disko.FSStat) error {
 	}
 
 	// Write free block bitmap
-	driver.image.Write(blockBitmap.Data(false))
+	driver.rawStream.Write(blockBitmap.Data(false))
 
 	// Write size of inode bitmap
 	binary.LittleEndian.PutUint16(wbuf[:], uint16(inodeBitmapSize))
-	driver.image.Write(wbuf[:])
+	driver.rawStream.Write(wbuf[:])
 
 	// Write free inode bitmap. Since a 1 indicates the inode is in use, this is
 	// all null bytes.
-	driver.image.Write(bytes.Repeat([]byte{0}, int(inodeBitmapSize)))
+	driver.rawStream.Write(bytes.Repeat([]byte{0}, int(inodeBitmapSize)))
 
 	// Write miscellaneous disk statistics, a total of 20 bytes. Since this is a
 	// new disk, all of it is zeroes. That makes the last cold boot timestamp be
 	// the Unix epoch (midnight UTC 1970-01-01) but how much do we really care?
-	driver.image.Write(bytes.Repeat([]byte{0}, 20))
+	driver.rawStream.Write(bytes.Repeat([]byte{0}, 20))
 
 	firstDataBlock := 2 + (inodeBitmapSize / 2)
 
@@ -127,12 +127,12 @@ func (driver *Driver) Format(stat disko.FSStat) error {
 		LastModifiedTime: nowTs,
 	}
 	rootDirectoryInode.Blocks[0] = PhysicalBlock(firstDataBlock)
-	binary.Write(driver.image, binary.LittleEndian, &rootDirectoryInode)
+	binary.Write(driver.rawStream, binary.LittleEndian, &rootDirectoryInode)
 
 	// Subsequent inodes go here
 	inode := RawInode{Flags: FlagIsModified}
 	for i := 1; i < int(inodeBitmapSize)*8; i++ {
-		err := binary.Write(driver.image, binary.LittleEndian, &inode)
+		err := binary.Write(driver.rawStream, binary.LittleEndian, &inode)
 		if err != nil {
 			return err
 		}
@@ -140,13 +140,13 @@ func (driver *Driver) Format(stat disko.FSStat) error {
 
 	// The ilist has been completely written out. Seek into the first data block
 	// and write the "." and ".." entries for the root directory.
-	driver.image.Seek(stat.BlockSize*int64(firstDataBlock), io.SeekStart)
+	driver.rawStream.Seek(stat.BlockSize*int64(firstDataBlock), io.SeekStart)
 	binary.Write(
-		driver.image,
+		driver.rawStream,
 		binary.LittleEndian,
 		RawDirent{INumber: 41, Name: [8]byte{'.'}})
 	binary.Write(
-		driver.image,
+		driver.rawStream,
 		binary.LittleEndian,
 		RawDirent{INumber: 41, Name: [8]byte{'.', '.'}})
 
