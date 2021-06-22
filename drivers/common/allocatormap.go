@@ -1,4 +1,4 @@
-// Block management layer
+// Bitmap allocator
 
 package common
 
@@ -9,25 +9,25 @@ import (
 	"github.com/dargueta/disko"
 )
 
-type BlockManager struct {
+type Allocator struct {
 	AllocationBitmap   bitmap.Bitmap
-	blockStream        BlockStream
-	lastAllocatedBlock BlockID
+	lastAllocatedIndex uint
+	TotalUnits         uint
 }
 
-func NewBlockManager(blockStream BlockStream) BlockManager {
-	return BlockManager{
-		blockStream:      blockStream,
-		AllocationBitmap: bitmap.New(int(blockStream.TotalBlocks)),
+func NewAllocator(totalUnits uint) Allocator {
+	return Allocator{
+		AllocationBitmap: bitmap.New(int(totalUnits)),
+		TotalUnits:       totalUnits,
 	}
 }
 
 // AllocateBlock allocates the first available block it finds and returns its
 // index. If no blocks are available, it returns an error.
-func (manager *BlockManager) AllocateBlock() (BlockID, error) {
-	for i := uint(0); i < manager.blockStream.TotalBlocks; i++ {
-		if !manager.AllocationBitmap.Get(int(i)) {
-			manager.AllocationBitmap.Set(int(i), true)
+func (alloc *Allocator) AllocateBlock() (BlockID, error) {
+	for i := uint(0); i < alloc.TotalUnits; i++ {
+		if !alloc.AllocationBitmap.Get(int(i)) {
+			alloc.AllocationBitmap.Set(int(i), true)
 			return BlockID(i), nil
 		}
 	}
@@ -37,28 +37,28 @@ func (manager *BlockManager) AllocateBlock() (BlockID, error) {
 
 // FreeBlock frees an allocated block. Trying to free a block that is already
 // allocated will return the errno code EALREADY.
-func (manager *BlockManager) FreeBlock(block BlockID) error {
-	if block >= BlockID(manager.blockStream.TotalBlocks) {
+func (alloc *Allocator) FreeBlock(block BlockID) error {
+	if block >= BlockID(alloc.TotalUnits) {
 		msg := fmt.Sprintf(
 			"invalid block id: %d not in range [0, %d)",
 			block,
-			manager.blockStream.TotalBlocks)
+			alloc.TotalUnits)
 		return disko.NewDriverErrorWithMessage(disko.EINVAL, msg)
 	}
-	if !manager.AllocationBitmap.Get(int(block)) {
+	if !alloc.AllocationBitmap.Get(int(block)) {
 		msg := fmt.Sprintf("block %d is already free", block)
 		return disko.NewDriverErrorWithMessage(disko.EALREADY, msg)
 	}
 
-	manager.AllocationBitmap.Set(int(block), false)
+	alloc.AllocationBitmap.Set(int(block), false)
 	return nil
 }
 
-func (manager *BlockManager) findRun(count uint, value bool) (BlockID, error) {
+func (manager *Allocator) findRun(count uint, value bool) (BlockID, error) {
 	runSize := uint(0)
 	runStart := BlockID(0)
 
-	for i := uint(0); i < manager.blockStream.TotalBlocks; i++ {
+	for i := uint(0); i < manager.TotalUnits; i++ {
 		bit := manager.AllocationBitmap.Get(int(i))
 		if bit == !value {
 			// We hit the opposite value we were looking for, so this is the end
@@ -86,7 +86,7 @@ func (manager *BlockManager) findRun(count uint, value bool) (BlockID, error) {
 
 // AllocateContiguousBlocks allocates a set of contiguous blocks in a first-fit
 // manner.
-func (manager *BlockManager) AllocateContiguousBlocks(count uint) (BlockID, error) {
+func (manager *Allocator) AllocateContiguousBlocks(count uint) (BlockID, error) {
 	runStart, err := manager.findRun(count, false)
 	if err != nil {
 		return BlockID(0), err
