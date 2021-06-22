@@ -1,8 +1,8 @@
-Disko -- A Disk Image Manager
-=============================
+Disko: A Disk Image Editor
+==========================
 
 This is purely for the purpose of my learning Go and I don't want to have just one copy
-on my hard drive. This should not be taken seriously at all. Don't use it.
+of the source code on my hard drive. This should not be taken seriously at all. Don't use it.
 
 File Systems
 ------------
@@ -12,24 +12,30 @@ for, as well as the status of the capabilities. You may notice that there are a
 lot of old formats here; this is because I've recently gotten into retro computing
 and want to be able to play around with old systems.
 
-=========== ================ ==== ==================== ================ ============
-File System Format New Image Read Write Existing Files Create New Files Delete Files
------------ ---------------- ---- -------------------- ---------------- ------------
+=============== ================ ==== ==================== ================ ============
+File System     Format New Image Read Write Existing Files Create New Files Delete Files
+--------------- ---------------- ---- -------------------- ---------------- ------------
 CP/M 1.4
 CP/M 2.2
 CP/M 3.1
 CP/M 4.1
-FAT 8       ✅ [#]_           ✅
+FAT 8           B [#]_
 FAT 12
 FAT 16
 FAT 32
 MINIX
-Unix V1FS
+Unix V1FS [#]_  ✅
 Unix V6FS
 Unix V7FS
 Unix V10FS
 XV6
-=========== ================ ==== ==================== ================ ============
+=============== ================ ==== ==================== ================ ============
+
+*Legend:*
+
+* ✅: Full support
+* ``B``: Beta, largely stable, may contain bugs
+* ``A``: Alpha, use at your peril
 
 
 CLI Features
@@ -73,3 +79,6 @@ Footnotes
 ---------
 
 .. [#] Works for the larger image size; smaller image size is buggy.
+.. [#] Timestamps are stored using the 1973 revision that uses the canonical
+       Unix epoch. The first specification can't represent timestamps past
+       1973-04-08 12:06:28.250.
