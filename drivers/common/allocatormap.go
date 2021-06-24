@@ -24,6 +24,32 @@ func NewAllocator(totalUnits uint) Allocator {
 	}
 }
 
+// NewAllocatorFromFreeBitmap creates a new allocator starting from an existing
+// bitmap that indicates which elements are available for use.
+func NewAllocatorFromFreeBitmap(freeMap []byte) Allocator {
+	alloc := Allocator{
+		AllocationBitmap: bitmap.New(len(freeMap) * 8),
+		TotalUnits:       uint(len(freeMap) * 8),
+	}
+
+	for i := range freeMap {
+		bit := bitmap.Get(freeMap, i)
+		alloc.AllocationBitmap.Set(i, !bit)
+	}
+	return alloc
+}
+
+// NewAllocatorFromInUseBitmap creates a new allocator starting from an existing
+// bitmap that indicates which elements are in use.
+func NewAllocatorFromInUseBitmap(inUseMap []byte) Allocator {
+	bitmapBuf := make([]byte, len(inUseMap))
+	copy(bitmapBuf, inUseMap)
+	return Allocator{
+		AllocationBitmap: bitmap.Bitmap(bitmapBuf),
+		TotalUnits:       uint(len(inUseMap) * 8),
+	}
+}
+
 // AllocateSingle allocates the first available unit it finds and returns its
 // index. If no units are available, it returns an error.
 func (alloc *Allocator) AllocateSingle() (UnitID, error) {

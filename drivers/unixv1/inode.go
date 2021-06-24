@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/dargueta/disko"
+	"github.com/dargueta/disko/drivers/common"
 )
 
 type RawInode struct {
@@ -51,4 +52,16 @@ func InodeToRawInode(inode Inode) (INumber, RawInode) {
 	}
 	copy(raw.Blocks[:], inode.blocks)
 	return INumber(inode.InodeNumber), raw
+}
+
+type InodeManager struct {
+	alloc       common.Allocator
+	blockStream common.BlockStream
+}
+
+func InodeManagerFromBitmap(blockStream common.BlockStream, allocationMap []byte) InodeManager {
+	return InodeManager{
+		blockStream: blockStream,
+		alloc:       common.NewAllocatorFromInUseBitmap(allocationMap),
+	}
 }
