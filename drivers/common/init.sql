@@ -38,7 +38,8 @@ CREATE TABLE allocated_blocks (
     id INTEGER PRIMARY KEY,
     inode_id INTEGER REFERENCES inodes(id) ON DELETE CASCADE,
     block_id INTEGER NOT NULL,
-    sequence_number INTEGER,
+    sequence_number INTEGER NOT NULL,
+    indirection_level INTEGER DEFAULT 0,
     UNIQUE(inode_id, sequence_number)
 );
 -- Same note as earlier -- no need to create a separate index on the inode ID,
