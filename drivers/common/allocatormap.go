@@ -17,6 +17,7 @@ type Allocator struct {
 	TotalUnits         uint
 }
 
+// NewAllocator creates a new allocation bitmap with all bits cleared.
 func NewAllocator(totalUnits uint) Allocator {
 	return Allocator{
 		AllocationBitmap: bitmap.New(int(totalUnits)),
@@ -25,7 +26,7 @@ func NewAllocator(totalUnits uint) Allocator {
 }
 
 // NewAllocatorFromFreeBitmap creates a new allocator starting from an existing
-// bitmap that indicates which elements are available for use.
+// bitmap that indicates which units are available for use.
 func NewAllocatorFromFreeBitmap(freeMap []byte) Allocator {
 	alloc := Allocator{
 		AllocationBitmap: bitmap.New(len(freeMap) * 8),
@@ -40,7 +41,7 @@ func NewAllocatorFromFreeBitmap(freeMap []byte) Allocator {
 }
 
 // NewAllocatorFromInUseBitmap creates a new allocator starting from an existing
-// bitmap that indicates which elements are in use.
+// bitmap that indicates which units are in use.
 func NewAllocatorFromInUseBitmap(inUseMap []byte) Allocator {
 	bitmapBuf := make([]byte, len(inUseMap))
 	copy(bitmapBuf, inUseMap)
@@ -56,6 +57,7 @@ func (alloc *Allocator) AllocateSingle() (UnitID, error) {
 	for i := uint(0); i < alloc.TotalUnits; i++ {
 		if !alloc.AllocationBitmap.Get(int(i)) {
 			alloc.AllocationBitmap.Set(int(i), true)
+			alloc.lastAllocatedIndex = UnitID(i)
 			return UnitID(i), nil
 		}
 	}
@@ -63,8 +65,8 @@ func (alloc *Allocator) AllocateSingle() (UnitID, error) {
 	return 0, disko.NewDriverError(disko.ENOSPC)
 }
 
-// FreeBlock frees an allocated block. Trying to free a block that is already
-// allocated will return the errno code EALREADY.
+// FreeSingle frees an allocated unit. Trying to free a unit that isn't allocated
+// will return the errno code EALREADY.
 func (alloc *Allocator) FreeSingle(unit UnitID) error {
 	if unit >= UnitID(alloc.TotalUnits) {
 		msg := fmt.Sprintf(
@@ -145,9 +147,13 @@ func (alloc *Allocator) AllocateContiguous(count uint) (UnitID, error) {
 	for i := uint(0); i < count; i++ {
 		alloc.AllocationBitmap.Set(int(i+uint(runStart)), true)
 	}
+	alloc.lastAllocatedIndex = UnitID(uint(runStart) + count - 1)
 	return runStart, nil
 }
 
+// FreeContiguous frees a set of contiguous `count` units starting at index
+// `start`. If any units in the range are already free, it fails immediately and
+// the bitmap is *not* modified.
 func (alloc *Allocator) FreeContiguous(start UnitID, count uint) error {
 	if !alloc.HasContiguousValuesAt(start, true, count) {
 		msg := fmt.Sprintf(
