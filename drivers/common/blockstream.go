@@ -18,7 +18,7 @@ type BlockStream struct {
 	// BytesPerBlock gives the size of a block on this device, in bytes. All reads
 	// and writes must be done in integer multiples of this size.
 	BytesPerBlock uint
-	// TotalBlocksThe total number of blocks in this stream.
+	// TotalBlocks is the total number of blocks in this stream.
 	TotalBlocks uint
 	// StartOffset is an offset from the beginning of the stream, in bytes, that
 	// will be considered the beginning of block 0 for the device. This is useful
@@ -38,6 +38,8 @@ func NewBlockStream(
 	}
 }
 
+// DetermineBlockCount gives the total number of blocks in a stream, rounded down
+// to the nearest block.
 func DetermineBlockCount(stream *io.Seeker, blockSize uint) (uint, error) {
 	offset, err := (*stream).Seek(0, io.SeekEnd)
 	if err != nil {
@@ -65,7 +67,9 @@ func (device *BlockStream) BlockIDToFileOffset(blockID BlockID) (int64, error) {
 	return device.StartOffset + (int64(blockID) * int64(device.BytesPerBlock)), nil
 }
 
-// CheckIOBounds checks to see
+// CheckIOBounds checks to see if `dataLength` bytes can be read from or written
+// to the block stream, starting at blockID. If the bounds check fails, it returns
+// an error indicating exactly what went wrong.
 func (device *BlockStream) CheckIOBounds(blockID BlockID, dataLength uint) error {
 	if uint(blockID) >= device.TotalBlocks {
 		return fmt.Errorf(
@@ -93,6 +97,8 @@ func (device *BlockStream) CheckIOBounds(blockID BlockID, dataLength uint) error
 	return nil
 }
 
+// seekToBlock positions the stream pointer at the byte offset where the given
+// block starts.
 func (device *BlockStream) seekToBlock(blockID BlockID) error {
 	offset, err := device.BlockIDToFileOffset(blockID)
 	if err != nil {
@@ -102,7 +108,7 @@ func (device *BlockStream) seekToBlock(blockID BlockID) error {
 	return err
 }
 
-// Read reads one or more blocks starting from `blockID`.
+// Read reads `count` whole blocks starting from `blockID`.
 func (device *BlockStream) Read(blockID BlockID, count uint) ([]byte, error) {
 	stream := (*device.stream).(io.ReadSeeker)
 
