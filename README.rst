@@ -61,9 +61,9 @@ Interactive editing
 License
 -------
 
-Against my better judgement I'm making this open-source for anyone to use at their own
-peril. This is released under the terms of the BSD 3-Clause License. Please see
-LICENSE.txt in this repository for the legal text.
+Against my better judgement I'm open-sourcing this footgun for anyone to use,
+albeit at their own peril. This is released under the terms of the BSD 3-Clause
+License. Please see LICENSE.txt in this repository for the legal text.
 
 Acknowledgments
 ---------------
