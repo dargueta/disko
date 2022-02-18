@@ -6,6 +6,9 @@ import (
 
 type ClusterID uint
 
+// ClusterStream is an abstraction layer for systems that deal with groups of
+// multiple blocks, optionally offset from the beginning of the disk. It's most
+// useful for FAT 12/16/32
 type ClusterStream struct {
 	BlockStream       *BlockStream
 	BlocksPerCluster  uint
@@ -45,6 +48,8 @@ func NewBasicClusterStream(
 		ClusterID(blockStream.TotalBlocks/blocksPerCluster))
 }
 
+// ClusterIDToBlock takes a cluster ID and returns the ID of the first block of
+// that cluster.
 func (stream *ClusterStream) ClusterIDToBlock(clusterID ClusterID) (BlockID, error) {
 	err := stream.CheckIOBounds(clusterID, 0)
 	if err != nil {
@@ -82,6 +87,7 @@ func (stream *ClusterStream) CheckIOBounds(cluster ClusterID, dataLength uint) e
 	return nil
 }
 
+// Read reads `count` clusters, starting at `cluster`.
 func (stream *ClusterStream) Read(cluster ClusterID, count uint) ([]byte, error) {
 	err := stream.CheckIOBounds(cluster, count)
 	if err != nil {
@@ -95,6 +101,8 @@ func (stream *ClusterStream) Read(cluster ClusterID, count uint) ([]byte, error)
 	return stream.BlockStream.Read(block, count*stream.BlocksPerCluster)
 }
 
+// Write writes a whole number of clusters starting at `cluster`. The length of
+// `data` must be an exact multiple of the cluster size, in bytes.
 func (stream *ClusterStream) Write(cluster ClusterID, data []byte) error {
 	err := stream.CheckIOBounds(cluster, uint(len(data)))
 	if err != nil {
