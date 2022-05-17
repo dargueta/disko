@@ -1,16 +1,28 @@
 BINDIR := bin
+DRIVER_BASE_DIR := drivers
+
 
 .PHONY: all
-all: $(BINDIR)/disko $(BINDIR)/fat
+all: $(BINDIR)/disko
 
-$(BINDIR)/disko: api.go errors.go
-	go build -o $@ $<
+BASE_SOURCES = $(wildcard ./*.go)
 
-FAT_DIR := drivers/fat
-FAT_SOURCES := $(wildcard $(FAT_DIR)/*.go)
+DRIVER_NAMES = common cpm fat fat8 lbr minix unixv1 unixv6 unixv10
+DRIVER_DIRECTORIES = $(addprefix drivers/,$(DRIVER_NAMES))
+ALL_DRIVER_SOURCES = $(foreach d,$(DRIVER_DIRECTORIES),$(wildcard $(d)/*.go))
 
-$(BINDIR)/fat: $(FAT_SOURCES)
-	go build -o $@ $(FAT_SOURCES)
+CLI_SOURCES = $(wildcard cmd/*.go)
+
+ALL_SOURCES = $(ALL_DRIVER_SOURCES) $(CLI_SOURCES) $(BASE_SOURCES)
+
+
+$(BINDIR)/disko: $(ALL_SOURCES) | $(BINDIR)
+	go build -o $@ $^
+
+
+$(BINDIR):
+	mkdir -p $@
+
 
 .PHONY: clean
 clean:
