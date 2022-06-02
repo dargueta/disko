@@ -62,7 +62,7 @@ License
 -------
 
 Against my better judgement I'm open-sourcing this footgun for anyone to use,
-albeit at their own peril. This is released under the terms of the BSD 3-Clause
+albeit at their own peril. This is released under the terms of the Apache 2.0
 License. Please see LICENSE.txt in this repository for the legal text.
 
 Acknowledgments
