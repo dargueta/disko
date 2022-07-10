@@ -27,7 +27,11 @@ const (
 	// MountFlagsAllowAdminister indicates to Driver.Mount() that the image
 	// should be mounted with the ability to change file permissions.
 	MountFlagsAllowAdminister = MountFlags(1 << iota)
-	MountFlagsCustomStart     = MountFlags(1 << iota)
+	// MountFlagsCustomStart is the lowest bit flag that is not defined by the
+	// API standard and is free for drivers to use in an implementation-specific
+	// manner. All bits higher than this are guaranteed to be ignored by drivers
+	// that do not recognize them.
+	MountFlagsCustomStart = MountFlags(1 << iota)
 )
 
 const MountFlagsAllowAll = MountFlagsCustomStart - 1
@@ -69,14 +73,15 @@ type FSStat struct {
 	Files uint64
 	// FilesFree is the number of remaining directory entries available for use.
 	// Drivers should set this to 0 for file systems that have no limit on the
-	// maximum directory entries.
+	// maximum number of directory entries.
 	FilesFree uint64
 	// FileSystemID is the serial number for the disk image, if available.
 	FileSystemID uint64
 	// MaxNameLength is the longest possible name for a directory entry, in bytes.
 	// Drivers should set this to 0 if there is no limit.
 	MaxNameLength int64
-	// Flags is
+	// Flags is free for drivers to use as they see fit, but mostly to preserve
+	// flags present in the boot block. Driver-agnostic functions will ignore it.
 	Flags int64
 	// Label is the volume label, if available.
 	Label string
@@ -107,8 +112,8 @@ type FormattingDriver interface {
 
 // OpeningDriver is the interface for drivers implementing the POSIX open(3) function.
 //
-// Drivers need not implement all functionality for valid flags. For example, read-only
-// drivers must return an error if called with the os.O_CREATE flag.
+// Drivers need not implement all functionality for valid flags. For example,
+// read-only drivers must return an error if called with the os.O_CREATE flag.
 type OpeningDriver interface {
 	// OpenFile is equivalent to os.OpenFile.
 	OpenFile(path string, flag int, perm os.FileMode) (*os.File, error)
@@ -123,9 +128,9 @@ type ReadingDriver interface {
 	ReadFile(path string) ([]byte, error)
 	// Stat returns information about the directory entry at the given path.
 	//
-	// If a file system doesn't support a particular feature, drivers should use a
-	// reasonable default value. For most of these 0 is fine, but for compatibility
-	// drivers should use 1 for `Nlinks` and 0o777 for `ModeFlags`.
+	// If a file system doesn't support a particular feature, drivers should use
+	// a reasonable default value. For most of these 0 is fine, but for
+	// compatibility drivers should use 1 for `Nlinks` and 0o777 for `ModeFlags`.
 	Stat(path string) (FileStat, error)
 }
 

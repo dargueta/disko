@@ -10,8 +10,8 @@ the definition in the manual gives a maximum representable date of 1973-04-08
 
 Further implementation details gleaned from a draft version of the Unix V1
 source code. Specifically, I looked at the boot code and hard-coded data as well
-as the file system overview provided as an addendum to the man page in the programmers'
-manual.
+as the file system overview provided as an addendum to the man page in the
+programmers' manual.
 
 Draft source code for Unix v1: http://www.bitsavers.org/pdf/bellLabs/unix/PreliminaryUnixImplementationDocument_Jun72.pdf
 Relevant parts are sections E.0 pp 4 & 7, F.6 (pages 9, 12, and 100+ in the PDF)
