@@ -24,11 +24,11 @@ type BlockStream struct {
 	// will be considered the beginning of block 0 for the device. This is useful
 	// for skipping over MBRs or other volumes stored on the same image.
 	StartOffset int64
-	stream      *io.Seeker
+	stream      io.ReadWriteSeeker
 }
 
 func NewBlockStream(
-	stream *io.Seeker, totalBlocks uint, blockSize uint, startOffset int64,
+	stream io.ReadWriteSeeker, totalBlocks uint, blockSize uint, startOffset int64,
 ) BlockStream {
 	return BlockStream{
 		StartOffset:   startOffset,
@@ -40,8 +40,8 @@ func NewBlockStream(
 
 // DetermineBlockCount gives the total number of blocks in a stream, rounded down
 // to the nearest block.
-func DetermineBlockCount(stream *io.Seeker, blockSize uint) (uint, error) {
-	offset, err := (*stream).Seek(0, io.SeekEnd)
+func DetermineBlockCount(stream io.Seeker, blockSize uint) (uint, error) {
+	offset, err := stream.Seek(0, io.SeekEnd)
 	if err != nil {
 		return 0, err
 	}
@@ -50,7 +50,7 @@ func DetermineBlockCount(stream *io.Seeker, blockSize uint) (uint, error) {
 
 // NewSectorDevice is a constructor that creates a new BlockDevice with 512-byte
 // blocks and starts from an offset of 0.
-func NewBasicBlockStream(stream *io.Seeker, totalBlocks uint) BlockStream {
+func NewBasicBlockStream(stream io.ReadWriteSeeker, totalBlocks uint) BlockStream {
 	return NewBlockStream(stream, totalBlocks, 512, 0)
 }
 
@@ -104,14 +104,12 @@ func (device *BlockStream) seekToBlock(blockID BlockID) error {
 	if err != nil {
 		return err
 	}
-	_, err = (*device.stream).Seek(offset, io.SeekStart)
+	_, err = device.stream.Seek(offset, io.SeekStart)
 	return err
 }
 
 // Read reads `count` whole blocks starting from `blockID`.
 func (device *BlockStream) Read(blockID BlockID, count uint) ([]byte, error) {
-	stream := (*device.stream).(io.ReadSeeker)
-
 	err := device.CheckIOBounds(blockID, count*device.BytesPerBlock)
 	if err != nil {
 		return nil, err
@@ -124,7 +122,7 @@ func (device *BlockStream) Read(blockID BlockID, count uint) ([]byte, error) {
 
 	readSize := device.BytesPerBlock * count
 	buffer := make([]byte, device.BytesPerBlock*count)
-	bytesRead, err := stream.Read(buffer)
+	bytesRead, err := device.stream.Read(buffer)
 	if bytesRead < int(readSize) || err != nil {
 		return nil, err
 	}
@@ -134,8 +132,6 @@ func (device *BlockStream) Read(blockID BlockID, count uint) ([]byte, error) {
 // Write writes data to the block device. `data` must be a multiple of the block
 // size.
 func (device *BlockStream) Write(blockID BlockID, data []byte) error {
-	stream := (*device.stream).(io.WriteSeeker)
-
 	err := device.CheckIOBounds(blockID, uint(len(data)))
 	if err != nil {
 		return err
@@ -146,6 +142,49 @@ func (device *BlockStream) Write(blockID BlockID, data []byte) error {
 		return err
 	}
 
-	_, err = stream.Write(data)
+	_, err = device.stream.Write(data)
+	return err
+}
+
+type StreamTruncator interface {
+	Truncate(size int64) (int64, error)
+}
+
+func (device *BlockStream) Resize(newNumBlocks uint) error {
+	if device.TotalBlocks == newNumBlocks {
+		return nil
+	}
+
+	var err error
+
+	// If the image is smaller than the requested new size, write the number of
+	// missing blocks, filled with nulls.
+	if device.TotalBlocks < newNumBlocks {
+		numMissing := newNumBlocks - device.TotalBlocks
+		nullData := make([]byte, device.BytesPerBlock*numMissing)
+		_, err = device.stream.Write(nullData)
+		return err
+	} else {
+		// The image is larger than the requested new size. Attempt to truncate
+		// it.
+		truncator, ok := device.stream.(StreamTruncator)
+		if ok {
+			_, err = truncator.Truncate(int64(newNumBlocks * device.BytesPerBlock))
+		} else {
+			// The stream doesn't have a compatible Truncate() function, so we
+			// can't shrink the image.
+			err = fmt.Errorf(
+				"can't resize image from %d blocks to %d: the underlying stream"+
+					" doesn't provide a way to shrink it",
+				device.TotalBlocks,
+				newNumBlocks,
+			)
+		}
+	}
+
+	if err == nil {
+		device.TotalBlocks = newNumBlocks
+		return nil
+	}
 	return err
 }
