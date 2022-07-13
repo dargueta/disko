@@ -90,17 +90,27 @@ type FSStat struct {
 // Driver is the bare minimum interface for all drivers.
 type Driver interface {
 	// Mount initializes the driver with a file for the disk image. This must be
-	// called before using the driver. Drivers should ignore subsequent calls to
-	// Mount() before an Unmount().
+	// called before using the driver.
+	//
+	// In the event that an image is already mounted when this is called, one of
+	// two things will happen: if `flags` is NOT identical to `CurrentMountFlags()`,
+	// the function fails immediately with EBUSY. Otherwise, it "succeeds" and
+	// returns nil. In both cases, the function should not modify the driver's
+	// state.
 	Mount(flags MountFlags) error
 
+	// CurrentMountFlags returns the flags that the volume is currently mounted
+	// with.
+	CurrentMountFlags() MountFlags
+
 	// Unmount flushes all pending changes to the disk image. The driver must
-	// not be used after this function is called. This must fail with EBUSY if
-	// any resources are still in use, such as open files.
+	// not be used after this function is called, except to call `Mount()` again.
+	// This must fail with EBUSY if any resources are still in use, such as open
+	// files.
 	Unmount() error
 
 	// GetFSInfo returns basic information about the file system. It must not be
-	// called before the file system is mounted.
+	// called if the file system is unmounted.
 	GetFSInfo() (FSStat, error)
 }
 
