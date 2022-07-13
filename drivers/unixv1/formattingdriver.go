@@ -12,6 +12,8 @@ import (
 	"github.com/dargueta/disko"
 )
 
+// IsValidBlockAndInodeCount determines if the number of inodes is valid given
+// a disk of size `numBlocks`. This assumes that `numBlocks` is greater than 66.
 func IsValidBlockAndInodeCount(numBlocks, numInodes uint) bool {
 	blockBitmapSize := (numBlocks + (-numBlocks % 8)) / 8
 	inodeBitmapSize := (numInodes + (-numInodes % 8)) / 8
@@ -26,7 +28,7 @@ func IsValidBlockAndInodeCount(numBlocks, numInodes uint) bool {
 	return (blockBitmapSize + inodeBitmapSize) <= 1000
 }
 
-func (driver *Driver) Format(stat disko.FSStat) error {
+func (driver *UnixV1Driver) Format(stat disko.FSStat) error {
 	if driver.isMounted {
 		return disko.NewDriverError(disko.EBUSY)
 	}
@@ -81,7 +83,7 @@ func (driver *Driver) Format(stat disko.FSStat) error {
 		return disko.NewDriverErrorWithMessage(disko.EINVAL, msg)
 	}
 
-	driver.rawStream.Truncate(int64(stat.TotalBlocks) * 512)
+	driver.image.Resize(uint(stat.TotalBlocks))
 	driver.rawStream.Seek(0, io.SeekStart)
 
 	var wbuf [2]byte

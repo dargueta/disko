@@ -3,7 +3,7 @@ package unixv1
 import (
 	"encoding/binary"
 	"fmt"
-	"os"
+	"io"
 	"time"
 
 	"github.com/boljen/go-bitmap"
@@ -45,25 +45,27 @@ type RawDirent struct {
 	Name    [8]byte
 }
 
-type Driver struct {
-	BlockFreeMap bitmap.Bitmap
-	Inodes       []Inode
-	isMounted    bool
-	rawStream    *os.File
-	image        common.BlockStream
+type UnixV1Driver struct {
+	BlockFreeMap      bitmap.Bitmap
+	Inodes            []Inode
+	isMounted         bool
+	rawStream         io.ReadWriteSeeker
+	image             common.BlockStream
+	currentMountFlags disko.MountFlags
 }
 
 const TimestampResolution time.Duration = time.Second / 60
 
-func NewDriverFromFile(file *os.File) (Driver, error) {
-	totalBlocks, err := common.DetermineBlockCount(file, 512)
+func NewDriverFromStream(stream io.ReadWriteSeeker) (UnixV1Driver, error) {
+	totalBlocks, err := common.DetermineBlockCount(stream, 512)
 	if err != nil {
-		return Driver{}, err
+		return UnixV1Driver{}, err
 	}
 
-	driver := Driver{
-		rawStream: file,
-		image:     common.NewBasicBlockStream(file, totalBlocks)}
+	driver := UnixV1Driver{
+		rawStream: stream,
+		image:     common.NewBasicBlockStream(stream, totalBlocks),
+	}
 	return driver, nil
 }
 
@@ -78,10 +80,15 @@ func DeserializeTimestamp(tstamp uint32) time.Time {
 ////////////////////////////////////////////////////////////////////////////////
 // Implementing Driver interface
 
-func (driver *Driver) Mount(flags disko.MountFlags) error {
+func (driver *UnixV1Driver) Mount(flags disko.MountFlags) error {
 	if driver.isMounted {
+		if driver.currentMountFlags == flags {
+			return nil
+		}
 		return disko.NewDriverError(disko.EALREADY)
 	}
+
+	driver.currentMountFlags = flags
 
 	var blockBitmapSize uint16
 	err := binary.Read(driver.rawStream, binary.LittleEndian, &blockBitmapSize)
@@ -126,6 +133,44 @@ func (driver *Driver) Mount(flags disko.MountFlags) error {
 	driver.isMounted = true
 	return nil
 }
+
+func (driver *UnixV1Driver) CurrentMountFlags() disko.MountFlags {
+	return driver.currentMountFlags
+}
+
+// TODO(dargueta): Unmount()
+
+func (driver *UnixV1Driver) GetFSInfo() (disko.FSStat, error) {
+	if !driver.isMounted {
+		return disko.FSStat{}, disko.NewDriverError(disko.EIO)
+	}
+
+	freeBlocks := uint64(0)
+	for i := 0; i < int(driver.image.TotalBlocks); i++ {
+		if driver.BlockFreeMap.Get(i) {
+			freeBlocks++
+		}
+	}
+
+	totalFiles := uint64(0)
+	for _, inode := range driver.Inodes {
+		if inode.IsAllocated {
+			totalFiles++
+		}
+	}
+
+	return disko.FSStat{
+		BlockSize:       512,
+		TotalBlocks:     uint64(driver.image.TotalBlocks),
+		BlocksFree:      freeBlocks,
+		BlocksAvailable: uint64(driver.image.TotalBlocks) - freeBlocks,
+		Files:           totalFiles,
+		FilesFree:       uint64(len(driver.Inodes)),
+		MaxNameLength:   8,
+	}, nil
+}
+
+////////////////////////////////////////////////////////////////////////////////
 
 // ConvertFSFlagsToStandard takes inode flags found in the on-disk representation
 // of an inode and converts them to their standardized Unix equivalents. For
