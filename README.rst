@@ -1,16 +1,21 @@
 Disko: A Disk Image Editor
 ==========================
 
-This is purely for the purpose of my learning Go and I don't want to have just one copy
-of the source code on my hard drive. This should not be taken seriously at all. Don't use it.
+I've recently gotten into retro computing and found I need to create disk images.
+I also wanted to learn Go, so I figured I could kill two birds with one stone
+and create a tool for doing this, written in Go.
+
+You'll notice that there are a lot of ancient disk formats here, and nothing more
+modern like extfs. This is deliberate; I need this for my retro computing projects,
+so a lot of this is of no interest to anyone except those in the retro community.
+
+Why the name? Disk + Go -> DiskGo -> Disko. Obviously.
 
 File Systems
 ------------
 
 The following table shows the file systems that drivers exist (or are planned)
-for, as well as the status of the capabilities. You may notice that there are a
-lot of old formats here; this is because I've recently gotten into retro computing
-and want to be able to play around with old systems.
+for, as well as the status of the capabilities.
 
 =============== ================ ==== ==================== ================ ============
 File System     Format New Image Read Write Existing Files Create New Files Delete Files
