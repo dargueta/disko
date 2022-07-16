@@ -1,6 +1,7 @@
 package common
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 
@@ -158,8 +159,11 @@ func (device *BlockStream) Resize(newNumBlocks uint) error {
 	// If the image is smaller than the requested new size, write the number of
 	// missing blocks, filled with nulls.
 	if device.TotalBlocks < newNumBlocks {
-		numMissing := newNumBlocks - device.TotalBlocks
-		nullData := make([]byte, device.BytesPerBlock*numMissing)
+		numBlocksMissing := newNumBlocks - device.TotalBlocks
+		nullData := bytes.Repeat(
+			[]byte{0},
+			int(device.BytesPerBlock*numBlocksMissing),
+		)
 		_, err = device.stream.Write(nullData)
 		return err
 	} else {
