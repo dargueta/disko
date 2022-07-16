@@ -29,7 +29,7 @@ FAT 12
 FAT 16
 FAT 32
 MINIX
-Unix V1FS [#]_  ✅
+Unix V1FS [#]_  ✔
 Unix V6FS
 Unix V7FS
 Unix V10FS
@@ -38,7 +38,7 @@ XV6
 
 *Legend:*
 
-* ✅: Full support
+* ✔: Full support
 * ``B``: Beta, largely stable, may contain bugs
 * ``A``: Alpha, use at your peril
 
