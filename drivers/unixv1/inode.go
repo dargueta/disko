@@ -55,13 +55,13 @@ func InodeToRawInode(inode Inode) (INumber, RawInode) {
 }
 
 type InodeManager struct {
-	alloc       common.Allocator
+	allocator   common.Allocator
 	blockStream common.BlockStream
 }
 
 func InodeManagerFromBitmap(blockStream common.BlockStream, allocationMap []byte) InodeManager {
 	return InodeManager{
 		blockStream: blockStream,
-		alloc:       common.NewAllocatorFromInUseBitmap(allocationMap),
+		allocator:   common.NewAllocatorFromInUseBitmap(allocationMap),
 	}
 }

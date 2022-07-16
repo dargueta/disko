@@ -62,9 +62,10 @@ func NewDriverFromStream(stream io.ReadWriteSeeker) (UnixV1Driver, error) {
 		return UnixV1Driver{}, err
 	}
 
+	blockStream := common.NewBasicBlockStream(stream, totalBlocks)
 	driver := UnixV1Driver{
 		rawStream: stream,
-		image:     common.NewBasicBlockStream(stream, totalBlocks),
+		image:     blockStream,
 	}
 	return driver, nil
 }
@@ -112,7 +113,8 @@ func (driver *UnixV1Driver) Mount(flags disko.MountFlags) error {
 		message := fmt.Sprintf(
 			"corruption detected: Inode and block bitmaps can't exceed 1000"+
 				" bytes together, got %d",
-			blockBitmapSize+inodeBitmapSize)
+			blockBitmapSize+inodeBitmapSize,
+		)
 		return disko.NewDriverErrorWithMessage(disko.EUCLEAN, message)
 	}
 
@@ -138,7 +140,10 @@ func (driver *UnixV1Driver) CurrentMountFlags() disko.MountFlags {
 	return driver.currentMountFlags
 }
 
-// TODO(dargueta): Unmount()
+func (driver *UnixV1Driver) Unmount() error {
+	driver.currentMountFlags = 0
+	return nil
+}
 
 func (driver *UnixV1Driver) GetFSInfo() (disko.FSStat, error) {
 	if !driver.isMounted {
