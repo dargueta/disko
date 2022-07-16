@@ -1,7 +1,9 @@
 package disko
 
 import (
+	"io"
 	"os"
+	"syscall"
 	"time"
 )
 
@@ -87,6 +89,50 @@ type FSStat struct {
 	Label string
 }
 
+type Truncator interface {
+	Truncate(size int64) error
+}
+
+// File is the expected interface for file handles from drivers.
+//
+// This interface is intended to be more or less a drop-in replacement for
+// `os.File`, *however* not all functions need be implemented. In particular,
+// the deadline-related functions should be no-ops, and `SyscallConn()` should
+// return an ENOSYS error.
+type File interface {
+	io.ReadWriteCloser
+	io.Seeker
+	io.ReaderAt
+	io.ReaderFrom
+	io.WriterAt
+	io.StringWriter
+	Truncator
+
+	// Name returns the name of the file.
+	Name() string
+
+	Chown(uid, gid int) error
+	Sync() error
+	Chdir() error
+	Chmod(mode os.FileMode) error
+
+	// SetDeadline is only present for compatibility with os.File(). Drivers
+	// should implement it as a no-op.
+	SetDeadline(t time.Time) error
+
+	// SetReadDeadline is only present for compatibility with os.File(). Drivers
+	// should implement it as a no-op.
+	SetReadDeadline(t time.Time) error
+
+	// SetWriteDeadline is only present for compatibility with os.File(). Drivers
+	// should implement it as a no-op.
+	SetWriteDeadline(t time.Time) error
+
+	// SyscallConn is only present for compatibility with os.File(). Drivers
+	// should ignore it and return an ENOSYS error immediately.
+	SyscallConn() (syscall.RawConn, error)
+}
+
 // Driver is the bare minimum interface for all drivers.
 type Driver interface {
 	// Mount initializes the driver with a file for the disk image. This must be
@@ -100,10 +146,10 @@ type Driver interface {
 	Mount(flags MountFlags) error
 
 	// CurrentMountFlags returns the flags that the volume is currently mounted
-	// with.
+	// with. If 0, the image is not mounted. This can never fail.
 	CurrentMountFlags() MountFlags
 
-	// Unmount flushes all pending changes to the disk image. The driver must
+	// Unmount flushes all pending changes to the disk image. The driver should
 	// not be used after this function is called, except to call `Mount()` again.
 	// This must fail with EBUSY if any resources are still in use, such as open
 	// files.
@@ -126,13 +172,13 @@ type FormattingDriver interface {
 // read-only drivers must return an error if called with the os.O_CREATE flag.
 type OpeningDriver interface {
 	// OpenFile is equivalent to os.OpenFile.
-	OpenFile(path string, flag int, perm os.FileMode) (*os.File, error)
+	OpenFile(path string, flag int, perm os.FileMode) (File, error)
 }
 
 // ReadingDriver is the interface for drivers supporting read operations.
 type ReadingDriver interface {
 	SameFile(fi1, fi2 os.FileInfo) bool
-	Open(path string) (*os.File, error)
+	Open(path string) (File, error)
 	ReadDir(path string) ([]DirectoryEntry, error)
 	// ReadFile return the contents of the file at the given path.
 	ReadFile(path string) ([]byte, error)
@@ -164,7 +210,7 @@ type WritingDriver interface {
 	RemoveAll(path string) error
 	Repath(oldpath, newpath string) error
 	Truncate(path string, size int64) error
-	Create(path string) (*os.File, error)
+	Create(path string) (File, error)
 	WriteFile(filepath string, data []byte, perm os.FileMode) error
 	// Flush writes all changes to the disk image.
 	Flush() error
@@ -177,6 +223,9 @@ type WritingLinkingDriver interface {
 	Link(oldpath, newpath string) error
 	Symlink(oldpath, newpath string) error
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// Directory Entries
 
 // DirectoryEntry represents a file, directory, device, or other entity
 // encountered on the file system. It must implement the os.FileInfo interface

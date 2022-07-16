@@ -3,6 +3,8 @@ package common
 import (
 	"fmt"
 	"io"
+
+	"github.com/dargueta/disko"
 )
 
 type BlockID uint
@@ -146,10 +148,6 @@ func (device *BlockStream) Write(blockID BlockID, data []byte) error {
 	return err
 }
 
-type StreamTruncator interface {
-	Truncate(size int64) (int64, error)
-}
-
 func (device *BlockStream) Resize(newNumBlocks uint) error {
 	if device.TotalBlocks == newNumBlocks {
 		return nil
@@ -167,9 +165,9 @@ func (device *BlockStream) Resize(newNumBlocks uint) error {
 	} else {
 		// The image is larger than the requested new size. Attempt to truncate
 		// it.
-		truncator, ok := device.stream.(StreamTruncator)
+		truncator, ok := device.stream.(disko.Truncator)
 		if ok {
-			_, err = truncator.Truncate(int64(newNumBlocks * device.BytesPerBlock))
+			err = truncator.Truncate(int64(newNumBlocks * device.BytesPerBlock))
 		} else {
 			// The stream doesn't have a compatible Truncate() function, so we
 			// can't shrink the image.
