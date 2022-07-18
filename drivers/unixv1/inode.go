@@ -24,7 +24,7 @@ type Inode struct {
 	blocks      []PhysicalBlock
 }
 
-func RawInodeToInode(inumber INumber, raw RawInode) Inode {
+func RawInodeToInode(inumber Inumber, raw RawInode) Inode {
 	sizeInBlocks := (raw.Size + (-raw.Size % 512)) / 512
 	return Inode{
 		IsAllocated: raw.Flags&FlagFileAllocated != 0,
@@ -43,7 +43,7 @@ func RawInodeToInode(inumber INumber, raw RawInode) Inode {
 	}
 }
 
-func InodeToRawInode(inode Inode) (INumber, RawInode) {
+func InodeToRawInode(inode Inode) (Inumber, RawInode) {
 	raw := RawInode{
 		Flags:  ConvertStandardFlagsToFS(inode.ModeFlags),
 		Nlinks: uint8(inode.Nlinks),
@@ -51,7 +51,7 @@ func InodeToRawInode(inode Inode) (INumber, RawInode) {
 		Size:   uint16(inode.Size),
 	}
 	copy(raw.Blocks[:], inode.blocks)
-	return INumber(inode.InodeNumber), raw
+	return Inumber(inode.InodeNumber), raw
 }
 
 type InodeManager struct {

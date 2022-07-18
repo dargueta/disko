@@ -146,11 +146,11 @@ func (driver *UnixV1Driver) Format(stat disko.FSStat) error {
 	binary.Write(
 		driver.rawStream,
 		binary.LittleEndian,
-		RawDirent{INumber: 41, Name: [8]byte{'.'}})
+		RawDirent{Inumber: 41, Name: [8]byte{'.'}})
 	binary.Write(
 		driver.rawStream,
 		binary.LittleEndian,
-		RawDirent{INumber: 41, Name: [8]byte{'.', '.'}})
+		RawDirent{Inumber: 41, Name: [8]byte{'.', '.'}})
 
 	return nil
 }
