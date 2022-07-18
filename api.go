@@ -229,33 +229,10 @@ type WritingLinkingDriver interface {
 
 // DirectoryEntry represents a file, directory, device, or other entity
 // encountered on the file system. It must implement the os.FileInfo interface
-// but only needs to fill values in Stat for the features it supports. (As far
-// as the os.FileInfo interface goes, drivers only need to implement Name(); all
-// others have default implementations.)
+// but only needs to fill values in Stat for the features it supports.
 //
 // For recommendations for how to fill the fields in Stat, see ReadingDriver.Stat().
-type DirectoryEntry struct {
+type DirectoryEntry interface {
 	os.FileInfo
-	Stat FileStat
-}
-
-// ModTime returns the timestamp of the DirectoryEntry.
-func (d *DirectoryEntry) ModTime() time.Time {
-	return d.Stat.LastModified
-}
-
-// Mode returns the file system mode of the directory as an os.FileMode. If you
-// need more detailed information, see DirectoryEntry.Stat.
-func (d *DirectoryEntry) Mode() os.FileMode {
-	return os.FileMode(d.Stat.ModeFlags & 0x1ff)
-}
-
-// IsDir returns true if it's a directory.
-func (d *DirectoryEntry) IsDir() bool {
-	return (d.Stat.ModeFlags & S_IFDIR) != 0
-}
-
-// Sys returns a copy of the FileStat object backing this directory entry.
-func (d *DirectoryEntry) Sys() FileStat {
-	return d.Stat
+	Stat() FileStat
 }
