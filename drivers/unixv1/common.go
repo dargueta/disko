@@ -79,14 +79,32 @@ func (driver *UnixV1Driver) inumberToInode(inumber Inumber) (Inode, error) {
 	return Inode{}, fmt.Errorf("inumberToInode() not implemented")
 }
 
-func (driver *UnixV1Driver) openFileUsingInode(inode Inode) (disko.File, error) {
-	return nil, fmt.Errorf("openFileWithInode() not implemented")
-}
-
 func (driver *UnixV1Driver) pathToInode(path string) (Inode, error) {
 	inumber, err := driver.pathToInumber(path)
 	if err != nil {
 		return Inode{}, err
 	}
 	return driver.inumberToInode(inumber)
+}
+
+func (driver *UnixV1Driver) openFileUsingInode(inode Inode) (disko.File, error) {
+	return nil, fmt.Errorf("openFileWithInode() not implemented")
+}
+
+func (driver *UnixV1Driver) getRawContentsUsingInode(inode Inode) ([]byte, error) {
+	handle, err := driver.openFileUsingInode(inode)
+	if err != nil {
+		return nil, err
+	}
+
+	buffer := make([]byte, int(inode.Size))
+	_, readErr := handle.Read(buffer)
+	closeErr := handle.Close()
+
+	if readErr != nil {
+		return nil, readErr
+	} else if closeErr != nil {
+		return nil, closeErr
+	}
+	return buffer, nil
 }

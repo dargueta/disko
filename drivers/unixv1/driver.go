@@ -40,11 +40,6 @@ const CanonicalDefaultDirectoryPermissions = disko.S_IFDIR | disko.S_IRUSR |
 
 var fsEpoch time.Time = time.Date(1971, 1, 1, 0, 0, 0, 0, nil)
 
-type RawDirent struct {
-	Inumber Inumber
-	Name    [8]byte
-}
-
 type UnixV1Driver struct {
 	disko.FormattingDriver
 	disko.OpeningDriver

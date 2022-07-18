@@ -2,6 +2,7 @@
 package unixv1
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/dargueta/disko"
@@ -13,8 +14,41 @@ func (driver *UnixV1Driver) SameFile(fi1, fi2 os.FileInfo) bool {
 	return f1Stat.InodeNumber == f2Stat.InodeNumber
 }
 
-// Open(path string) (File, error)
-// ReadDir(path string) ([]DirectoryEntry, error)
+func (driver *UnixV1Driver) Open(path string) (disko.File, error) {
+	return driver.OpenFile(path, os.O_RDONLY, 0)
+}
+
+func (driver *UnixV1Driver) ReadDir(path string) ([]disko.DirectoryEntry, error) {
+	inode, err := driver.pathToInode(path)
+	if err != nil {
+		return nil, err
+	}
+
+	if !inode.IsDir() {
+		err = disko.NewDriverErrorWithMessage(
+			disko.ENOTDIR,
+			fmt.Sprintf("`%s` is not a directory", path),
+		)
+	}
+
+	rawDirBytes, err := driver.getRawContentsUsingInode(inode)
+	if err != nil {
+		return nil, err
+	}
+
+	totalDirents := len(rawDirBytes) / 10
+	allDirents := make([]disko.DirectoryEntry, totalDirents)
+
+	for i := 0; i < totalDirents; i++ {
+		thisDirent, err := driver.buildDirentFromBytes(rawDirBytes[i*10 : (i+1)*10])
+		if err != nil {
+			continue
+		}
+		allDirents[i] = thisDirent.DirectoryEntry
+	}
+
+	return allDirents, nil
+}
 
 func (driver *UnixV1Driver) ReadFile(path string) ([]byte, error) {
 	inode, err := driver.pathToInode(path)
@@ -22,14 +56,13 @@ func (driver *UnixV1Driver) ReadFile(path string) ([]byte, error) {
 		return nil, err
 	}
 
-	handle, err := driver.openFileUsingInode(inode)
-	if err != nil {
-		return nil, err
+	if !inode.IsFile() {
+		err = disko.NewDriverErrorWithMessage(
+			disko.EISDIR,
+			fmt.Sprintf("`%s` is not a file", path),
+		)
 	}
-
-	buffer := make([]byte, int(inode.Size))
-	_, err = handle.Read(buffer)
-	return buffer, err
+	return driver.getRawContentsUsingInode(inode)
 }
 
 func (driver *UnixV1Driver) Stat(path string) (disko.FileStat, error) {
