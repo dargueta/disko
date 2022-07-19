@@ -108,13 +108,13 @@ type File interface {
 	io.StringWriter
 	Truncator
 
-	// Name returns the name of the file.
-	Name() string
-
-	Chown(uid, gid int) error
-	Sync() error
 	Chdir() error
 	Chmod(mode os.FileMode) error
+	Chown(uid, gid int) error
+	Fd() uintptr
+	Name() string
+	Readdir(n int) ([]os.FileInfo, error)
+	Readdirnames(n int) ([]string, error)
 
 	// SetDeadline is only present for compatibility with os.File(). Drivers
 	// should implement it as a no-op.
@@ -131,6 +131,9 @@ type File interface {
 	// SyscallConn is only present for compatibility with os.File(). Drivers
 	// should ignore it and return an ENOSYS error immediately.
 	SyscallConn() (syscall.RawConn, error)
+
+	Stat() (os.FileInfo, error)
+	Sync()
 }
 
 // Driver is the bare minimum interface for all drivers.
@@ -179,7 +182,6 @@ type OpeningDriver interface {
 type ReadingDriver interface {
 	SameFile(fi1, fi2 os.FileInfo) bool
 	Open(path string) (File, error)
-	ReadDir(path string) ([]DirectoryEntry, error)
 	// ReadFile return the contents of the file at the given path.
 	ReadFile(path string) ([]byte, error)
 	// Stat returns information about the directory entry at the given path.
@@ -188,6 +190,10 @@ type ReadingDriver interface {
 	// a reasonable default value. For most of these 0 is fine, but for
 	// compatibility drivers should use 1 for `Nlinks` and 0o777 for `ModeFlags`.
 	Stat(path string) (FileStat, error)
+}
+
+type DirReadingDriver interface {
+	ReadDir(path string) ([]DirectoryEntry, error)
 }
 
 // ReadingLinkingDriver provides a read-only interface for linking features on
@@ -204,16 +210,19 @@ type WritingDriver interface {
 	Chmod(path string, mode os.FileMode) error
 	Chown(path string, uid, gid int) error
 	Chtimes(path string, atime time.Time, mtime time.Time) error
-	Mkdir(path string, perm os.FileMode) error
-	MkdirAll(path string, perm os.FileMode) error
 	Remove(path string) error
-	RemoveAll(path string) error
 	Repath(oldpath, newpath string) error
 	Truncate(path string, size int64) error
 	Create(path string) (File, error)
 	WriteFile(filepath string, data []byte, perm os.FileMode) error
 	// Flush writes all changes to the disk image.
 	Flush() error
+}
+
+type DirWritingDriver interface {
+	Mkdir(path string, perm os.FileMode) error
+	MkdirAll(path string, perm os.FileMode) error
+	RemoveAll(path string) error
 }
 
 // WritingLinkingDriver provides a writing interface to linking features on file
