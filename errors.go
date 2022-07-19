@@ -5,34 +5,57 @@ import (
 )
 
 // DriverError is a wrapper around system errno codes, with a customizable error message.
-type DriverError struct {
-	ErrnoCode Errno
-	message   string
+type DriverError interface {
+	error
+	Errno() Errno
+	Unwrap() error
+}
+
+type driverError struct {
+	errno         Errno
+	message       string
+	originalError error
 }
 
 // Error implements the `error` object interface. When called, it returns a string
 // describing the error.
-func (e DriverError) Error() string {
+func (e driverError) Error() string {
 	if e.message != "" {
 		return e.message
 	}
-	return StrError(e.ErrnoCode)
+	return StrError(e.errno)
+}
+
+func (e driverError) Errno() Errno {
+	return e.errno
+}
+
+func (e driverError) Unwrap() error {
+	return e.originalError
 }
 
 // NewDriverError creates a new DriverError with a default message derived from the
 // system's error code.
-func NewDriverError(errnoCode Errno) *DriverError {
-	return &DriverError{
-		ErrnoCode: errnoCode,
-		message:   StrError(errnoCode),
+func NewDriverError(errnoCode Errno) DriverError {
+	return driverError{
+		errno:   errnoCode,
+		message: StrError(errnoCode),
+	}
+}
+
+func NewDriverErrorFromError(errnoCode Errno, originalError error) DriverError {
+	return driverError{
+		errno:         errnoCode,
+		message:       fmt.Sprintf("%s: %s", StrError(errnoCode), originalError.Error()),
+		originalError: originalError,
 	}
 }
 
 // NewDriverErrorWithMessage creates a new DriverError from a system error code with a
 // custom message.
-func NewDriverErrorWithMessage(errnoCode Errno, message string) *DriverError {
-	return &DriverError{
-		ErrnoCode: errnoCode,
-		message:   fmt.Sprintf("%s: %s", StrError(errnoCode), message),
+func NewDriverErrorWithMessage(errnoCode Errno, message string) DriverError {
+	return driverError{
+		errno:   errnoCode,
+		message: fmt.Sprintf("%s: %s", StrError(errnoCode), message),
 	}
 }
