@@ -1,5 +1,7 @@
 package disko
 
+import "os"
+
 ////////////////////////////////////////////////////////////////////////////////
 // File attribute flags
 
@@ -95,3 +97,35 @@ const MS_MGC_MSK = 0xffff0000
 const MS_MGC_VAL = 0xc0ed0000
 
 const DEFAULT_MOUNT_FLAGS = MS_NOSUID | MS_NODEV | MS_NOEXEC | MS_REMOUNT
+
+const O_IOMODE_MASK = os.O_RDONLY | os.O_RDWR | os.O_WRONLY
+
+////////////////////////////////////////////////////////////////////////////////
+
+type IOFlags int
+
+func (flags IOFlags) Append() bool {
+	return int(flags)&os.O_APPEND != 0
+}
+
+func (flags IOFlags) CanRead() bool {
+	masked := int(flags) & O_IOMODE_MASK
+	return masked == os.O_RDWR || masked == os.O_WRONLY
+}
+
+func (flags IOFlags) CanWrite() bool {
+	masked := int(flags) & O_IOMODE_MASK
+	return masked == os.O_RDWR || masked == os.O_RDONLY
+}
+
+func (flags IOFlags) Create() bool {
+	return (int(flags)&os.O_CREATE != 0) || flags.CanWrite()
+}
+
+func (flags IOFlags) Exclusive() bool {
+	return int(flags)&os.O_EXCL != 0
+}
+
+func (flags IOFlags) Synchronous() bool {
+	return int(flags)&os.O_SYNC != 0
+}
