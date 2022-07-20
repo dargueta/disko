@@ -89,11 +89,12 @@ type Dirent struct {
 	isDeleted      bool
 	size           int64
 	mode           os.FileMode
+	stat           disko.FileStat
 }
 
 // GetLastAccessedAt returns the timestamp at which the directory entry was last accessed.
 func (d *Dirent) GetLastAccessedAt() time.Time {
-	return d.Stat.LastAccessed
+	return d.stat.LastAccessed
 }
 
 // SetLastAccessedAt sets the timestamp at which the directory entry was last accessed.
@@ -102,12 +103,12 @@ func (d *Dirent) SetLastAccessedAt(t time.Time) error {
 	if t.Before(fatEpoch) {
 		return disko.NewDriverError(disko.ERANGE)
 	}
-	d.Stat.LastAccessed = t
+	d.stat.LastAccessed = t
 	return nil
 }
 
 func (d *Dirent) GetLastModifiedAt() time.Time {
-	return d.Stat.LastModified
+	return d.stat.LastModified
 }
 
 // SetLastModifiedAt sets the timestamp at which the directory entry was last modified.
@@ -116,7 +117,7 @@ func (d *Dirent) SetLastModifiedAt(t time.Time) error {
 	if t.Before(fatEpoch) {
 		return disko.NewDriverError(disko.ERANGE)
 	}
-	d.Stat.LastModified = t
+	d.stat.LastModified = t
 	return nil
 }
 
@@ -126,7 +127,7 @@ func (d *Dirent) GetCreatedAt() (time.Time, error) {
 	if d.isDeleted {
 		return time.Unix(0, 0), disko.NewDriverError(disko.ENOENT)
 	}
-	return d.Stat.CreatedAt, nil
+	return d.stat.CreatedAt, nil
 }
 
 // SetCreatedAt sets the timestamp at which the directory entry was created.
@@ -139,7 +140,7 @@ func (d *Dirent) SetCreatedAt(t time.Time) error {
 		return disko.NewDriverError(disko.ENOENT)
 	}
 
-	d.Stat.CreatedAt = t
+	d.stat.CreatedAt = t
 	return nil
 }
 
@@ -151,7 +152,7 @@ func (d *Dirent) GetDeletedAt() (time.Time, error) {
 	if !d.isDeleted {
 		return time.Unix(0, 0), disko.NewDriverError(disko.EINVAL)
 	}
-	return d.Stat.DeletedAt, nil
+	return d.stat.DeletedAt, nil
 }
 
 // SetDeletedAt sets the time at which a directory entry was deleted, marking it as deleted
@@ -272,25 +273,23 @@ func NewDirentFromRaw(bootSector *FATBootSector, rawDirent *RawDirent) (Dirent, 
 	}
 
 	dirent := Dirent{
-		DirectoryEntry: disko.DirectoryEntry{
-			Stat: disko.FileStat{
-				DeviceID: 0,
-				// FAT systems have no concept of inodes but a quick way to see if two
-				// directory entries point to the same thing is to see if the first cluster
-				// is the same. Thus, we'll sorta cheat and use that as a file ID.
-				InodeNumber:  uint64(firstCluster),
-				Nlinks:       1,
-				ModeFlags:    mode,
-				Uid:          0,
-				Gid:          0,
-				Rdev:         0,
-				Size:         size,
-				BlockSize:    int64(bootSector.BytesPerCluster),
-				NumBlocks:    sizeInClusters,
-				LastAccessed: DateFromInt(rawDirent.LastAccessedDate),
-				LastModified: lastModified,
-				CreatedAt:    createdAt,
-			},
+		stat: disko.FileStat{
+			DeviceID: 0,
+			// FAT systems have no concept of inodes but a quick way to see if two
+			// directory entries point to the same thing is to see if the first cluster
+			// is the same. Thus, we'll sorta cheat and use that as a file ID.
+			InodeNumber:  uint64(firstCluster),
+			Nlinks:       1,
+			ModeFlags:    mode,
+			Uid:          0,
+			Gid:          0,
+			Rdev:         0,
+			Size:         size,
+			BlockSize:    int64(bootSector.BytesPerCluster),
+			NumBlocks:    sizeInClusters,
+			LastAccessed: DateFromInt(rawDirent.LastAccessedDate),
+			LastModified: lastModified,
+			CreatedAt:    createdAt,
 		},
 		AttributeFlags: int(rawDirent.AttributeFlags),
 		NTReserved:     int(rawDirent.NTReserved),
@@ -345,7 +344,7 @@ func (drv *FATDriver) clusterToDirentSlice(data []byte) ([]Dirent, error) {
 
 			// If the error code is ENOENT then that means this directory entry is free
 			// and we've hit the end of the directory.
-			if drverr.ErrnoCode == disko.ENOENT {
+			if drverr.Errno() == disko.ENOENT {
 				break
 			}
 			// Else: We failed for a different reason. Pass this error up to the
@@ -383,6 +382,8 @@ func (d Dirent) ModTime() time.Time { return d.GetLastModifiedAt() }
 
 func (d Dirent) IsDir() bool { return d.mode.IsDir() }
 
-func (d Dirent) Sys() interface{} { return d.Stat }
+func (d Dirent) Sys() interface{} { return d.stat }
+
+func (d Dirent) Stat() disko.FileStat { return d.stat }
 
 // -----------------------------------------------------------------------------

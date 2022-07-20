@@ -92,6 +92,7 @@ type RawDirent struct {
 type LBRDirent struct {
 	disko.DirectoryEntry
 	name string
+	stat disko.FileStat
 }
 
 // MakeTimestampFromParts creates a Go time.Time object from the date and time
@@ -131,18 +132,16 @@ func NewDirent(stream *io.Reader) (LBRDirent, error) {
 	}
 
 	newEntry := LBRDirent{
-		DirectoryEntry: disko.DirectoryEntry{
-			Stat: disko.FileStat{
-				Nlinks:       1,
-				ModeFlags:    0o777,
-				Uid:          0,
-				Gid:          0,
-				Size:         int64(raw.SizeInSectors)*128 - int64(raw.PadCount),
-				BlockSize:    128,
-				NumBlocks:    int64(raw.SizeInSectors),
-				LastModified: lastModifiedTimestamp,
-				CreatedAt:    createdTimestamp,
-			},
+		stat: disko.FileStat{
+			Nlinks:       1,
+			ModeFlags:    0o777,
+			Uid:          0,
+			Gid:          0,
+			Size:         int64(raw.SizeInSectors)*128 - int64(raw.PadCount),
+			BlockSize:    128,
+			NumBlocks:    int64(raw.SizeInSectors),
+			LastModified: lastModifiedTimestamp,
+			CreatedAt:    createdTimestamp,
 		},
 		name: fullName,
 	}
@@ -152,4 +151,9 @@ func NewDirent(stream *io.Reader) (LBRDirent, error) {
 // Name returns the name of the directory entry.
 func (dirent *LBRDirent) Name() string {
 	return dirent.name
+}
+
+// Stat returns file information
+func (dirent *LBRDirent) Stat() disko.FileStat {
+	return dirent.stat
 }

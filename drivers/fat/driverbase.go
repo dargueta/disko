@@ -235,7 +235,7 @@ func (drv *FATDriver) readDirFromDirent(directoryDirent *Dirent) ([]Dirent, erro
 	allDirents := []Dirent{}
 
 	i := uint(0)
-	for true {
+	for {
 		clusterData, err := drv.readClusterOfDirent(directoryDirent, i)
 		if err != nil {
 			return nil, err
@@ -362,7 +362,7 @@ func (drv *FATDriver) Stat(path string) (disko.FileStat, error) {
 		return disko.FileStat{}, err
 	}
 
-	return dirent.Stat, nil
+	return dirent.stat, nil
 }
 
 // Lstat returns information about the file or directory at the given path.
@@ -391,9 +391,9 @@ func (drv *FATDriver) Chmod(path string, mode os.FileMode) error {
 	// anything beyond that.
 	if (mode & 0b010010010) == 0 {
 		// No one has write access
-		dirent.Stat.ModeFlags &= ^uint32(0b010010010)
+		dirent.stat.ModeFlags &= ^uint32(0b010010010)
 	} else {
-		dirent.Stat.ModeFlags |= 0b010010010
+		dirent.stat.ModeFlags |= 0b010010010
 	}
 
 	return drv.fs.UpdateDirent(&dirent)
