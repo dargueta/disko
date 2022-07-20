@@ -15,7 +15,7 @@ func (driver *UnixV1Driver) SameFile(fi1, fi2 os.FileInfo) bool {
 }
 
 func (driver *UnixV1Driver) Open(path string) (disko.File, error) {
-	return driver.OpenFile(path, os.O_RDONLY, 0)
+	return driver.OpenFile(path, disko.O_RDONLY, 0)
 }
 
 func (driver *UnixV1Driver) ReadDir(path string) ([]disko.DirectoryEntry, error) {

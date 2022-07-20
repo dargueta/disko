@@ -172,7 +172,7 @@ type FormattingDriver interface {
 // OpeningDriver is the interface for drivers implementing the POSIX open(3) function.
 //
 // Drivers need not implement all functionality for valid flags. For example,
-// read-only drivers must return an error if called with the os.O_CREATE flag.
+// read-only drivers must return an error if called with the disko.O_CREATE flag.
 type OpeningDriver interface {
 	// OpenFile is equivalent to os.OpenFile.
 	OpenFile(path string, flag int, perm os.FileMode) (File, error)

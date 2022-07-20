@@ -1,7 +1,5 @@
 package disko
 
-import "os"
-
 ////////////////////////////////////////////////////////////////////////////////
 // File attribute flags
 
@@ -43,29 +41,6 @@ const S_IRWXU = S_IXUSR | S_IWUSR | S_IRUSR
 
 // MS_RDONLY means: mount the file system as read-only.
 const MS_RDONLY = 0x00000001
-
-// MS_NOSUID means: Do not honor set-user-ID and set-group-ID bits or file
-// capabilities when executing programs from this filesystem.
-//
-// This is irrelevant, but the flag is included for the sake of completeness
-// (also I copied and pasted this from my system's header file and don't want to
-// change anything.)
-const MS_NOSUID = 0x00000002
-
-// MS_NODEV means: Do not allow access to devices (special files) on this
-// filesystem.
-//
-// This is irrelevant, but the flag is included for the sake of completeness
-// (also I copied and pasted this from my system's header file and don't want to
-// change anything.)
-const MS_NODEV = 0x00000004
-
-// MS_NOEXEC means: Do not allow programs to be executed from this filesystem.
-//
-// This is irrelevant, but the flag is included for the sake of completeness
-// (also I copied and pasted this from my system's header file and don't want to
-// change anything.)
-const MS_NOEXEC = 0x00000008
 const MS_SYNCHRONOUS = 0x00000010
 const MS_REMOUNT = 0x00000020
 const MS_MANDLOCK = 0x00000040
@@ -73,59 +48,63 @@ const MS_DIRSYNC = 0x00000080
 const MS_NOSYMFOLLOW = 0x00000100
 const MS_NOATIME = 0x00000400
 const MS_NODIRATIME = 0x00000800
-const MS_BIND = 0x00001000
-const MS_MOVE = 0x00002000
-const MS_REC = 0x00004000
-const MS_SILENT = 0x00008000
-const MS_POSIXACL = 0x00010000
-const MS_UNBINDABLE = 0x00020000
-const MS_PRIVATE = 0x00040000
-const MS_SLAVE = 0x00080000
-const MS_SHARED = 0x00100000
 const MS_RELATIME = 0x00200000
-const MS_KERNMOUNT = 0x00400000
 const MS_I_VERSION = 0x00800000
 const MS_STRICTATIME = 0x01000000
 const MS_LAZYTIME = 0x02000000
-const MS_RMT_MASK = 0x02800051
-const MS_SUBMOUNT = 0x04000000
-const MS_NOREMOTELOCK = 0x08000000
-const MS_NOSEC = 0x10000000
-const MS_BORN = 0x20000000
-const MS_ACTIVE = 0x40000000
 const MS_MGC_MSK = 0xffff0000
 const MS_MGC_VAL = 0xc0ed0000
 
-const DEFAULT_MOUNT_FLAGS = MS_NOSUID | MS_NODEV | MS_NOEXEC | MS_REMOUNT
+const DEFAULT_MOUNT_FLAGS = MS_MGC_VAL | MS_REMOUNT
 
-const O_IOMODE_MASK = os.O_RDONLY | os.O_RDWR | os.O_WRONLY
+const O_RDONLY = 0x00000000
+const O_WRONLY = 0x00000001
+const O_RDWR = 0x00000002
+const O_APPEND = 0x00000008
+const O_CREATE = 0x00000200
+const O_TRUNC = 0x00000400
+const O_EXCL = 0x00000800
+const O_SYNC = 0x00002000
+const O_NOFOLLOW = 0x00100000
+const O_DIRECTORY = 0x00200000
+const O_TMPFILE = 0x00800000
+const O_NOATIME = 0x01000000
+const O_PATH = 0x02000000
+
+const O_ACCMODE = O_RDONLY | O_RDWR | O_WRONLY
+
+// const O_TEXTORBINMODE = O_TEXT | O_BINARY
 
 ////////////////////////////////////////////////////////////////////////////////
 
 type IOFlags int
 
 func (flags IOFlags) Append() bool {
-	return int(flags)&os.O_APPEND != 0
+	return int(flags)&O_APPEND != 0
 }
 
 func (flags IOFlags) CanRead() bool {
-	masked := int(flags) & O_IOMODE_MASK
-	return masked == os.O_RDWR || masked == os.O_WRONLY
+	masked := int(flags) & O_ACCMODE
+	return masked == O_RDWR || masked == O_WRONLY
 }
 
 func (flags IOFlags) CanWrite() bool {
-	masked := int(flags) & O_IOMODE_MASK
-	return masked == os.O_RDWR || masked == os.O_RDONLY
+	masked := int(flags) & O_ACCMODE
+	return masked == O_RDWR || masked == O_RDONLY
 }
 
 func (flags IOFlags) Create() bool {
-	return (int(flags)&os.O_CREATE != 0) || flags.CanWrite()
+	return int(flags)&O_CREATE != 0
+}
+
+func (flags IOFlags) Truncate() bool {
+	return int(flags)&O_TRUNC != 0
 }
 
 func (flags IOFlags) Exclusive() bool {
-	return int(flags)&os.O_EXCL != 0
+	return int(flags)&O_EXCL != 0
 }
 
 func (flags IOFlags) Synchronous() bool {
-	return int(flags)&os.O_SYNC != 0
+	return int(flags)&O_SYNC != 0
 }
