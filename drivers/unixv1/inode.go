@@ -1,6 +1,7 @@
 package unixv1
 
 import (
+	"os"
 	"time"
 
 	"github.com/dargueta/disko"
@@ -24,16 +25,8 @@ type Inode struct {
 	blocks      []PhysicalBlock
 }
 
-func (inode *Inode) GetInodeType() int {
-	return int(inode.ModeFlags & disko.S_IFMT)
-}
-
-func (inode *Inode) IsDir() bool {
-	return inode.GetInodeType() == disko.S_IFDIR
-}
-
-func (inode *Inode) IsFile() bool {
-	return inode.GetInodeType() == disko.S_IFREG
+func (inode *Inode) GetInodeType() os.FileMode {
+	return inode.ModeFlags & disko.S_IFMT
 }
 
 func RawInodeToInode(inumber Inumber, raw RawInode) Inode {

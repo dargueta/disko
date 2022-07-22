@@ -41,15 +41,15 @@ const CanonicalDefaultDirectoryPermissions = disko.S_IFDIR | disko.S_IRUSR |
 var fsEpoch time.Time = time.Date(1971, 1, 1, 0, 0, 0, 0, nil)
 
 type UnixV1Driver struct {
-	disko.FormattingDriver
+	disko.FormattingDriver // Done
 	disko.OpeningDriver
-	disko.ReadingDriver
-	BlockFreeMap      bitmap.Bitmap
-	Inodes            []Inode
-	isMounted         bool
-	rawStream         io.ReadWriteSeeker
-	image             common.BlockStream
-	currentMountFlags disko.MountFlags
+	disko.ReadingDriver // Done
+	BlockFreeMap        bitmap.Bitmap
+	Inodes              []Inode
+	isMounted           bool
+	rawStream           io.ReadWriteSeeker
+	image               common.BlockStream
+	currentMountFlags   disko.MountFlags
 }
 
 const TimestampResolution time.Duration = time.Second / 60

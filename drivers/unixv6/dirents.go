@@ -1,7 +1,8 @@
 package unixv6
 
 import (
-	"syscall"
+	"fmt"
+	"os"
 	"time"
 
 	"github.com/dargueta/disko"
@@ -59,31 +60,88 @@ const (
 	FlagOtherX    = 0x0001 // S_IXOTH
 )
 
+func ConvertFSFlagsToStandard(flags uint16) (os.FileMode, error) {
+	// Preserve the permissions flags and discard the rest; we'll add them back
+	// in shortly.
+	mode := os.FileMode(flags) & os.ModePerm
+
+	switch flags & FileTypeMask {
+	case FileTypeBlockDevice:
+		mode |= os.ModeDevice
+	case FileTypeCharDevice:
+		mode |= os.ModeCharDevice
+	case FileTypeDirectory:
+		mode |= os.ModeDir
+	}
+
+	if flags&FlagSetGID != 0 {
+		mode |= os.ModeSetgid
+	}
+
+	if flags&FlagSetUID != 0 {
+		mode |= os.ModeSetuid
+	}
+
+	return mode, nil
+}
+
+func ConvertStandardFlagsToFS(flags os.FileMode) (uint16, error) {
+	mode := uint16(flags&os.ModePerm) | FlagIsAllocated
+
+	switch flags & os.ModeType {
+	case os.ModeCharDevice:
+		mode |= FileTypeCharDevice
+	case os.ModeDevice:
+		mode |= FileTypeBlockDevice
+	case os.ModeDir:
+		mode |= FileTypeDirectory
+	case 0:
+		// Regular file, do nothing
+	default:
+		return mode,
+			fmt.Errorf(
+				"invalid mode flags %#.08x: type %#.08x is unsupported",
+				flags,
+				flags&os.ModeType,
+			)
+	}
+
+	if flags&os.ModeSetgid != 0 {
+		mode |= FlagSetGID
+	}
+
+	if flags&os.ModeSetuid != 0 {
+		mode |= FlagSetUID
+	}
+
+	return mode, nil
+}
+
 func RawInodeToStat(inumber Inumber, inode RawInode) (disko.FileStat, error) {
-	mode := uint32(inode.Flags)
+	mode, err := ConvertFSFlagsToStandard(inode.Flags)
+	if err != nil {
+		return disko.FileStat{}, err
+	}
 
-	// Clear the IsAllocated flag because it corresponds to modern S_IFREG, and
-	// also clear FlagIsLargeFile because it corresponds to S_IFIFO. These two
-	// bits have no meaning outside the UV6FS implementation internals, so they
-	// can be cleared.
-	mode &^= FlagIsAllocated | FlagIsLargeFile
+	size := uint(inode.Size[0]) |
+		(uint(inode.Size[1]) << 8) |
+		(uint(inode.Size[2]) << 16)
 
-	// UnixV6 indicates a regular file with X & FileTypeMask = 0. Nowadays we
-	// need to OR in the S_IFREG flag to indicate this is a regular file.
-	if mode&syscall.S_IFMT == 0 {
-		mode |= syscall.S_IFREG
+	blocks := size / 512
+	if size%512 != 0 {
+		blocks++
 	}
 
 	return disko.FileStat{
-		InodeNumber: uint64(inumber),
-		Nlinks:      uint64(inode.NLink),
-		ModeFlags:   mode,
-		Uid:         uint32(inode.UID),
-		Gid:         uint32(inode.GID),
-		Rdev:        0,
-		// TODO size
-		BlockSize: 512,
-		// TODO blocks
+		InodeNumber:  uint64(inumber),
+		Nlinks:       uint64(inode.NLink),
+		ModeFlags:    mode,
+		Uid:          uint32(inode.UID),
+		Gid:          uint32(inode.GID),
+		Rdev:         0,
+		Size:         int64(size),
+		BlockSize:    512,
+		NumBlocks:    int64(blocks),
 		LastAccessed: time.Unix(int64(inode.AccessedTime), 0),
 		LastModified: time.Unix(int64(inode.ModifiedTime), 0),
 	}, nil

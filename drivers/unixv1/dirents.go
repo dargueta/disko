@@ -26,9 +26,11 @@ func (dirent *DirectoryEntry) Name() string {
 func (dirent *DirectoryEntry) Size() int64 {
 	return dirent.stat.Size
 }
+
 func (dirent *DirectoryEntry) Mode() os.FileMode {
 	return os.FileMode(dirent.stat.ModeFlags)
 }
+
 func (dirent *DirectoryEntry) ModTime() time.Time {
 	return dirent.stat.LastModified
 }

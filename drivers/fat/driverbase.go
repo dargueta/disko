@@ -51,7 +51,7 @@ func (drv *FATDriver) readAbsoluteSectors(sector SectorID, numSectors uint) ([]b
 		return buffer, err
 	} else if nRead < int(bootSector.BytesPerSector) {
 		return nil, fmt.Errorf(
-			"Unexpected short read. Wanted %d bytes, got %d.", bootSector.BytesPerSector, nRead)
+			"unexpected short read. Wanted %d bytes, got %d", bootSector.BytesPerSector, nRead)
 	}
 
 	return buffer, nil
@@ -66,29 +66,6 @@ func (drv *FATDriver) readCluster(cluster ClusterID) ([]byte, error) {
 
 	bootSector := drv.fs.GetBootSector()
 	return drv.readAbsoluteSectors(sectorID, uint(bootSector.SectorsPerCluster))
-}
-
-// readSectorInCluster returns the bytes of the `index`th sector of the given cluster.
-// `index` starts from 0. On error, the byte slice will be nil and the second return value
-// is an error object detailing what went wrong.
-func (drv *FATDriver) readSectorsInCluster(cluster ClusterID, index uint, numSectors uint) ([]byte, error) {
-	firstSector, err := drv.getFirstSectorOfCluster(cluster)
-	if err != nil {
-		return nil, err
-	}
-
-	bootSector := drv.fs.GetBootSector()
-	if (index + numSectors) >= uint(bootSector.SectorsPerCluster) {
-		return nil, disko.NewDriverErrorWithMessage(
-			disko.ERANGE,
-			fmt.Sprintf(
-				"cannot read %d sectors from index %d: read would exceed cluster size",
-				index,
-				numSectors))
-	}
-
-	absoluteSector := uint(firstSector) + index
-	return drv.readAbsoluteSectors(SectorID(absoluteSector), numSectors)
 }
 
 // listClusters returns a list of every cluster in the chain beginning at chainStart.
@@ -391,7 +368,7 @@ func (drv *FATDriver) Chmod(path string, mode os.FileMode) error {
 	// anything beyond that.
 	if (mode & 0b010010010) == 0 {
 		// No one has write access
-		dirent.stat.ModeFlags &= ^uint32(0b010010010)
+		dirent.stat.ModeFlags &= ^os.FileMode(0b010010010)
 	} else {
 		dirent.stat.ModeFlags |= 0b010010010
 	}

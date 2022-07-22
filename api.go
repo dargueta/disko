@@ -36,6 +36,18 @@ const (
 	MountFlagsCustomStart = MountFlags(1 << iota)
 )
 
+func (flags MountFlags) CanRead() bool {
+	return flags&MountFlagsAllowRead != 0
+}
+
+func (flags MountFlags) CanWrite() bool {
+	return flags&MountFlagsAllowWrite != 0
+}
+
+func (flags MountFlags) CanDelete() bool {
+	return flags&MountFlagsAllowDelete != 0
+}
+
 const MountFlagsAllowAll = MountFlagsCustomStart - 1
 const MountFlagsAllowReadWrite = MountFlagsAllowRead | MountFlagsAllowWrite
 const MountFlagsMask = MountFlagsAllowAll
@@ -45,7 +57,7 @@ type FileStat struct {
 	DeviceID     uint64
 	InodeNumber  uint64
 	Nlinks       uint64
-	ModeFlags    uint32
+	ModeFlags    os.FileMode
 	Uid          uint32
 	Gid          uint32
 	Rdev         uint64
@@ -57,6 +69,18 @@ type FileStat struct {
 	LastAccessed time.Time
 	LastModified time.Time
 	DeletedAt    time.Time
+}
+
+func (stat *FileStat) IsDir() bool {
+	return stat.ModeFlags&S_IFMT == S_IFDIR
+}
+
+func (stat *FileStat) IsFile() bool {
+	return stat.ModeFlags&S_IFMT == S_IFREG
+}
+
+func (stat *FileStat) IsSymlink() bool {
+	return stat.ModeFlags&S_IFMT == S_IFLNK
 }
 
 // FSStat is a platform-independent form of syscall.Statfs_t.

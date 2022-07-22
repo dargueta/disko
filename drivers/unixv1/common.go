@@ -2,6 +2,7 @@ package unixv1
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/dargueta/disko"
 )
@@ -10,8 +11,8 @@ import (
 // of an inode and converts them to their standardized Unix equivalents. For
 // example, `FlagNonOwnerRead` is converted to `S_IRGRP | S_IROTH`. Unrecognized
 // flags are ignored.
-func ConvertFSFlagsToStandard(rawFlags uint16) uint32 {
-	stdFlags := uint32(0)
+func ConvertFSFlagsToStandard(rawFlags uint16) os.FileMode {
+	stdFlags := os.FileMode(0)
 
 	if rawFlags&FlagIsDirectory != 0 {
 		// N.B. directories must be marked executable on modern *NIX systems.
@@ -41,7 +42,7 @@ func ConvertFSFlagsToStandard(rawFlags uint16) uint32 {
 
 // ConvertStandardFlagsToFS is the inverse of ConvertFSFlagsToStandard; it takes
 // Unix mode flags and converts them to their on-disk representation.
-func ConvertStandardFlagsToFS(flags uint32) uint16 {
+func ConvertStandardFlagsToFS(flags os.FileMode) uint16 {
 	rawFlags := uint16(0)
 
 	if flags&disko.S_IFDIR != 0 {

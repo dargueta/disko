@@ -201,8 +201,8 @@ func TimestampFromParts(datePart uint16, timePart uint16, hundredths uint8) time
 
 // AttrFlagsToFileMode converts FAT attribute flags into the mode flags used by
 // syscall.Stat_t.Mode.
-func AttrFlagsToFileMode(flags uint8) uint32 {
-	var mode uint32
+func AttrFlagsToFileMode(flags uint8) os.FileMode {
+	var mode os.FileMode
 
 	// FAT has no way to mark files as executable or not, so the executable bit is always set.
 	if (flags & AttrReadOnly) != 0 {
