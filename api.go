@@ -29,6 +29,13 @@ const (
 	// MountFlagsAllowAdminister indicates to Driver.Mount() that the image
 	// should be mounted with the ability to change file permissions.
 	MountFlagsAllowAdminister = MountFlags(1 << iota)
+	// MountFlagsPreserveTimestamps indicates that existing objects'
+	// LastAccessed, LastModified, LastChanged, and DeletedAt timestamps should
+	// NOT be changed. There are a few exceptions:
+	//
+	// Objects created or deleted will have their timestamps set appropriately
+	// and then left alone for the duration of the mount.
+	MountFlagsPreserveTimestamps = MountFlags(1 << iota)
 	// MountFlagsCustomStart is the lowest bit flag that is not defined by the
 	// API standard and is free for drivers to use in an implementation-specific
 	// manner. All bits higher than this are guaranteed to be ignored by drivers
@@ -48,9 +55,13 @@ func (flags MountFlags) CanDelete() bool {
 	return flags&MountFlagsAllowDelete != 0
 }
 
-const MountFlagsAllowAll = MountFlagsCustomStart - 1
 const MountFlagsAllowReadWrite = MountFlagsAllowRead | MountFlagsAllowWrite
-const MountFlagsMask = MountFlagsAllowAll
+const MountFlagsAllowAll = (MountFlagsAllowRead |
+	MountFlagsAllowWrite |
+	MountFlagsAllowInsert |
+	MountFlagsAllowDelete |
+	MountFlagsAllowAdminister)
+const MountFlagsMask = MountFlagsCustomStart - 1
 
 // FileStat is a platform-independent form of syscall.Stat_t.
 type FileStat struct {
