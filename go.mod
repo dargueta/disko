@@ -1,10 +1,10 @@
 module github.com/dargueta/disko
 
-go 1.17
+go 1.18
 
 require (
 	github.com/boljen/go-bitmap v0.0.0-20151001105940-23cd2fb0ce7d
-	github.com/urfave/cli/v2 v2.8.1
+	github.com/urfave/cli/v2 v2.11.1
 )
 
 require (
