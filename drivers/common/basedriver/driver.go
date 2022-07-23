@@ -61,8 +61,8 @@ type CommonDriver struct {
 		DirReadingDriver:
 			ReadDir
 
-		ReadingLinkingDriver:
-			Lstat
+		ReadingLinkingDriver: DONE
+			Lstat 			DONE
 			Readlink 		DONE
 
 		WritingDriver:
@@ -103,6 +103,9 @@ func (driver *CommonDriver) normalizePath(path string) string {
 	return posixpath.Join(driver.workingDirPath, path)
 }
 
+// resolveSymlink dereferences `object` (if it's a symlink), following multiple
+// levels of indirection if needed to get to a file  system object. If `object`
+// isn't a symlink, this becmes a no-op and returns it unmodified.
 func (driver *CommonDriver) resolveSymlink(
 	object ObjectDescriptor,
 	path string,
@@ -356,6 +359,22 @@ func (driver *CommonDriver) Readlink(path string) (string, error) {
 		return "", err
 	}
 	return string(contents), nil
+}
+
+func (driver *CommonDriver) Lstat(path string) (disko.FileStat, error) {
+	path = driver.normalizePath(path)
+	object, err := driver.getObjectAtPath(path)
+	if err != nil {
+		return disko.FileStat{}, err
+	}
+
+	// Unconditionally try to resolve `object` as a symlink. If it isn't one,
+	// nothing happens and we get `object` back.
+	object, err = driver.resolveSymlink(object, path)
+	if err != nil {
+		return disko.FileStat{}, err
+	}
+	return object.Stat(), nil
 }
 
 // WritingDriver ---------------------------------------------------------------
