@@ -1,7 +1,6 @@
 package basedriver
 
 import (
-	"io"
 	"io/fs"
 	"os"
 	"syscall"
@@ -11,7 +10,9 @@ import (
 )
 
 type FileInfo struct {
-	fs.FileInfo
+	os.FileInfo
+	disko.DirectoryEntry
+
 	disko.FileStat
 	name string
 }
@@ -24,35 +25,41 @@ func (info *FileInfo) Size() int64 {
 	return info.FileStat.Size
 }
 
-func (info *FileInfo) Mode() fs.FileMode {
-	return fs.FileMode(info.FileStat.ModeFlags)
+func (info FileInfo) Mode() os.FileMode {
+	return os.FileMode(info.FileStat.ModeFlags)
 }
 
-func (info *FileInfo) ModTime() time.Time {
+func (info *FileInfo) Type() fs.FileMode {
+	return info.FileStat.ModeFlags
+}
+
+func (info FileInfo) ModTime() time.Time {
 	return info.FileStat.LastModified
 }
 
-func (info *FileInfo) IsDir() bool {
-	return info.FileStat.ModeFlags&disko.S_IFDIR != 0
+func (info FileInfo) IsDir() bool {
+	return info.FileStat.ModeFlags&os.ModeDir != 0
 }
 
-func (info *FileInfo) Sys() disko.FileStat {
+func (info *FileInfo) Info() (os.FileInfo, error) {
+	return info, nil
+}
+
+func (info *FileInfo) Stat() disko.FileStat {
+	return info.FileStat
+}
+
+func (info *FileInfo) Sys() any {
 	return info.FileStat
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
 type File struct {
-	io.ReadWriteCloser
-	io.Seeker
-	io.ReaderAt
-	io.ReaderFrom
-	io.WriterAt
-	io.StringWriter
-	disko.Truncator
-
 	disko.File
+
 	owningDriver *CommonDriver
+	descriptor   ObjectDescriptor
 	fileInfo     FileInfo
 	ioFlags      disko.IOFlags
 }
@@ -106,5 +113,5 @@ func (file *File) SyscallConn() (syscall.RawConn, error) {
 }
 
 func (file *File) Stat() (os.FileInfo, error) {
-	return file.fileInfo.FileInfo, nil
+	return file.fileInfo.Info()
 }

@@ -19,17 +19,14 @@ type ObjectDescriptor interface {
 	Unlink() disko.DriverError
 	Update(stat disko.FileStat) disko.DriverError
 	ListDir() (map[string]ObjectDescriptor, disko.DriverError)
+	Name() string
 }
 
 // DriverImplementation is an interface that drivers must implement to get all
 // default functionality from the CommonDriver.
 type DriverImplementation interface {
 	// CreateObject creates an object on the file system that is *not* a
-	// directory. There are a few guarantees:
-	//
-	// 1) `path` is an absolute path on the file system uniquely identifying the
-	// object that needs to be created. 2) This function will not be called with a
-	// path that points to an object that already exists.
+	// directory. This is guaranteed to never be called
 	CreateObject(
 		name string,
 		parent ObjectDescriptor,
@@ -58,12 +55,12 @@ type CommonDriver struct {
 			SameFile	DONE
 			Stat		DONE
 
-		DirReadingDriver:
-			ReadDir
+		DirReadingDriver:	DONE
+			ReadDir			DONE
 
-		ReadingLinkingDriver: DONE
-			Lstat 			DONE
-			Readlink 		DONE
+		ReadingLinkingDriver:	DONE
+			Lstat			DONE
+			Readlink		DONE
 
 		WritingDriver:
 			Chmod
@@ -79,7 +76,7 @@ type CommonDriver struct {
 		DirWritingDriver:	DONE
 			Mkdir			DONE
 			MkdirAll		DONE
-			RemoveAll 		DONE
+			RemoveAll		DONE
 
 		WritingLinkingDriver:
 			Lchown
@@ -343,6 +340,29 @@ func (driver *CommonDriver) Stat(path string) (disko.FileStat, error) {
 		return disko.FileStat{}, err
 	}
 	return object.Stat(), nil
+}
+
+// DirReadingDriver ------------------------------------------------------------
+
+func (driver *CommonDriver) ReadDir(path string) ([]disko.DirectoryEntry, error) {
+	path = driver.normalizePath(path)
+	object, err := driver.getObjectAtPath(path)
+	if err != nil {
+		return nil, err
+	}
+
+	dirents, err := object.ListDir()
+	if err != nil {
+		return nil, err
+	}
+
+	output := make([]disko.DirectoryEntry, 0, len(dirents))
+	for _, direntObject := range dirents {
+		dirent := NewDirectoryEntryFromDescriptor(direntObject)
+		output = append(output, dirent)
+	}
+
+	return output, nil
 }
 
 // ReadingLinkingDriver --------------------------------------------------------
