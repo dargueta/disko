@@ -1,6 +1,9 @@
 package disko
 
-import "os"
+import (
+	"os"
+	"syscall"
+)
 
 ////////////////////////////////////////////////////////////////////////////////
 // File attribute flags
@@ -42,54 +45,84 @@ const DefaultDirModeFlags = os.ModeDir | S_IRWXU | S_IXGRP | S_IRGRP | S_IXOTH |
 
 ////////////////////////////////////////////////////////////////////////////////
 
-const O_RDONLY = 0x00000000
-const O_WRONLY = 0x00000001
-const O_RDWR = 0x00000002
-const O_APPEND = 0x00000008
-const O_CREATE = 0x00000200
-const O_TRUNC = 0x00000400
-const O_EXCL = 0x00000800
-const O_SYNC = 0x00002000
-const O_NOFOLLOW = 0x00100000
-const O_DIRECTORY = 0x00200000
-const O_TMPFILE = 0x00800000 // Probably don't need this
-const O_NOATIME = 0x01000000
-const O_PATH = 0x02000000
+type IOFlags int
+
+const O_RDONLY = IOFlags(0x00000000)
+const O_WRONLY = IOFlags(0x00000001)
+const O_RDWR = IOFlags(0x00000002)
+const O_APPEND = IOFlags(0x00000008)
+const O_CREATE = IOFlags(0x00000200)
+const O_TRUNC = IOFlags(0x00000400)
+const O_EXCL = IOFlags(0x00000800)
+const O_SYNC = IOFlags(0x00002000)
+const O_NOFOLLOW = IOFlags(0x00100000)
+const O_DIRECTORY = IOFlags(0x00200000)
+const O_TMPFILE = IOFlags(0x00800000) // Probably don't need this
+const O_NOATIME = IOFlags(0x01000000)
+const O_PATH = IOFlags(0x02000000)
 
 const O_ACCMODE = O_RDONLY | O_RDWR | O_WRONLY
 
-// const O_TEXTORBINMODE = O_TEXT | O_BINARY
+func OSFlagsToIOFlags(flags int) IOFlags {
+	var ioFlags IOFlags
 
-////////////////////////////////////////////////////////////////////////////////
+	switch flags & syscall.O_ACCMODE {
+	case os.O_WRONLY:
+		ioFlags = O_WRONLY
+	case os.O_RDWR:
+		ioFlags = O_RDWR
+	default:
+		ioFlags = O_RDONLY
+	}
 
-type IOFlags int
+	if flags&os.O_APPEND != 0 {
+		ioFlags |= O_APPEND
+	}
+	if flags&os.O_CREATE != 0 {
+		ioFlags |= O_CREATE
+	}
+	if flags&os.O_EXCL != 0 {
+		ioFlags |= O_EXCL
+	}
+	if flags&os.O_TRUNC != 0 {
+		ioFlags |= O_TRUNC
+	}
+	if flags&os.O_SYNC != 0 {
+		ioFlags |= O_SYNC
+	}
+	return ioFlags
+}
 
 func (flags IOFlags) Append() bool {
-	return int(flags)&O_APPEND != 0
+	return flags&O_APPEND != 0
 }
 
 func (flags IOFlags) CanRead() bool {
-	masked := int(flags) & O_ACCMODE
+	masked := flags & O_ACCMODE
 	return masked == O_RDWR || masked == O_WRONLY
 }
 
 func (flags IOFlags) CanWrite() bool {
-	masked := int(flags) & O_ACCMODE
+	masked := flags & O_ACCMODE
 	return masked == O_RDWR || masked == O_RDONLY
 }
 
 func (flags IOFlags) Create() bool {
-	return int(flags)&O_CREATE != 0
+	return flags&O_CREATE != 0
 }
 
 func (flags IOFlags) Truncate() bool {
-	return int(flags)&O_TRUNC != 0
+	return flags&O_TRUNC != 0
 }
 
 func (flags IOFlags) Exclusive() bool {
-	return int(flags)&O_EXCL != 0
+	return flags&O_EXCL != 0
 }
 
 func (flags IOFlags) Synchronous() bool {
-	return int(flags)&O_SYNC != 0
+	return flags&O_SYNC != 0
+}
+
+func (flags IOFlags) NoFollow() bool {
+	return flags&O_NOFOLLOW != 0
 }

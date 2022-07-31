@@ -83,15 +83,15 @@ type FileStat struct {
 }
 
 func (stat *FileStat) IsDir() bool {
-	return stat.ModeFlags&S_IFMT == S_IFDIR
+	return stat.ModeFlags.IsDir()
 }
 
 func (stat *FileStat) IsFile() bool {
-	return stat.ModeFlags&S_IFMT == S_IFREG
+	return stat.ModeFlags.IsRegular()
 }
 
 func (stat *FileStat) IsSymlink() bool {
-	return stat.ModeFlags&S_IFMT == S_IFLNK
+	return stat.ModeFlags&os.ModeType == os.ModeSymlink
 }
 
 // FSStat is a platform-independent form of syscall.Statfs_t.
@@ -210,7 +210,7 @@ type FormattingDriver interface {
 // read-only drivers must return an error if called with the disko.O_CREATE flag.
 type OpeningDriver interface {
 	// OpenFile is equivalent to os.OpenFile.
-	OpenFile(path string, flag int, perm os.FileMode) (File, error)
+	OpenFile(path string, flag IOFlags, perm os.FileMode) (File, error)
 }
 
 // ReadingDriver is the interface for drivers supporting read operations.
@@ -277,6 +277,6 @@ type WritingLinkingDriver interface {
 //
 // For recommendations for how to fill the fields in Stat, see ReadingDriver.Stat().
 type DirectoryEntry interface {
-	os.FileInfo
+	os.DirEntry
 	Stat() FileStat
 }
