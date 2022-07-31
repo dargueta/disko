@@ -32,7 +32,7 @@ func GetGeometry(totalBlocks uint) (Geometry, error) {
 		geo.DirectoryTrackNumber = 18
 	case 1898:
 		geo.TotalTracks = 73
-		geo.TrueTotalTracks = 77
+		geo.TrueTotalTracks = 73
 		geo.SectorsPerTrack = 26
 		geo.DirectoryTrackNumber = 35
 	case 2002:

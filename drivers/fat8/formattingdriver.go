@@ -12,7 +12,8 @@ import (
 // Format creates a new empty disk image using the given disk information.
 //
 // This driver only requires the TotalBlocks field to be set in `information`.
-// It must either be 2002 for a floppy image, or 720 for a minifloppy image.
+// It must either be 1898 for a floppy image, or 640 for a minifloppy image.
+// 2002 is accepted as a synonym for 1898.
 func (driver *Driver) Format(information disko.FSStat) error {
 	if driver.isMounted {
 		return disko.NewDriverErrorWithMessage(
