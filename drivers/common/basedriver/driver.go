@@ -12,9 +12,9 @@ import (
 ////////////////////////////////////////////////////////////////////////////////
 
 type ObjectDescriptor interface {
-	ID() int64
+	ID() uintptr
 	Stat() disko.FileStat
-	Open(flags int) (disko.File, disko.DriverError)
+	Open(flags disko.IOFlags) (disko.File, disko.DriverError)
 	Resize(newSize int64) disko.DriverError
 	Unlink() disko.DriverError
 	Update(stat disko.FileStat) disko.DriverError
@@ -68,7 +68,7 @@ type CommonDriver struct {
 			Chtimes
 			Create			DONE
 			Flush
-			Remove
+			Remove 			DONE
 			Repath
 			Truncate		DONE
 			WriteFile
@@ -148,7 +148,7 @@ func (driver *CommonDriver) resolveSymlink(
 				)
 		}
 
-		object, err = driver.getObjectAtPath(nextPath)
+		object, err = driver.getObjectAtPathNoFollow(nextPath)
 		if err != nil {
 			return nil, err
 		}
@@ -160,10 +160,10 @@ func (driver *CommonDriver) resolveSymlink(
 	return object, nil
 }
 
-// getObjectAtPath resolves a normalized absolute path to an object descriptor.
-// It follows symbolic links for directories, but does *not* follow the final
-// path component if it's a symbolic link.
-func (driver *CommonDriver) getObjectAtPath(
+// getObjectAtPathNoFollow resolves a normalized absolute path to an object
+// descriptor. It follows symbolic links for intermediate directories, but does
+// *not* follow the final path component if it's a symbolic link.
+func (driver *CommonDriver) getObjectAtPathNoFollow(
 	path string,
 ) (ObjectDescriptor, disko.DriverError) {
 	if path == "/" || path == "" {
@@ -171,35 +171,46 @@ func (driver *CommonDriver) getObjectAtPath(
 	}
 
 	parentPath, baseName := posixpath.Split(path)
-	parentObject, err := driver.getObjectAtPath(parentPath)
+	parentObject, err := driver.getObjectAtPathFollowingLink(parentPath)
 	if err != nil {
 		return nil, err
 	}
 
 	parentStat := parentObject.Stat()
-	if parentStat.IsSymlink() {
-		// The parent directory is a symbolic link to somewhere. Resolve it.
-		parentObject, err = driver.resolveSymlink(parentObject, parentPath)
+	if !parentStat.IsDir() {
+		return nil,
+			disko.NewDriverErrorWithMessage(
+				disko.ENOTDIR,
+				fmt.Sprintf(
+					"cannot resolve path `%s`: `%s` is not a directory",
+					path,
+					parentPath,
+				),
+			)
+
+	}
+
+	return driver.implementation.GetObject(baseName, parentObject)
+}
+
+func (driver *CommonDriver) getObjectAtPathFollowingLink(
+	path string,
+) (ObjectDescriptor, disko.DriverError) {
+	object, err := driver.getObjectAtPathNoFollow(path)
+	if err != nil {
+		return nil, err
+	}
+
+	stat := object.Stat()
+	for stat.IsSymlink() {
+		object, err = driver.resolveSymlink(object, path)
 		if err != nil {
 			return nil, err
 		}
-
-		parentStat = parentObject.Stat()
+		stat = object.Stat()
 	}
 
-	if parentStat.IsDir() {
-		return driver.implementation.GetObject(baseName, parentObject)
-	}
-
-	return nil,
-		disko.NewDriverErrorWithMessage(
-			disko.ENOTDIR,
-			fmt.Sprintf(
-				"cannot resolve path `%s`: `%s` is not a directory",
-				path,
-				parentPath,
-			),
-		)
+	return object, nil
 }
 
 // getContentsOfObject returns the contents of an object as it exists on the
@@ -228,13 +239,13 @@ func (driver *CommonDriver) getContentsOfObject(
 
 func (driver *CommonDriver) OpenFile(
 	path string,
-	flags int,
+	flags disko.IOFlags,
 	perm os.FileMode,
 ) (File, error) {
 	absPath := driver.normalizePath(path)
 	ioFlags := disko.IOFlags(flags)
 
-	object, err := driver.getObjectAtPath(absPath)
+	object, err := driver.getObjectAtPathFollowingLink(absPath)
 	if err != nil {
 		// An error occurred. If the file is missing we may be able to create it
 		// and proceed.
@@ -245,7 +256,7 @@ func (driver *CommonDriver) OpenFile(
 				// its parent directory, then call CreateObject() for the file
 				// in that directory.
 				parentDir, baseName := posixpath.Split(absPath)
-				parentObject, err := driver.getObjectAtPath(parentDir)
+				parentObject, err := driver.getObjectAtPathFollowingLink(parentDir)
 				if err != nil {
 					// Parent directory doesn't exist
 					return File{}, err
@@ -267,22 +278,10 @@ func (driver *CommonDriver) OpenFile(
 	}
 
 	stat := object.Stat()
-	if stat.IsSymlink() {
-		// The file is a symbolic link. Resolve it.
-		object, err = driver.resolveSymlink(object, absPath)
-		if err != nil {
-			return File{}, err
-		}
-
-		// Update `stat` to contain the resolved object's information, not that
-		// of the symlink.
-		stat = object.Stat()
-	}
-
 	if !stat.IsFile() {
 		return File{},
 			disko.NewDriverErrorWithMessage(
-				disko.ENFILE,
+				disko.EISDIR,
 				fmt.Sprintf("`%s` isn't a regular file", absPath),
 			)
 	}
@@ -311,7 +310,7 @@ func (driver *CommonDriver) Open(path string) (File, error) {
 
 func (driver *CommonDriver) ReadFile(path string) ([]byte, error) {
 	path = driver.normalizePath(path)
-	object, err := driver.getObjectAtPath(path)
+	object, err := driver.getObjectAtPathNoFollow(path)
 	if err != nil {
 		return nil, err
 	}
@@ -335,7 +334,7 @@ func (driver *CommonDriver) SameFile(fi1, fi2 os.FileInfo) bool {
 
 func (driver *CommonDriver) Stat(path string) (disko.FileStat, error) {
 	path = driver.normalizePath(path)
-	object, err := driver.getObjectAtPath(path)
+	object, err := driver.getObjectAtPathNoFollow(path)
 	if err != nil {
 		return disko.FileStat{}, err
 	}
@@ -346,7 +345,7 @@ func (driver *CommonDriver) Stat(path string) (disko.FileStat, error) {
 
 func (driver *CommonDriver) ReadDir(path string) ([]disko.DirectoryEntry, error) {
 	path = driver.normalizePath(path)
-	object, err := driver.getObjectAtPath(path)
+	object, err := driver.getObjectAtPathNoFollow(path)
 	if err != nil {
 		return nil, err
 	}
@@ -369,9 +368,17 @@ func (driver *CommonDriver) ReadDir(path string) ([]disko.DirectoryEntry, error)
 
 func (driver *CommonDriver) Readlink(path string) (string, error) {
 	path = driver.normalizePath(path)
-	object, err := driver.getObjectAtPath(path)
+	object, err := driver.getObjectAtPathNoFollow(path)
 	if err != nil {
 		return "", err
+	}
+
+	stat := object.Stat()
+	if !stat.IsSymlink() {
+		return "", disko.NewDriverErrorWithMessage(
+			disko.EINVAL,
+			fmt.Sprintf("`%s` is not a symlink", path),
+		)
 	}
 
 	contents, err := driver.getContentsOfObject(object)
@@ -383,7 +390,7 @@ func (driver *CommonDriver) Readlink(path string) (string, error) {
 
 func (driver *CommonDriver) Lstat(path string) (disko.FileStat, error) {
 	path = driver.normalizePath(path)
-	object, err := driver.getObjectAtPath(path)
+	object, err := driver.getObjectAtPathNoFollow(path)
 	if err != nil {
 		return disko.FileStat{}, err
 	}
@@ -407,9 +414,47 @@ func (driver *CommonDriver) Create(path string) (File, error) {
 	)
 }
 
+func (driver *CommonDriver) Remove(path string) error {
+	absPath := driver.normalizePath(path)
+	object, err := driver.getObjectAtPathFollowingLink(absPath)
+	if err != nil {
+		return err
+	}
+
+	stat := object.Stat()
+	if stat.IsDir() {
+		// Caller wants to remove a directory. The directory must be empty, i.e.
+		// must at most only contain the "." and ".." entries.
+		dirents, err := object.ListDir()
+		if err != nil {
+			return err
+		}
+
+		// Remove the "." and ".." since we don't care about them.
+		delete(dirents, ".")
+		delete(dirents, "..")
+
+		// If there are any other entries in here the directory isn't empty and
+		// we must fail.
+		if len(dirents) > 0 {
+			return disko.NewDriverErrorWithMessage(
+				disko.ENOTEMPTY,
+				fmt.Sprintf("can't remove `%s`: directory not empty", absPath),
+			)
+		}
+	} else if !stat.IsFile() {
+		return disko.NewDriverErrorWithMessage(
+			disko.EINVAL,
+			fmt.Sprintf("can't remove `%s`: not a file or directory", absPath),
+		)
+	}
+
+	return object.Unlink()
+}
+
 func (driver *CommonDriver) Truncate(path string) error {
 	absPath := driver.normalizePath(path)
-	object, err := driver.getObjectAtPath(absPath)
+	object, err := driver.getObjectAtPathNoFollow(absPath)
 	if err != nil {
 		return err
 	}
@@ -426,7 +471,7 @@ func (driver *CommonDriver) Mkdir(path string, perm os.FileMode) error {
 	absPath := driver.normalizePath(path)
 	parentDir, baseName := posixpath.Split(absPath)
 
-	parentObject, err := driver.getObjectAtPath(parentDir)
+	parentObject, err := driver.getObjectAtPathNoFollow(parentDir)
 	if err != nil {
 		return err
 	}
@@ -455,7 +500,7 @@ func (driver *CommonDriver) MkdirAll(path string, perm os.FileMode) error {
 	perm &^= os.ModeType
 	perm |= os.ModeDir
 
-	parentObject, err := driver.getObjectAtPath(parentDir)
+	parentObject, err := driver.getObjectAtPathNoFollow(parentDir)
 	if err != nil {
 		if err.Errno() == disko.ENOENT {
 			// Parent directory doesn't exist, create it.
@@ -472,7 +517,7 @@ func (driver *CommonDriver) MkdirAll(path string, perm os.FileMode) error {
 
 func (driver *CommonDriver) RemoveAll(path string) error {
 	path = driver.normalizePath(path)
-	object, err := driver.getObjectAtPath(path)
+	object, err := driver.getObjectAtPathNoFollow(path)
 	if err != nil {
 		return err
 	}
