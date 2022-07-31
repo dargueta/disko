@@ -11,6 +11,15 @@ so a lot of this is of no interest to anyone except those in the retro community
 
 Why the name? Disk + Go -> DiskGo -> Disko. Obviously.
 
+API
+---
+
+At time of writing (July 2022) I'm doing an overhaul of the API. Ignore most of
+``api.go``; I've managed to implement most of the ``Driver`` interface while
+needing a much simpler (albeit more abstract) interface from file system
+implementations. This should greatly simplify adding new drivers.
+
+
 File Systems
 ------------
 
@@ -77,8 +86,8 @@ This project uses the following third-party packages in accordance with their
 licenses. A project's appearance in this list does not imply endorsement by or
 affiliation with the author.
 
+* `cli <github.com/urfave/cli>`_ by urfave
 * `go-bitmap <https://github.com/boljen/go-bitmap>`_ by Bol Christophe
-
 
 Footnotes
 ---------
