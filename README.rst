@@ -19,6 +19,71 @@ At time of writing (July 2022) I'm doing an overhaul of the API. Ignore most of
 needing a much simpler (albeit more abstract) interface from file system
 implementations. This should greatly simplify adding new drivers.
 
+The base driver implements the following functions out of the box:
+
+Legend:
+
+* ✔: Supported
+* ⚠: Conditionally supported, depends on an API function I haven't settled on yet.
+* ✘: Doesn't make sense for this, implemented as a no-op
+
+========= ======= ======
+Function  Support Notes
+--------- ------- ------
+Chmod
+Chown
+Chtimes
+Create    ✔
+Flush
+Lchown
+Link
+Lstat     ✔
+Mkdir     ✔
+MkdirAll  ✔
+Open      ✔
+OpenFile  ✔
+ReadDir   ✔
+ReadFile  ✔
+Readlink  ✔
+Remove    ✔
+RemoveAll ✔
+Repath
+SameFile  ✔
+Stat      ✔
+Symlink
+Truncate  ✔
+WriteFile
+========= ======= ======
+
+File handles support the following:
+
+================ ======= =====
+Function         Support Notes
+---------------- ------- -----
+Chdir
+Chmod
+Chown
+Close            ⚠
+Fd               ✔
+Name             ✔
+Read
+ReadAt
+Readdir
+Readdirnames
+ReadFrom
+Seek
+SetDeadline      ✘
+SetReadDeadline  ✘
+SetWriteDeadline ✘
+Stat             ✔
+Sync
+SyscallConn      ✘
+Truncate
+Write
+WriteAt
+WriteString
+WriteTo
+================ ======= =====
 
 File Systems
 ------------
