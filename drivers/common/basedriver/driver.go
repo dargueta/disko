@@ -67,7 +67,8 @@ type CommonDriver struct {
 			OpenFile 	DONE
 
 		ReadingDriver:	DONE
-			Open 		DONE
+			Chdir		DONE
+			Open		DONE
 			ReadFile	DONE
 			SameFile	DONE
 			Stat		DONE
@@ -85,7 +86,7 @@ type CommonDriver struct {
 			Chtimes
 			Create			DONE
 			Flush
-			Remove 			DONE
+			Remove			DONE
 			Repath
 			Truncate		DONE
 			WriteFile		DONE
@@ -328,6 +329,25 @@ func (driver *CommonDriver) OpenFile(
 }
 
 // ReadingDriver ---------------------------------------------------------------
+
+func (driver *CommonDriver) Chdir(path string) error {
+	absPath := driver.normalizePath(path)
+	object, err := driver.getObjectAtPathFollowingLink(absPath)
+	if err != nil {
+		return err
+	}
+
+	stat := object.Stat()
+	if !stat.IsDir() {
+		return disko.NewDriverErrorWithMessage(
+			disko.ENOTDIR,
+			fmt.Sprintf("not a directory: `%s`", absPath),
+		)
+	}
+
+	driver.workingDirPath = absPath
+	return nil
+}
 
 func (driver *CommonDriver) Open(path string) (File, error) {
 	return driver.OpenFile(path, disko.O_RDONLY, 0)

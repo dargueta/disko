@@ -30,6 +30,7 @@ Legend:
 ========= ======= ======
 Function  Support Notes
 --------- ------- ------
+Chdir     ✔
 Chmod
 Chown
 Chtimes

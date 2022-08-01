@@ -229,6 +229,7 @@ type OpeningDriver interface {
 
 // ReadingDriver is the interface for drivers supporting read operations.
 type ReadingDriver interface {
+	Chdir(path string) error
 	SameFile(fi1, fi2 os.FileInfo) bool
 	Open(path string) (File, error)
 	// ReadFile return the contents of the file at the given path.
