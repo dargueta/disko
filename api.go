@@ -124,6 +124,20 @@ type FSStat struct {
 	Label string
 }
 
+// FSCapabilities indicates the features available for the file system. If a
+// file system supports a feature, driver implementations MUST set it as available
+// even if the driver hasn't implemented it yet.
+type FSCapabilities struct {
+	Directories     bool
+	Symlinks        bool
+	HardLinks       bool
+	CreatedTime     bool
+	AccessedTime    bool
+	ModifiedTime    bool
+	ChangedTime     bool
+	UnixPermissions bool
+}
+
 type Truncator interface {
 	Truncate(size int64) error
 }

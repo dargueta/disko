@@ -57,6 +57,8 @@ type DriverImplementation interface {
 	// function should return identical data if no modifications have been made
 	// to the file system.
 	FSStat() disko.FSStat
+
+	GetFSCapabilities() disko.FSCapabilities
 }
 
 type CommonDriver struct {
@@ -86,7 +88,7 @@ type CommonDriver struct {
 			Remove 			DONE
 			Repath
 			Truncate		DONE
-			WriteFile
+			WriteFile		DONE
 
 		DirWritingDriver:	DONE
 			Mkdir			DONE
@@ -482,6 +484,25 @@ func (driver *CommonDriver) Truncate(path string) error {
 		return err
 	}
 	return object.Resize(0)
+}
+
+func (driver *CommonDriver) WriteFile(
+	path string,
+	data []byte,
+	perm os.FileMode,
+) error {
+	handle, err := driver.OpenFile(
+		path,
+		disko.O_WRONLY|disko.O_CREATE|disko.O_TRUNC,
+		perm,
+	)
+	if err != nil {
+		return err
+	}
+	defer handle.Close()
+
+	_, err = handle.Write(data)
+	return err
 }
 
 // DirWritingDriver ------------------------------------------------------------
