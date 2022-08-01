@@ -29,7 +29,7 @@ Legend:
 
 ========= ======= ======
 Function  Support Notes
---------- ------- ------
+========= ======= ======
 Chdir     ✔
 Chmod
 Chown
@@ -60,7 +60,7 @@ File handles support the following:
 
 ================ ======= =====
 Function         Support Notes
----------------- ------- -----
+================ ======= =====
 Chdir
 Chmod
 Chown
@@ -94,7 +94,7 @@ for, as well as the status of the capabilities.
 
 =============== ================ ==== ==================== ================ ============
 File System     Format New Image Read Write Existing Files Create New Files Delete Files
---------------- ---------------- ---- -------------------- ---------------- ------------
+=============== ================ ==== ==================== ================ ============
 CP/M 1.4
 CP/M 2.2
 CP/M 3.1
@@ -123,7 +123,7 @@ CLI Features
 
 ========================= ======
 Feature                   Status
-------------------------- ------
+========================= ======
 Create blank image
 List files
 Insert individual files
