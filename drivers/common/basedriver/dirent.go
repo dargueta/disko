@@ -13,7 +13,7 @@ type DirectoryEntry struct {
 	stat disko.FileStat
 }
 
-func NewDirectoryEntryFromDescriptor(object ObjectDescriptor) DirectoryEntry {
+func NewDirectoryEntryFromHandle(object ObjectHandle) DirectoryEntry {
 	return DirectoryEntry{
 		name: object.Name(),
 		stat: object.Stat(),

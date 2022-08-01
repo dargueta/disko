@@ -11,14 +11,14 @@ import (
 
 ////////////////////////////////////////////////////////////////////////////////
 
-type ObjectDescriptor interface {
+type ObjectHandle interface {
 	ID() uintptr
 	Stat() disko.FileStat
 	Open(flags disko.IOFlags) (disko.File, disko.DriverError)
 	Resize(newSize int64) disko.DriverError
 	Unlink() disko.DriverError
 	Update(stat disko.FileStat) disko.DriverError
-	ListDir() (map[string]ObjectDescriptor, disko.DriverError)
+	ListDir() (map[string]ObjectHandle, disko.DriverError)
 	Name() string
 }
 
@@ -26,21 +26,36 @@ type ObjectDescriptor interface {
 // default functionality from the CommonDriver.
 type DriverImplementation interface {
 	// CreateObject creates an object on the file system that is *not* a
-	// directory. This is guaranteed to never be called
+	// directory. The following guarantees apply: A) this will never be called
+	// for an object that already exists; B) `parent` will always be a valid
+	// object handle.
 	CreateObject(
 		name string,
-		parent ObjectDescriptor,
+		parent ObjectHandle,
 		perm os.FileMode,
-	) (ObjectDescriptor, disko.DriverError)
+	) (ObjectHandle, disko.DriverError)
 
+	// GetObject returns a handle to an object with the given name in a directory
+	// specified by `parent`. The following guarantees apply: A) this will never
+	// be called for a nonexistent object; B) `parent` will always be a valid
+	// object handle.
 	GetObject(
 		name string,
-		parent ObjectDescriptor,
-	) (ObjectDescriptor, disko.DriverError)
+		parent ObjectHandle,
+	) (ObjectHandle, disko.DriverError)
 
-	GetRootDirectory() ObjectDescriptor
+	// Return a handle to the root directory of the disk image. This must always
+	// be a valid object handle, even if directories are not supported by the
+	// file system (e.g. FAT8).
+	GetRootDirectory() ObjectHandle
 
+	// MarkFileClosed is a provisional function and should be ignored for the
+	// time being.
 	MarkFileClosed(file *File) disko.DriverError
+
+	// FSStat returns information about the file system. Multiple calls to this
+	// function should return identical data if no modifications have been made
+	// to the file system.
 	FSStat() disko.FSStat
 }
 
@@ -102,11 +117,13 @@ func (driver *CommonDriver) normalizePath(path string) string {
 
 // resolveSymlink dereferences `object` (if it's a symlink), following multiple
 // levels of indirection if needed to get to a file  system object. If `object`
-// isn't a symlink, this becmes a no-op and returns it unmodified.
+// isn't a symlink, this becomes a no-op and returns the handle unmodified.
+//
+// `path` must be a normalized absolute path.
 func (driver *CommonDriver) resolveSymlink(
-	object ObjectDescriptor,
+	object ObjectHandle,
 	path string,
-) (ObjectDescriptor, disko.DriverError) {
+) (ObjectHandle, disko.DriverError) {
 	stat := object.Stat()
 	if !stat.IsSymlink() {
 		return object, nil
@@ -134,6 +151,8 @@ func (driver *CommonDriver) resolveSymlink(
 				)
 		}
 
+		// Compute the next path in this chain; if it's already in the cache
+		// then we hit a cycle.
 		nextPath := driver.normalizePath(string(symlinkText))
 		_, exists := pathCache[nextPath]
 		if exists {
@@ -141,18 +160,20 @@ func (driver *CommonDriver) resolveSymlink(
 				disko.NewDriverErrorWithMessage(
 					disko.ELOOP,
 					fmt.Sprintf(
-						"found loop resolving symlink `%s`: hit `%s` twice",
+						"found cycle resolving symlink `%s`: hit `%s` twice",
 						path,
 						nextPath,
 					),
 				)
 		}
 
+		// Get the object at the next path but don't dereference it.
 		object, err = driver.getObjectAtPathNoFollow(nextPath)
 		if err != nil {
 			return nil, err
 		}
 
+		// Update the latest path and file stats for the next loop iteration.
 		stat = object.Stat()
 		currentPath = nextPath
 	}
@@ -161,11 +182,13 @@ func (driver *CommonDriver) resolveSymlink(
 }
 
 // getObjectAtPathNoFollow resolves a normalized absolute path to an object
-// descriptor. It follows symbolic links for intermediate directories, but does
-// *not* follow the final path component if it's a symbolic link.
+// handle. It follows symbolic links for intermediate directories, but does *not*
+// follow the final path component if it's a symbolic link.
+//
+// `path` must be a normalized absolute path.
 func (driver *CommonDriver) getObjectAtPathNoFollow(
 	path string,
-) (ObjectDescriptor, disko.DriverError) {
+) (ObjectHandle, disko.DriverError) {
 	if path == "/" || path == "" {
 		return driver.implementation.GetRootDirectory(), nil
 	}
@@ -195,7 +218,7 @@ func (driver *CommonDriver) getObjectAtPathNoFollow(
 
 func (driver *CommonDriver) getObjectAtPathFollowingLink(
 	path string,
-) (ObjectDescriptor, disko.DriverError) {
+) (ObjectHandle, disko.DriverError) {
 	object, err := driver.getObjectAtPathNoFollow(path)
 	if err != nil {
 		return nil, err
@@ -217,7 +240,7 @@ func (driver *CommonDriver) getObjectAtPathFollowingLink(
 // file system, regardless of whether it's a file or directory. Symbolic links
 // are not followed.
 func (driver *CommonDriver) getContentsOfObject(
-	object ObjectDescriptor,
+	object ObjectHandle,
 ) ([]byte, disko.DriverError) {
 	handle, err := object.Open(disko.O_RDONLY)
 	if err != nil {
@@ -252,9 +275,9 @@ func (driver *CommonDriver) OpenFile(
 		if err.Errno() == disko.ENOENT {
 			// File does not exist, can we create it?
 			if ioFlags.Create() {
-				// To create the missing file, we need to get a descriptor for
-				// its parent directory, then call CreateObject() for the file
-				// in that directory.
+				// To create the missing file, we need to get a handle for its
+				// parent directory, then call CreateObject() for the file in
+				// that directory.
 				parentDir, baseName := posixpath.Split(absPath)
 				parentObject, err := driver.getObjectAtPathFollowingLink(parentDir)
 				if err != nil {
@@ -357,7 +380,7 @@ func (driver *CommonDriver) ReadDir(path string) ([]disko.DirectoryEntry, error)
 
 	output := make([]disko.DirectoryEntry, 0, len(dirents))
 	for _, direntObject := range dirents {
-		dirent := NewDirectoryEntryFromDescriptor(direntObject)
+		dirent := NewDirectoryEntryFromHandle(direntObject)
 		output = append(output, dirent)
 	}
 

@@ -59,7 +59,7 @@ type File struct {
 	disko.File
 
 	owningDriver *CommonDriver
-	descriptor   ObjectDescriptor
+	handle       ObjectHandle
 	fileInfo     FileInfo
 	ioFlags      disko.IOFlags
 }
