@@ -59,33 +59,34 @@ type File struct {
 	disko.File
 
 	owningDriver *CommonDriver
-	handle       ObjectHandle
+	objectHandle ObjectHandle
 	fileInfo     FileInfo
 	ioFlags      disko.IOFlags
 }
 
 /*
-	io.ReadWriteCloser
-	io.Seeker
-	io.ReaderAt
-	io.ReaderFrom
-	io.WriterAt
-	io.StringWriter
-	Truncator
-
 	Chdir() error
 	Chmod(mode os.FileMode) error
 	Chown(uid, gid int) error
-	Fd() uintptr 							// DONE
-	Name() string							// DONE
+	Close
+	Fd() uintptr							DONE
+	Name() string							DONE
+	Read
+	ReadAt
 	Readdir(n int) ([]os.FileInfo, error)
 	Readdirnames(n int) ([]string, error)
-	SetDeadline(t time.Time) error 			// DONE
-	SetReadDeadline(t time.Time) error 		// DONE
-	SetWriteDeadline(t time.Time) error 	// DONE
-	SyscallConn() (syscall.RawConn, error) 	// DONE
-	Stat() (os.FileInfo, error) 			// DONE
+	ReadFrom
+	Seek
+	SetDeadline(t time.Time) error			// DONE
+	SetReadDeadline(t time.Time) error		// DONE
+	SetWriteDeadline(t time.Time) error		// DONE
+	Stat() (os.FileInfo, error)				// DONE
 	Sync()
+	SyscallConn() (syscall.RawConn, error)	// DONE
+	Truncate								// DONE
+	Write
+	WriteAt
+	WriteString
 */
 
 func (file *File) Close() error {
@@ -114,4 +115,8 @@ func (file *File) SyscallConn() (syscall.RawConn, error) {
 
 func (file *File) Stat() (os.FileInfo, error) {
 	return file.fileInfo.Info()
+}
+
+func (file *File) Truncate(newSize int64) error {
+	return file.objectHandle.Resize(newSize)
 }

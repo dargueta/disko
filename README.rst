@@ -79,7 +79,7 @@ SetWriteDeadline ✘
 Stat             ✔
 Sync
 SyscallConn      ✘
-Truncate
+Truncate         ✔
 Write
 WriteAt
 WriteString
