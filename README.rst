@@ -103,7 +103,7 @@ FAT 8           B [#]_
 FAT 12
 FAT 16
 FAT 32
-MINIX
+MINIX 3
 Unix V1FS [#]_  ✔
 Unix V6FS
 Unix V7FS
@@ -137,6 +137,21 @@ Extract using shell globs
 Interactive editing
 ========================= ======
 
+Further Reading
+---------------
+
+* `UNIX v1 Manual`_, relevant parts pages 171-174.
+* `UNIX v6 File System`_
+* `Xerox BASIC-80 Manual`_, documenting FAT 8 on pages 172, 176, and 178.
+* `FAT 12/16/32 on Wikipedia`_
+* `CP/M file systems`_, including extensions.
+* `MINIX 3 <https://flylib.com/books/en/3.275.1.54/1/>`_, shorter explanation `here <http://ohm.hgesser.de/sp-ss2012/Intro-MinixFS.pdf>`_.
+
+.. _UNIX v1 Manual: http://www.bitsavers.org/pdf/bellLabs/unix/UNIX_ProgrammersManual_Nov71.pdf
+.. _UNIX v6 File System: http://man.cat-v.org/unix-6th/5/fs
+.. _FAT 12/16/32 on Wikipedia: https://en.wikipedia.org/wiki/File_Allocation_Table
+.. _Xerox BASIC-80 Manual: http://bitsavers.trailing-edge.com/pdf/xerox/820-II/BASIC-80_5.0.pdf
+.. _CP/M file systems: https://www.seasip.info/Cpm/formats.html
 
 License
 -------
