@@ -44,9 +44,9 @@ type DriverImplementation interface {
 		parent ObjectHandle,
 	) (ObjectHandle, disko.DriverError)
 
-	// Return a handle to the root directory of the disk image. This must always
-	// be a valid object handle, even if directories are not supported by the
-	// file system (e.g. FAT8).
+	// GetRootDirectory returns a handle to the root directory of the disk image.
+	// This must always be a valid object handle, even if directories are not
+	// supported by the file system (e.g. FAT8).
 	GetRootDirectory() ObjectHandle
 
 	// MarkFileClosed is a provisional function and should be ignored for the
@@ -312,13 +312,13 @@ func (driver *CommonDriver) OpenFile(
 			)
 	}
 
-	baseFileObject, err := object.Open(flags)
+	fdesc, err := object.Open(flags)
 	if err != nil {
 		return File{}, err
 	}
 
 	return File{
-		File:         baseFileObject,
+		File:         fdesc,
 		owningDriver: driver,
 		fileInfo: FileInfo{
 			FileStat: stat,
@@ -332,6 +332,7 @@ func (driver *CommonDriver) OpenFile(
 
 func (driver *CommonDriver) Chdir(path string) error {
 	absPath := driver.normalizePath(path)
+
 	object, err := driver.getObjectAtPathFollowingLink(absPath)
 	if err != nil {
 		return err
@@ -355,20 +356,12 @@ func (driver *CommonDriver) Open(path string) (File, error) {
 
 func (driver *CommonDriver) ReadFile(path string) ([]byte, error) {
 	path = driver.normalizePath(path)
-	object, err := driver.getObjectAtPathNoFollow(path)
+
+	object, err := driver.getObjectAtPathFollowingLink(path)
 	if err != nil {
 		return nil, err
 	}
-
-	handle, err := object.Open(disko.O_RDONLY)
-	if err != nil {
-		return nil, err
-	}
-	defer handle.Close()
-
-	buffer := make([]byte, object.Stat().Size)
-	_, readErr := handle.Read(buffer)
-	return buffer, readErr
+	return driver.getContentsOfObject(object)
 }
 
 func (driver *CommonDriver) SameFile(fi1, fi2 os.FileInfo) bool {
@@ -379,7 +372,8 @@ func (driver *CommonDriver) SameFile(fi1, fi2 os.FileInfo) bool {
 
 func (driver *CommonDriver) Stat(path string) (disko.FileStat, error) {
 	path = driver.normalizePath(path)
-	object, err := driver.getObjectAtPathNoFollow(path)
+
+	object, err := driver.getObjectAtPathFollowingLink(path)
 	if err != nil {
 		return disko.FileStat{}, err
 	}
@@ -390,7 +384,8 @@ func (driver *CommonDriver) Stat(path string) (disko.FileStat, error) {
 
 func (driver *CommonDriver) ReadDir(path string) ([]disko.DirectoryEntry, error) {
 	path = driver.normalizePath(path)
-	object, err := driver.getObjectAtPathNoFollow(path)
+
+	object, err := driver.getObjectAtPathFollowingLink(path)
 	if err != nil {
 		return nil, err
 	}
@@ -499,7 +494,7 @@ func (driver *CommonDriver) Remove(path string) error {
 
 func (driver *CommonDriver) Truncate(path string) error {
 	absPath := driver.normalizePath(path)
-	object, err := driver.getObjectAtPathNoFollow(absPath)
+	object, err := driver.getObjectAtPathFollowingLink(absPath)
 	if err != nil {
 		return err
 	}
@@ -535,7 +530,7 @@ func (driver *CommonDriver) Mkdir(path string, perm os.FileMode) error {
 	absPath := driver.normalizePath(path)
 	parentDir, baseName := posixpath.Split(absPath)
 
-	parentObject, err := driver.getObjectAtPathNoFollow(parentDir)
+	parentObject, err := driver.getObjectAtPathFollowingLink(parentDir)
 	if err != nil {
 		return err
 	}
@@ -564,7 +559,7 @@ func (driver *CommonDriver) MkdirAll(path string, perm os.FileMode) error {
 	perm &^= os.ModeType
 	perm |= os.ModeDir
 
-	parentObject, err := driver.getObjectAtPathNoFollow(parentDir)
+	parentObject, err := driver.getObjectAtPathFollowingLink(parentDir)
 	if err != nil {
 		if err.Errno() == disko.ENOENT {
 			// Parent directory doesn't exist, create it.
@@ -581,7 +576,7 @@ func (driver *CommonDriver) MkdirAll(path string, perm os.FileMode) error {
 
 func (driver *CommonDriver) RemoveAll(path string) error {
 	path = driver.normalizePath(path)
-	object, err := driver.getObjectAtPathNoFollow(path)
+	object, err := driver.getObjectAtPathFollowingLink(path)
 	if err != nil {
 		return err
 	}
