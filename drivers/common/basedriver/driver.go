@@ -337,7 +337,10 @@ func (driver *CommonDriver) Chdir(path string) error {
 	if err != nil {
 		return err
 	}
+	return driver.chdirToObject(object, absPath)
+}
 
+func (driver *CommonDriver) chdirToObject(object ObjectHandle, absPath string) error {
 	stat := object.Stat()
 	if !stat.IsDir() {
 		return disko.NewDriverErrorWithMessage(

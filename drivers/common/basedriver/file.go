@@ -89,6 +89,13 @@ type File struct {
 	WriteString
 */
 
+func (file *File) Chdir() error {
+	return file.owningDriver.chdirToObject(
+		file.objectHandle,
+		file.fileInfo.name,
+	)
+}
+
 func (file *File) Close() error {
 	return file.owningDriver.implementation.MarkFileClosed(file)
 }
