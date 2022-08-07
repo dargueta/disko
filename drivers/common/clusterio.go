@@ -12,7 +12,7 @@ type ClusterID uint
 type ClusterStream struct {
 	BlockStream       *BlockStream
 	BlocksPerCluster  uint
-	FirstBlock        BlockID
+	FirstBlock        LogicalBlock
 	FirstValidCluster ClusterID
 	LastValidCluster  ClusterID
 	bytesPerCluster   uint
@@ -22,7 +22,7 @@ type ClusterStream struct {
 func NewClusterStream(
 	blockStream *BlockStream,
 	blocksPerCluster uint,
-	firstBlock BlockID,
+	firstBlock LogicalBlock,
 	firstValidCluster ClusterID,
 	lastValidCluster ClusterID,
 ) (ClusterStream, error) {
@@ -50,13 +50,13 @@ func NewBasicClusterStream(
 
 // ClusterIDToBlock takes a cluster ID and returns the ID of the first block of
 // that cluster.
-func (stream *ClusterStream) ClusterIDToBlock(clusterID ClusterID) (BlockID, error) {
+func (stream *ClusterStream) ClusterIDToBlock(clusterID ClusterID) (LogicalBlock, error) {
 	err := stream.CheckIOBounds(clusterID, 0)
 	if err != nil {
 		return 0, err
 	}
 	normalizedCluster := uint(clusterID - stream.FirstValidCluster)
-	return stream.FirstBlock + (BlockID(normalizedCluster * stream.BlocksPerCluster)), nil
+	return stream.FirstBlock + (LogicalBlock(normalizedCluster * stream.BlocksPerCluster)), nil
 }
 
 func (stream *ClusterStream) CheckIOBounds(cluster ClusterID, dataLength uint) error {

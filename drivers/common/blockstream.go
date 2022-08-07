@@ -8,7 +8,8 @@ import (
 	"github.com/dargueta/disko"
 )
 
-type BlockID uint
+type LogicalBlock uint
+type PhysicalBlock uint
 type BlockData []byte
 
 // BlockStream is an abstraction layer around a stream to make it look like a
@@ -59,7 +60,7 @@ func NewBasicBlockStream(stream io.ReadWriteSeeker, totalBlocks uint) BlockStrea
 
 // BlockIDToFileOffset converts a block ID into a byte offset into the backing
 // I/O stream.
-func (device *BlockStream) BlockIDToFileOffset(blockID BlockID) (int64, error) {
+func (device *BlockStream) BlockIDToFileOffset(blockID LogicalBlock) (int64, error) {
 	if uint(blockID) >= device.TotalBlocks {
 		return -1,
 			fmt.Errorf(
@@ -73,7 +74,7 @@ func (device *BlockStream) BlockIDToFileOffset(blockID BlockID) (int64, error) {
 // CheckIOBounds checks to see if `dataLength` bytes can be read from or written
 // to the block stream, starting at blockID. If the bounds check fails, it returns
 // an error indicating exactly what went wrong.
-func (device *BlockStream) CheckIOBounds(blockID BlockID, dataLength uint) error {
+func (device *BlockStream) CheckIOBounds(blockID LogicalBlock, dataLength uint) error {
 	if uint(blockID) >= device.TotalBlocks {
 		return fmt.Errorf(
 			"invalid block ID %d: not in range [0, %d)",
@@ -102,7 +103,7 @@ func (device *BlockStream) CheckIOBounds(blockID BlockID, dataLength uint) error
 
 // seekToBlock positions the stream pointer at the byte offset where the given
 // block starts.
-func (device *BlockStream) seekToBlock(blockID BlockID) error {
+func (device *BlockStream) seekToBlock(blockID LogicalBlock) error {
 	offset, err := device.BlockIDToFileOffset(blockID)
 	if err != nil {
 		return err
@@ -112,7 +113,7 @@ func (device *BlockStream) seekToBlock(blockID BlockID) error {
 }
 
 // Read reads `count` whole blocks starting from `blockID`.
-func (device *BlockStream) Read(blockID BlockID, count uint) ([]byte, error) {
+func (device *BlockStream) Read(blockID LogicalBlock, count uint) ([]byte, error) {
 	err := device.CheckIOBounds(blockID, count*device.BytesPerBlock)
 	if err != nil {
 		return nil, err
@@ -134,7 +135,7 @@ func (device *BlockStream) Read(blockID BlockID, count uint) ([]byte, error) {
 
 // Write writes data to the block device. `data` must be a multiple of the block
 // size.
-func (device *BlockStream) Write(blockID BlockID, data []byte) error {
+func (device *BlockStream) Write(blockID LogicalBlock, data []byte) error {
 	err := device.CheckIOBounds(blockID, uint(len(data)))
 	if err != nil {
 		return err

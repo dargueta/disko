@@ -10,18 +10,18 @@ import (
 	"fmt"
 
 	"github.com/boljen/go-bitmap"
-	"github.com/dargueta/disko/drivers/common"
+	c "github.com/dargueta/disko/drivers/common"
 )
 
 // FetchBlockCallback is a pointer to a function that writes the contents of a
 // single block from the underlying storage into `buffer`. `buffer` is guaranteed
 // to be the size of exactly one block.
-type FetchBlockCallback func(blockIndex common.BlockID, buffer []byte) error
+type FetchBlockCallback func(blockIndex c.LogicalBlock, buffer []byte) error
 
 // FlushBlockCallback is a pointer to a function that writes the contents of the
 // given buffer to a block in the backing storage. `buffer` is guaranteed to be
 // the size of exactly one block.
-type FlushBlockCallback func(blockIndex common.BlockID, buffer []byte) error
+type FlushBlockCallback func(blockIndex c.LogicalBlock, buffer []byte) error
 
 type BlockCache struct {
 	loadedBlocks  bitmap.Bitmap
@@ -69,7 +69,7 @@ func (cache *BlockCache) sizeToNumBlocks(size uint) uint {
 // checkBounds verifies that `bufferSize` bytes can be accessed in the cache
 // starting from block `start`. If not, it returns an error describing the exact
 // conditions. If no error would occur, this returns nil.
-func (cache *BlockCache) checkBounds(start common.BlockID, bufferSize uint) error {
+func (cache *BlockCache) checkBounds(start c.LogicalBlock, bufferSize uint) error {
 	numBlocks := cache.sizeToNumBlocks(bufferSize)
 
 	if uint(start)+numBlocks >= cache.totalBlocks {
@@ -86,7 +86,10 @@ func (cache *BlockCache) checkBounds(start common.BlockID, bufferSize uint) erro
 
 // GetSlice returns a slice pointing to the cache's storage, beginning at block
 // `start` and continuing for `count` blocks.
-func (cache *BlockCache) GetSlice(start common.BlockID, count uint) ([]byte, error) {
+func (cache *BlockCache) GetSlice(
+	start c.LogicalBlock,
+	count uint,
+) ([]byte, error) {
 	err := cache.checkBounds(start, count*cache.bytesPerBlock)
 	if err != nil {
 		return nil, err
@@ -99,7 +102,7 @@ func (cache *BlockCache) GetSlice(start common.BlockID, count uint) ([]byte, err
 
 // loadBlockRange ensures that all blocks in the range [start, start + count) are
 // present in the cache, and loads any missing ones from storage.
-func (cache *BlockCache) loadBlockRange(start common.BlockID, count uint) error {
+func (cache *BlockCache) loadBlockRange(start c.LogicalBlock, count uint) error {
 	err := cache.checkBounds(start, count*cache.bytesPerBlock)
 	if err != nil {
 		return err
@@ -112,13 +115,13 @@ func (cache *BlockCache) loadBlockRange(start common.BlockID, count uint) error 
 			continue
 		}
 
-		buffer, err := cache.GetSlice(common.BlockID(blockIndex), 1)
+		buffer, err := cache.GetSlice(c.LogicalBlock(blockIndex), 1)
 		if err != nil {
 			return err
 		}
 
 		// Load the block from backing storage directly into the cache.
-		err = cache.fetch(common.BlockID(blockIndex), buffer)
+		err = cache.fetch(c.LogicalBlock(blockIndex), buffer)
 		if err != nil {
 			return fmt.Errorf(
 				"failed to load block %d from source: %s",
@@ -137,7 +140,7 @@ func (cache *BlockCache) loadBlockRange(start common.BlockID, count uint) error 
 
 // flushBlockRange writes out all dirty blocks (and only dirty blocks) to the
 // underlying storage and marks them as clean.
-func (cache *BlockCache) flushBlockRange(start common.BlockID, count uint) error {
+func (cache *BlockCache) flushBlockRange(start c.LogicalBlock, count uint) error {
 	err := cache.checkBounds(start, count*cache.bytesPerBlock)
 	if err != nil {
 		return err
@@ -150,13 +153,13 @@ func (cache *BlockCache) flushBlockRange(start common.BlockID, count uint) error
 			continue
 		}
 
-		buffer, err := cache.GetSlice(common.BlockID(blockIndex), 1)
+		buffer, err := cache.GetSlice(c.LogicalBlock(blockIndex), 1)
 		if err != nil {
 			return err
 		}
 
 		// Write the block to the underlying storage.
-		err = cache.flush(common.BlockID(blockIndex), buffer)
+		err = cache.flush(c.LogicalBlock(blockIndex), buffer)
 		if err != nil {
 			return fmt.Errorf(
 				"failed to flush block %d to storage: %s", blockIndex, err.Error(),
@@ -187,7 +190,7 @@ func (cache *BlockCache) FlushAll() error {
 //
 // Attempting to read past the end of the cache will result in an error, and
 // `buffer` will be left unmodified.
-func (cache *BlockCache) Read(start common.BlockID, buffer []byte) error {
+func (cache *BlockCache) Read(start c.LogicalBlock, buffer []byte) error {
 	bufLen := uint(len(buffer))
 	err := cache.checkBounds(start, bufLen)
 	if err != nil {
@@ -215,7 +218,7 @@ func (cache *BlockCache) Read(start common.BlockID, buffer []byte) error {
 //
 // Attempting to write past the end of the cache will result in an error, and
 // the cache will be left unmodified.
-func (cache *BlockCache) Write(start common.BlockID, buffer []byte) error {
+func (cache *BlockCache) Write(start c.LogicalBlock, buffer []byte) error {
 	bufLen := uint(len(buffer))
 
 	err := cache.checkBounds(start, bufLen)
@@ -233,7 +236,7 @@ func (cache *BlockCache) Write(start common.BlockID, buffer []byte) error {
 
 	// Mark all blocks we wrote to as present and dirty.
 	for i := uint(0); i < totalBlocks; i++ {
-		currentBlockIndex := int(common.BlockID(i) + start)
+		currentBlockIndex := int(c.LogicalBlock(i) + start)
 		cache.loadedBlocks.Set(currentBlockIndex, true)
 		cache.dirtyBlocks.Set(currentBlockIndex, true)
 	}
