@@ -5,19 +5,50 @@ import (
 	"os"
 	posixpath "path"
 	"path/filepath"
+	"time"
 
 	"github.com/dargueta/disko"
+	"github.com/dargueta/disko/drivers/common"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
 
 type ObjectHandle interface {
+	// ID returns a unique identifier for the file system object that this
+	// represents. All ObjectHandles referring to the same entity must return
+	// the same value here.
 	ID() uintptr
+
 	Stat() disko.FileStat
-	Open(flags disko.IOFlags) (disko.File, disko.DriverError)
-	Resize(newSize int64) disko.DriverError
+
+	// Resize changes the size of the object, in bytes. Drivers are responsible
+	// for ensuring the needed number of blocks are allocated or freed.
+	Resize(newSize uint64) disko.DriverError
+
+	ReadBlocks(index common.LogicalBlock, buffer []byte) disko.DriverError
+	WriteBlocks(index common.LogicalBlock, data []byte) disko.DriverError
+
+	// ZeroOutBlocks tells the driver to treat `count` blocks beginning at
+	// `startIndex` as consisting entirely of null bytes (0). It does not change
+	// the size of the object.
+	//
+	// Some file systems have optimizations for such "holes" that can save disk
+	// space. If the file system doesn't support hole optimization, the driver
+	// *must* set all bytes in these blocks to 0.
+	//
+	// NOTE: It's the driver's responsibility to consolidate holes where possible.
+	ZeroOutBlocks(startIndex common.LogicalBlock, count uint) disko.DriverError
+
+	// Unlink deletes the file system object. This is guaranteed to not be called
+	// unless the object has no dependents. For directories, this means that the
+	// method will not be called unless the only entries are "." and ".." (if
+	// applicable).
 	Unlink() disko.DriverError
-	Update(stat disko.FileStat) disko.DriverError
+
+	Chmod(mode os.FileMode) disko.DriverError
+	Chown(uid, gid int) disko.DriverError
+	Chtimes(createdAt, lastAccessed, lastModified, lastChanged, deletedAt time.Time) error
+
 	ListDir() (map[string]ObjectHandle, disko.DriverError)
 	Name() string
 }
@@ -245,9 +276,9 @@ func (driver *CommonDriver) getObjectAtPathFollowingLink(
 func (driver *CommonDriver) getContentsOfObject(
 	object ObjectHandle,
 ) ([]byte, disko.DriverError) {
-	handle, err := object.Open(disko.O_RDONLY)
+	handle, err := NewFileFromObjectHandle(driver, object, disko.O_RDONLY)
 	if err != nil {
-		return nil, err
+		return nil, disko.NewDriverErrorFromError(disko.EIO, err)
 	}
 	defer handle.Close()
 
@@ -312,20 +343,7 @@ func (driver *CommonDriver) OpenFile(
 			)
 	}
 
-	fdesc, err := object.Open(flags)
-	if err != nil {
-		return File{}, err
-	}
-
-	return File{
-		File:         fdesc,
-		owningDriver: driver,
-		fileInfo: FileInfo{
-			FileStat: stat,
-			name:     posixpath.Base(absPath),
-		},
-		ioFlags: ioFlags,
-	}, nil
+	return NewFileFromObjectHandle(driver, object, flags)
 }
 
 // ReadingDriver ---------------------------------------------------------------
