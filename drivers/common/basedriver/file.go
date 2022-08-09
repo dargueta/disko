@@ -3,7 +3,6 @@ package basedriver
 import (
 	"io/fs"
 	"os"
-	"syscall"
 	"time"
 
 	"github.com/dargueta/disko"
@@ -59,9 +58,6 @@ func (info *FileInfo) Sys() any {
 ////////////////////////////////////////////////////////////////////////////////
 
 type File struct {
-	// Interfaces
-	disko.File
-
 	// Embed
 	*basicstream.BasicStream
 
@@ -120,7 +116,6 @@ func NewFileFromObjectHandle(
 	Chmod
 	Chown
 	Close					DONE
-	Fd						DONE
 	Name					DONE
 	Read					DONE
 	ReadAt					DONE
@@ -128,12 +123,8 @@ func NewFileFromObjectHandle(
 	Readdirnames
 	ReadFrom
 	Seek					DONE
-	SetDeadline				DONE
-	SetReadDeadline			DONE
-	SetWriteDeadline		DONE
 	Stat					DONE
 	Sync					DONE
-	SyscallConn				DONE
 	Truncate				DONE
 	Write					DONE
 	WriteAt					DONE
@@ -152,28 +143,8 @@ func (file *File) Close() error {
 	return file.owningDriver.implementation.MarkFileClosed(file)
 }
 
-func (file *File) Fd() uintptr {
-	return 0
-}
-
 func (file *File) Name() string {
 	return file.fileInfo.name
-}
-
-func (file *File) SetDeadline(t time.Time) error {
-	return nil
-}
-
-func (file *File) SetReadDeadline(t time.Time) error {
-	return nil
-}
-
-func (file *File) SetWriteDeadline(t time.Time) error {
-	return nil
-}
-
-func (file *File) SyscallConn() (syscall.RawConn, error) {
-	return nil, disko.NewDriverError(disko.ENOSYS)
 }
 
 func (file *File) Stat() (os.FileInfo, error) {

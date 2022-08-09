@@ -3,7 +3,6 @@ package disko
 import (
 	"io"
 	"os"
-	"syscall"
 	"time"
 )
 
@@ -160,29 +159,11 @@ type File interface {
 	Chdir() error
 	Chmod(mode os.FileMode) error
 	Chown(uid, gid int) error
-	Fd() uintptr
 	Name() string
 	Readdir(n int) ([]os.FileInfo, error)
 	Readdirnames(n int) ([]string, error)
-
-	// SetDeadline is only present for compatibility with os.File(). Drivers
-	// should implement it as a no-op.
-	SetDeadline(t time.Time) error
-
-	// SetReadDeadline is only present for compatibility with os.File(). Drivers
-	// should implement it as a no-op.
-	SetReadDeadline(t time.Time) error
-
-	// SetWriteDeadline is only present for compatibility with os.File(). Drivers
-	// should implement it as a no-op.
-	SetWriteDeadline(t time.Time) error
-
-	// SyscallConn is only present for compatibility with os.File(). Drivers
-	// should ignore it and return an ENOSYS error immediately.
-	SyscallConn() (syscall.RawConn, error)
-
 	Stat() (os.FileInfo, error)
-	Sync()
+	Sync() error
 }
 
 // Driver is the bare minimum interface for all drivers.
