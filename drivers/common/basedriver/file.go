@@ -7,6 +7,9 @@ import (
 	"time"
 
 	"github.com/dargueta/disko"
+	"github.com/dargueta/disko/drivers/common"
+	"github.com/dargueta/disko/drivers/common/basicstream"
+	"github.com/dargueta/disko/drivers/common/blockcache"
 )
 
 type FileInfo struct {
@@ -56,37 +59,83 @@ func (info *FileInfo) Sys() any {
 ////////////////////////////////////////////////////////////////////////////////
 
 type File struct {
-	disko.File
+	// Interfaces
+	// disko.File
 
+	// Fields
 	owningDriver *CommonDriver
 	objectHandle ObjectHandle
 	fileInfo     FileInfo
 	ioFlags      disko.IOFlags
+	stream       *basicstream.BasicStream
+}
+
+// NewFileFromObjectHandle creates a Disko file object that is (more or less) a
+// drop-in replacement for os.File.
+func NewFileFromObjectHandle(
+	driver *CommonDriver,
+	object ObjectHandle,
+	ioFlags disko.IOFlags,
+) (File, error) {
+	fetchCb := func(index common.LogicalBlock, buffer []byte) error {
+		return object.ReadBlocks(index, buffer)
+	}
+	flushCb := func(index common.LogicalBlock, buffer []byte) error {
+		return object.WriteBlocks(index, buffer)
+	}
+	resizeCb := func(newSize common.LogicalBlock) error {
+		return object.Resize(uint64(newSize))
+	}
+
+	stat := object.Stat()
+	blockCache := blockcache.New(
+		uint(stat.BlockSize),
+		uint(stat.NumBlocks),
+		fetchCb,
+		flushCb,
+		resizeCb,
+	)
+
+	stream, err := basicstream.New(stat.Size, blockCache)
+	if err != nil {
+		return File{}, err
+	}
+
+	return File{
+		owningDriver: driver,
+		objectHandle: object,
+		ioFlags:      ioFlags,
+		stream:       stream,
+		fileInfo: FileInfo{
+			FileStat: stat,
+			name:     object.Name(),
+		},
+	}, nil
 }
 
 /*
-	Chdir() error
-	Chmod(mode os.FileMode) error
-	Chown(uid, gid int) error
-	Close
-	Fd() uintptr							DONE
-	Name() string							DONE
-	Read
-	ReadAt
-	Readdir(n int) ([]os.FileInfo, error)
-	Readdirnames(n int) ([]string, error)
+	Chdir					DONE
+	Chmod
+	Chown
+	Close					DONE
+	Fd						DONE
+	Name					DONE
+	Read					DONE
+	ReadAt					DONE
+	Readdir
+	Readdirnames
 	ReadFrom
-	Seek
-	SetDeadline(t time.Time) error			// DONE
-	SetReadDeadline(t time.Time) error		// DONE
-	SetWriteDeadline(t time.Time) error		// DONE
-	Stat() (os.FileInfo, error)				// DONE
-	Sync()
-	SyscallConn() (syscall.RawConn, error)	// DONE
-	Truncate								// DONE
-	Write
-	WriteAt
-	WriteString
+	Seek					DONE
+	SetDeadline				DONE
+	SetReadDeadline			DONE
+	SetWriteDeadline		DONE
+	Stat					DONE
+	Sync					DONE
+	SyscallConn				DONE
+	Truncate				DONE
+	Write					DONE
+	WriteAt					DONE
+	WriteString				DONE
 */
 
 func (file *File) Chdir() error {
@@ -97,11 +146,24 @@ func (file *File) Chdir() error {
 }
 
 func (file *File) Close() error {
+	file.stream.Close()
 	return file.owningDriver.implementation.MarkFileClosed(file)
 }
 
 func (file *File) Fd() uintptr {
 	return 0
+}
+
+func (file *File) Name() string {
+	return file.fileInfo.name
+}
+
+func (file *File) Read(buffer []byte) (int, error) {
+	return file.stream.Read(buffer)
+}
+
+func (file *File) ReadAt(buffer []byte, offset int64) (int, error) {
+	return file.stream.ReadAt(buffer, offset)
 }
 
 func (file *File) SetDeadline(t time.Time) error {
@@ -116,6 +178,10 @@ func (file *File) SetWriteDeadline(t time.Time) error {
 	return nil
 }
 
+func (file *File) Seek(offset int64, whence int) (int64, error) {
+	return file.stream.Seek(offset, whence)
+}
+
 func (file *File) SyscallConn() (syscall.RawConn, error) {
 	return nil, disko.NewDriverError(disko.ENOSYS)
 }
@@ -124,6 +190,22 @@ func (file *File) Stat() (os.FileInfo, error) {
 	return file.fileInfo.Info()
 }
 
+func (file *File) Sync() error {
+	return file.stream.Sync()
+}
+
 func (file *File) Truncate(newSize int64) error {
-	return file.objectHandle.Resize(newSize)
+	return file.stream.Truncate(newSize)
+}
+
+func (file *File) Write(buffer []byte) (int, error) {
+	return file.stream.Write(buffer)
+}
+
+func (file *File) WriteAt(buffer []byte, offset int64) (int, error) {
+	return file.stream.WriteAt(buffer, offset)
+}
+
+func (file *File) WriteString(s string) (int, error) {
+	return file.stream.WriteString(s)
 }

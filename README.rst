@@ -61,28 +61,28 @@ File handles support the following:
 ================ ======= =====
 Function         Support Notes
 ================ ======= =====
-Chdir
+Chdir            ✔
 Chmod
 Chown
-Close            ⚠
-Fd               ✔
+Close            ✔
+Fd               ✘
 Name             ✔
-Read
-ReadAt
+Read             ✔
+ReadAt           ✔
 Readdir
 Readdirnames
 ReadFrom
-Seek
+Seek             ✔
 SetDeadline      ✘
 SetReadDeadline  ✘
 SetWriteDeadline ✘
 Stat             ✔
-Sync
+Sync             ✔
 SyscallConn      ✘
 Truncate         ✔
-Write
-WriteAt
-WriteString
+Write            ✔
+WriteAt          ✔
+WriteString      ✔
 WriteTo
 ================ ======= =====
 
