@@ -1,8 +1,8 @@
 // Package blockcache provides a block-oriented cache that can be used for
-// providing a contiguous view of a single file system object scattered across
-// the disk image.
+// providing a linear view of a single object scattered across discontiguous
+// blocks in the disk image.
 //
-// All block indexes begin at 0.
+// All block indices begin at 0.
 
 package blockcache
 
@@ -14,7 +14,7 @@ import (
 )
 
 // FetchBlockCallback is a pointer to a function that writes the contents of a
-// single block from the underlying storage into `buffer`. `buffer` is guaranteed
+// single block from the backing storage into `buffer`. `buffer` is guaranteed
 // to be the size of exactly one block.
 type FetchBlockCallback func(blockIndex c.LogicalBlock, buffer []byte) error
 
@@ -23,11 +23,21 @@ type FetchBlockCallback func(blockIndex c.LogicalBlock, buffer []byte) error
 // the size of exactly one block.
 type FlushBlockCallback func(blockIndex c.LogicalBlock, buffer []byte) error
 
+// ResizeCallback is a pointer to a function that is called to allocate or free
+// blocks in the backing storage. It takes one argument, the new total number of
+// blocks to occupy.
+//
+// The implementation of the function can do anything so long as 1) it doesn't
+// modify the data in the blocks; 2) at least the requested number of blocks are
+// available.
+type ResizeCallback func(newTotalBlocks c.LogicalBlock) error
+
 type BlockCache struct {
 	loadedBlocks  bitmap.Bitmap
 	dirtyBlocks   bitmap.Bitmap
 	fetch         FetchBlockCallback
 	flush         FlushBlockCallback
+	resize        ResizeCallback
 	bytesPerBlock uint
 	totalBlocks   uint
 	data          []byte
@@ -39,6 +49,7 @@ func New(
 	totalBlocks uint,
 	fetchCb FetchBlockCallback,
 	flushCb FlushBlockCallback,
+	resizeCb ResizeCallback,
 ) *BlockCache {
 	return &BlockCache{
 		loadedBlocks:  bitmap.NewSlice(int(totalBlocks)),
@@ -46,6 +57,7 @@ func New(
 		data:          make([]byte, int(bytesPerBlock*totalBlocks)),
 		fetch:         fetchCb,
 		flush:         flushCb,
+		resize:        resizeCb,
 		bytesPerBlock: bytesPerBlock,
 		totalBlocks:   totalBlocks,
 	}
@@ -62,7 +74,12 @@ func (cache *BlockCache) TotalBlocks() uint {
 	return cache.totalBlocks
 }
 
-func (cache *BlockCache) sizeToNumBlocks(size uint) uint {
+func (cache *BlockCache) Size() int64 {
+	return int64(cache.bytesPerBlock) * int64(cache.totalBlocks)
+}
+
+// LengthToNumBlocks gives the minimum number of blocks required to hold
+func (cache *BlockCache) LengthToNumBlocks(size uint) uint {
 	return (size + cache.bytesPerBlock - 1) / cache.bytesPerBlock
 }
 
@@ -70,7 +87,7 @@ func (cache *BlockCache) sizeToNumBlocks(size uint) uint {
 // starting from block `start`. If not, it returns an error describing the exact
 // conditions. If no error would occur, this returns nil.
 func (cache *BlockCache) checkBounds(start c.LogicalBlock, bufferSize uint) error {
-	numBlocks := cache.sizeToNumBlocks(bufferSize)
+	numBlocks := cache.LengthToNumBlocks(bufferSize)
 
 	if uint(start)+numBlocks >= cache.totalBlocks {
 		return fmt.Errorf(
@@ -86,11 +103,13 @@ func (cache *BlockCache) checkBounds(start c.LogicalBlock, bufferSize uint) erro
 
 // GetSlice returns a slice pointing to the cache's storage, beginning at block
 // `start` and continuing for `count` blocks.
+//
+// The returned slice MUST NOT be modified.
 func (cache *BlockCache) GetSlice(
 	start c.LogicalBlock,
 	count uint,
 ) ([]byte, error) {
-	err := cache.checkBounds(start, count*cache.bytesPerBlock)
+	err := cache.loadBlockRange(start, count)
 	if err != nil {
 		return nil, err
 	}
@@ -98,6 +117,19 @@ func (cache *BlockCache) GetSlice(
 	startOffset := uint(start) * cache.bytesPerBlock
 	endOffset := startOffset + (count * cache.bytesPerBlock)
 	return cache.data[startOffset:endOffset], nil
+}
+
+// Data returns a slice of the entire cache's data. This requires loading all
+// blocks not yet in the cache, so it may incur a one-time performance penalty
+// for large files or with inefficient driver implementations.
+//
+// The returned slice MUST NOT be modified.
+func (cache *BlockCache) Data() ([]byte, error) {
+	err := cache.LoadAll()
+	if err != nil {
+		return nil, err
+	}
+	return cache.data, nil
 }
 
 // loadBlockRange ensures that all blocks in the range [start, start + count) are
@@ -197,7 +229,7 @@ func (cache *BlockCache) Read(start c.LogicalBlock, buffer []byte) error {
 		return err
 	}
 
-	numBlocks := cache.sizeToNumBlocks(bufLen)
+	numBlocks := cache.LengthToNumBlocks(bufLen)
 	err = cache.loadBlockRange(start, numBlocks)
 	if err != nil {
 		return err
@@ -226,7 +258,7 @@ func (cache *BlockCache) Write(start c.LogicalBlock, buffer []byte) error {
 		return err
 	}
 
-	totalBlocks := cache.sizeToNumBlocks(bufLen)
+	totalBlocks := cache.LengthToNumBlocks(bufLen)
 	targetByteSlice, err := cache.GetSlice(start, totalBlocks)
 	if err != nil {
 		return err
@@ -246,20 +278,35 @@ func (cache *BlockCache) Write(start c.LogicalBlock, buffer []byte) error {
 // Resize changes the number of blocks in the cache. Blocks are added to and
 // removed from the end.
 //
-// If the cache size is increased, empty blocks are appended to the end of the
-// slice. The unloaded blocks are treated as missing and clean, so calling
-// FlushAll() will *not* write them out.
-func (cache *BlockCache) Resize(newTotalBlocks uint) {
-	newCacheData := make([]byte, newTotalBlocks*cache.bytesPerBlock)
+// If the cache size is increased, zeroed-out blocks are appended to the end of
+// the slice. These new blocks are treated as dirty, so flushing the cache will
+// write them out.
+func (cache *BlockCache) Resize(newTotalBlocks uint) error {
+	err := cache.resize(c.LogicalBlock(newTotalBlocks))
+	if err != nil {
+		return err
+	}
+
+	newCacheData := make([]byte, uint(newTotalBlocks)*cache.bytesPerBlock)
 	copy(newCacheData, cache.data)
 
 	// Allocate new copies of the dirty/present bitmaps of the correct size.
-	newDirtyBlocks := bitmap.NewSlice(int(newTotalBlocks))
-	newLoadedBlocks := bitmap.NewSlice(int(newTotalBlocks))
+	newDirtyBlocks := bitmap.Bitmap(bitmap.NewSlice(int(newTotalBlocks)))
+	newLoadedBlocks := bitmap.Bitmap(bitmap.NewSlice(int(newTotalBlocks)))
 
 	// Copy the old data over.
 	copy(newDirtyBlocks, cache.dirtyBlocks)
 	copy(newLoadedBlocks, cache.loadedBlocks)
+
+	// If we added any blocks, mark them as dirty. Since memory is zeroed out
+	// when allocating, this means that if the data isn't modified we'll write
+	// out zeroed blocks. If we didn't mark them dirty, they wouldn't get
+	// written, and we could end up with trailing blocks filled with uninitialized
+	// data.
+	for i := cache.totalBlocks; i < newTotalBlocks; i++ {
+		newDirtyBlocks.Set(int(i), true)
+		newLoadedBlocks.Set(int(i), true)
+	}
 
 	// Set the new values now that we've successfully allocated and copied all
 	// the data.
@@ -267,4 +314,5 @@ func (cache *BlockCache) Resize(newTotalBlocks uint) {
 	cache.dirtyBlocks = newDirtyBlocks
 	cache.loadedBlocks = newLoadedBlocks
 	cache.totalBlocks = newTotalBlocks
+	return nil
 }
