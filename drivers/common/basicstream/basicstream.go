@@ -15,13 +15,14 @@ import (
 // BasicStream is a file-like wrapper around a BlockCache that emulates a
 // subset of the functionality provided by an `os.File` instance.
 type BasicStream struct {
-	// Interface
-	io.ReadWriteSeeker
-	io.Closer
-	io.ReaderAt
-	io.WriterAt
+	// Interfaces
+	// io.ReadWriteSeeker
+	// io.Closer
+	// io.ReaderAt
+	// io.WriterAt
+	// io.StringWriter
 
-	// Members
+	// Fields
 	size     int64
 	position int64
 	data     *blockcache.BlockCache
@@ -194,4 +195,9 @@ func (stream *BasicStream) WriteAt(buffer []byte, offset int64) (int, error) {
 
 	copy(targetSlice[startOffset:], buffer)
 	return len(buffer), nil
+}
+
+// WriteString writes a string to the stream.
+func (stream *BasicStream) WriteString(s string) (int, error) {
+	return stream.Write([]byte(s))
 }
