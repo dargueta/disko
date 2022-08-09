@@ -25,7 +25,7 @@ Legend:
 
 * ✔: Supported
 * ⚠: Conditionally supported, depends on an API function I haven't settled on yet.
-* ✘: Doesn't make sense for this, implemented as a no-op
+* ✘: Doesn't make sense for this, so the function wasn't implemented.
 
 ========= ======= ======
 Function  Support Notes
@@ -53,10 +53,10 @@ SameFile  ✔
 Stat      ✔
 Symlink
 Truncate  ✔
-WriteFile
+WriteFile ✔
 ========= ======= ======
 
-File handles support the following:
+File handles support the following methods from ``os.File``:
 
 ================ ======= =====
 Function         Support Notes
