@@ -60,14 +60,16 @@ func (info *FileInfo) Sys() any {
 
 type File struct {
 	// Interfaces
-	// disko.File
+	disko.File
+
+	// Embed
+	*basicstream.BasicStream
 
 	// Fields
 	owningDriver *CommonDriver
 	objectHandle ObjectHandle
 	fileInfo     FileInfo
 	ioFlags      disko.IOFlags
-	stream       *basicstream.BasicStream
 }
 
 // NewFileFromObjectHandle creates a Disko file object that is (more or less) a
@@ -105,7 +107,7 @@ func NewFileFromObjectHandle(
 		owningDriver: driver,
 		objectHandle: object,
 		ioFlags:      ioFlags,
-		stream:       stream,
+		BasicStream:  stream,
 		fileInfo: FileInfo{
 			FileStat: stat,
 			name:     object.Name(),
@@ -146,7 +148,7 @@ func (file *File) Chdir() error {
 }
 
 func (file *File) Close() error {
-	file.stream.Close()
+	file.BasicStream.Close()
 	return file.owningDriver.implementation.MarkFileClosed(file)
 }
 
@@ -156,14 +158,6 @@ func (file *File) Fd() uintptr {
 
 func (file *File) Name() string {
 	return file.fileInfo.name
-}
-
-func (file *File) Read(buffer []byte) (int, error) {
-	return file.stream.Read(buffer)
-}
-
-func (file *File) ReadAt(buffer []byte, offset int64) (int, error) {
-	return file.stream.ReadAt(buffer, offset)
 }
 
 func (file *File) SetDeadline(t time.Time) error {
@@ -178,34 +172,10 @@ func (file *File) SetWriteDeadline(t time.Time) error {
 	return nil
 }
 
-func (file *File) Seek(offset int64, whence int) (int64, error) {
-	return file.stream.Seek(offset, whence)
-}
-
 func (file *File) SyscallConn() (syscall.RawConn, error) {
 	return nil, disko.NewDriverError(disko.ENOSYS)
 }
 
 func (file *File) Stat() (os.FileInfo, error) {
 	return file.fileInfo.Info()
-}
-
-func (file *File) Sync() error {
-	return file.stream.Sync()
-}
-
-func (file *File) Truncate(newSize int64) error {
-	return file.stream.Truncate(newSize)
-}
-
-func (file *File) Write(buffer []byte) (int, error) {
-	return file.stream.Write(buffer)
-}
-
-func (file *File) WriteAt(buffer []byte, offset int64) (int, error) {
-	return file.stream.WriteAt(buffer, offset)
-}
-
-func (file *File) WriteString(s string) (int, error) {
-	return file.stream.WriteString(s)
 }
