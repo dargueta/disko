@@ -16,11 +16,11 @@ import (
 // subset of the functionality provided by an `os.File` instance.
 type BasicStream struct {
 	// Interfaces
-	// io.ReadWriteSeeker
-	// io.Closer
-	// io.ReaderAt
-	// io.WriterAt
-	// io.StringWriter
+	io.Closer
+	io.ReaderAt
+	io.ReadWriteSeeker
+	io.StringWriter
+	io.WriterAt
 
 	// Fields
 	size     int64
