@@ -18,9 +18,11 @@ type BasicStream struct {
 	// Interfaces
 	io.Closer
 	io.ReaderAt
+	io.ReaderFrom
 	io.ReadWriteSeeker
 	io.StringWriter
 	io.WriterAt
+	io.WriterTo
 
 	// Fields
 	size     int64
@@ -96,6 +98,36 @@ func (stream *BasicStream) ReadAt(buffer []byte, offset int64) (int, error) {
 		err = io.EOF
 	}
 	return int(numBytesToRead), err
+}
+
+func (stream *BasicStream) ReadFrom(r io.Reader) (n int64, err error) {
+	// If the argument is another BasicStream, make the read buffer be exactly
+	// one block in size to simplify reading. Otherwise, default to 512 bytes.
+	otherStream, ok := r.(*BasicStream)
+	var blockSize int
+	if ok {
+		blockSize = int(otherStream.data.BytesPerBlock())
+
+	} else {
+		blockSize = 512
+	}
+
+	buffer := make([]byte, blockSize)
+
+	totalBytesRead := int64(0)
+	for {
+		lastReadSize, readErr := r.Read(buffer)
+		totalBytesRead += int64(lastReadSize)
+
+		_, writeErr := stream.Write(buffer[:lastReadSize])
+		if readErr == io.EOF {
+			return totalBytesRead, nil
+		} else if readErr != nil {
+			return totalBytesRead, readErr
+		} else if writeErr != nil {
+			return totalBytesRead, writeErr
+		}
+	}
 }
 
 // Seek resets the stream pointer to `offset` bytes from the origin specified in
@@ -200,4 +232,27 @@ func (stream *BasicStream) WriteAt(buffer []byte, offset int64) (int, error) {
 // WriteString writes a string to the stream.
 func (stream *BasicStream) WriteString(s string) (int, error) {
 	return stream.Write([]byte(s))
+}
+
+func (stream *BasicStream) WriteTo(w io.Writer) (n int64, err error) {
+	buffer := make([]byte, stream.data.BytesPerBlock())
+	totalWritten := int64(0)
+
+	for {
+		blockSize, err := stream.Read(buffer)
+
+		// Always write the data we've read in regardless of whether an error
+		// occurred or not.
+		if blockSize > 0 {
+			w.Write(buffer[:blockSize])
+			totalWritten += int64(blockSize)
+		}
+
+		// If we hit EOF, we're done. Any other error is fatal.
+		if err == io.EOF {
+			return totalWritten, nil
+		} else if err != nil {
+			return totalWritten, err
+		}
+	}
 }

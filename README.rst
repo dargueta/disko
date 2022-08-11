@@ -69,9 +69,10 @@ Fd               ✘
 Name             ✔
 Read             ✔
 ReadAt           ✔
+ReadDir
 Readdir
 Readdirnames
-ReadFrom
+ReadFrom         ✔
 Seek             ✔
 SetDeadline      ✘
 SetReadDeadline  ✘
@@ -83,7 +84,7 @@ Truncate         ✔
 Write            ✔
 WriteAt          ✔
 WriteString      ✔
-WriteTo
+WriteTo          ✔
 ================ ======= =====
 
 File Systems
