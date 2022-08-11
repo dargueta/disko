@@ -14,11 +14,7 @@ import (
 ////////////////////////////////////////////////////////////////////////////////
 
 type ObjectHandle interface {
-	// ID returns a unique identifier for the file system object that this
-	// represents. All ObjectHandles referring to the same entity must return
-	// the same value here.
-	ID() uintptr
-
+	// Stat returns information on the status of the file as it appears on disk.
 	Stat() disko.FileStat
 
 	// Resize changes the size of the object, in bytes. Drivers are responsible
@@ -32,9 +28,14 @@ type ObjectHandle interface {
 	// `startIndex` as consisting entirely of null bytes (0). It does not change
 	// the size of the object.
 	//
-	// Some file systems have optimizations for such "holes" that can save disk
-	// space. If the file system doesn't support hole optimization, the driver
-	// *must* set all bytes in these blocks to 0.
+	// Functionally, it's equivalent to:
+	//
+	//		buffer := make([]byte, BlockSize * NUM_BLOCKS)
+	//		WriteBlocks(START_BLOCK, buffer)
+	//
+	// However, some file systems have optimizations for such "holes" that can
+	// save disk space. If the file system doesn't support hole optimization,
+	// the driver *must* set all bytes in these blocks to 0.
 	//
 	// NOTE: It's the driver's responsibility to consolidate holes where possible.
 	ZeroOutBlocks(startIndex common.LogicalBlock, count uint) disko.DriverError

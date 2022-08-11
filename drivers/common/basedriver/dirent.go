@@ -9,7 +9,10 @@ import (
 
 type DirectoryEntry struct {
 	disko.DirectoryEntry
+
+	// name is the name of the directory entry without its path component.
 	name string
+	// stat is a copy of the file's status information.
 	stat disko.FileStat
 }
 
