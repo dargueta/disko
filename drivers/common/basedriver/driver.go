@@ -21,7 +21,14 @@ type ObjectHandle interface {
 	// for ensuring the needed number of blocks are allocated or freed.
 	Resize(newSize uint64) disko.DriverError
 
+	// ReadBlocks fills `buffer` with data from a sequence of logical blocks
+	// beginning at `index`. `buffer` is guaranteed to be a nonzero multiple of
+	// the size of a block.
 	ReadBlocks(index common.LogicalBlock, buffer []byte) disko.DriverError
+
+	// ReadBlocks writes bytes from `buffer` into a sequence of logical blocks
+	// beginning at `index`. `buffer` is guaranteed to be a nonzero multiple of
+	// the size of a block.
 	WriteBlocks(index common.LogicalBlock, data []byte) disko.DriverError
 
 	// ZeroOutBlocks tells the driver to treat `count` blocks beginning at
@@ -46,6 +53,7 @@ type ObjectHandle interface {
 	// applicable).
 	Unlink() disko.DriverError
 
+	// Chmod changes the permission bits of this file system object. Only the
 	Chmod(mode os.FileMode) disko.DriverError
 	Chown(uid, gid int) disko.DriverError
 	Chtimes(createdAt, lastAccessed, lastModified, lastChanged, deletedAt time.Time) error

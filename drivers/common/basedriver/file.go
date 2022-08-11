@@ -113,8 +113,8 @@ func NewFileFromObjectHandle(
 
 /*
 	Chdir					DONE
-	Chmod
-	Chown
+	Chmod					DONE
+	Chown					DONE
 	Close					DONE
 	Name					DONE
 	Read					DONE
@@ -136,6 +136,14 @@ func (file *File) Chdir() error {
 		file.objectHandle,
 		file.fileInfo.name,
 	)
+}
+
+func (file *File) Chmod(mode os.FileMode) error {
+	return file.objectHandle.Chmod(mode)
+}
+
+func (file *File) Chown(uid, gid int) error {
+	return file.objectHandle.Chown(uid, gid)
 }
 
 func (file *File) Close() error {

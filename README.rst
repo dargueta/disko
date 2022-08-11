@@ -62,8 +62,8 @@ File handles support the following methods from ``os.File``:
 Function         Support Notes
 ================ ======= =====
 Chdir            ✔
-Chmod
-Chown
+Chmod            ✔
+Chown            ✔
 Close            ✔
 Fd               ✘
 Name             ✔
