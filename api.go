@@ -137,6 +137,9 @@ type FSCapabilities struct {
 	UnixPermissions bool
 }
 
+// Truncator is an interface for objects that support a Truncate() method. This
+// method must behave just like `os.File`'s method:
+// https://pkg.go.dev/os#File.Truncate
 type Truncator interface {
 	Truncate(size int64) error
 }

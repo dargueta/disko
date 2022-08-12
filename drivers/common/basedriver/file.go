@@ -1,7 +1,6 @@
 package basedriver
 
 import (
-	"io/fs"
 	"os"
 	"time"
 
@@ -11,47 +10,66 @@ import (
 	"github.com/dargueta/disko/drivers/common/blockcache"
 )
 
+// FileInfo gives detailed information about a file or directory. It implements
+// both the `os.FileInfo` and `os.DirEntry` interfaces, and can be used as a
+// `disko.FileStat` object as well.
 type FileInfo struct {
+	// Interfaces
 	os.FileInfo
 	disko.DirectoryEntry
 
+	// Embedded structs
 	disko.FileStat
+
+	// Fields
 	name string
 }
 
-func (info *FileInfo) Name() string {
-	return info.name
+// os.FileInfo implementation --------------------------------------------------
+
+// Mode returns the mode flags for the file or directory. It's functionally
+// identical to Type(), but used to implement the `os.FileInfo` interface.
+func (info FileInfo) Mode() os.FileMode {
+	return info.FileStat.ModeFlags
 }
 
 func (info *FileInfo) Size() int64 {
 	return info.FileStat.Size
 }
 
-func (info FileInfo) Mode() os.FileMode {
-	return os.FileMode(info.FileStat.ModeFlags)
-}
-
-func (info *FileInfo) Type() fs.FileMode {
-	return info.FileStat.ModeFlags
-}
-
 func (info FileInfo) ModTime() time.Time {
 	return info.FileStat.LastModified
+}
+
+func (info *FileInfo) Sys() any {
+	return info.FileStat
+}
+
+// os.DirEntry implementation --------------------------------------------------
+
+func (info *FileInfo) Name() string {
+	return info.name
+}
+
+// Type returns the mode flags for the file or directory. It's functionally
+// identical to Mode(), but used to implement the `os.DirEntry` interface.
+func (info *FileInfo) Type() os.FileMode {
+	return info.FileStat.ModeFlags
 }
 
 func (info FileInfo) IsDir() bool {
 	return info.FileStat.ModeFlags&os.ModeDir != 0
 }
 
+// Info is part of the `os.DirEntry` interface. It returns the `FileInfo` it was
+// called on, since that implements both interfaces.
 func (info *FileInfo) Info() (os.FileInfo, error) {
 	return info, nil
 }
 
-func (info *FileInfo) Stat() disko.FileStat {
-	return info.FileStat
-}
+// disko.DirectoryEntry methods ------------------------------------------------
 
-func (info *FileInfo) Sys() any {
+func (info *FileInfo) Stat() disko.FileStat {
 	return info.FileStat
 }
 
@@ -110,26 +128,6 @@ func NewFileFromObjectHandle(
 		},
 	}, nil
 }
-
-/*
-	Chdir					DONE
-	Chmod					DONE
-	Chown					DONE
-	Close					DONE
-	Name					DONE
-	Read					DONE
-	ReadAt					DONE
-	Readdir
-	Readdirnames
-	ReadFrom
-	Seek					DONE
-	Stat					DONE
-	Sync					DONE
-	Truncate				DONE
-	Write					DONE
-	WriteAt					DONE
-	WriteString				DONE
-*/
 
 func (file *File) Chdir() error {
 	return file.owningDriver.chdirToObject(
