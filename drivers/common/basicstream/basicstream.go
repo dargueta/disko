@@ -13,7 +13,7 @@ import (
 )
 
 // BasicStream is a file-like wrapper around a BlockCache that emulates a
-// subset of the functionality provided by an `os.File` instance.
+// subset of the functionality provided by an [os.File] instance.
 type BasicStream struct {
 	// Interfaces
 	io.Closer
@@ -131,7 +131,7 @@ func (stream *BasicStream) ReadFrom(r io.Reader) (n int64, err error) {
 }
 
 // Seek resets the stream pointer to `offset` bytes from the origin specified in
-// `whence`. It must be one of `io.SeekStart`, `io.SeekCurrent`, or `io.SeekEnd`.
+// `whence`. It must be one of [io.SeekStart], [io.SeekCurrent], or [io.SeekEnd].
 //
 // Seeking past the end of the file is possible; the file will automatically be
 // resized upon the first write. Attempting to read past the end of the file

@@ -62,7 +62,7 @@ const MountFlagsAllowAll = (MountFlagsAllowRead |
 	MountFlagsAllowAdminister)
 const MountFlagsMask = MountFlagsCustomStart - 1
 
-// FileStat is a platform-independent form of syscall.Stat_t.
+// FileStat is a platform-independent form of [syscall.Stat_t].
 type FileStat struct {
 	DeviceID     uint64
 	InodeNumber  uint64
@@ -93,7 +93,7 @@ func (stat *FileStat) IsSymlink() bool {
 	return stat.ModeFlags&os.ModeType == os.ModeSymlink
 }
 
-// FSStat is a platform-independent form of syscall.Statfs_t.
+// FSStat is a platform-independent form of [syscall.Statfs_t].
 type FSStat struct {
 	// BlockSize is the size of a logical block on the file system, in bytes.
 	BlockSize int64
@@ -138,8 +138,7 @@ type FSCapabilities struct {
 }
 
 // Truncator is an interface for objects that support a Truncate() method. This
-// method must behave just like `os.File`'s method:
-// https://pkg.go.dev/os#File.Truncate
+// method must behave just like [os.File.Truncate].
 type Truncator interface {
 	Truncate(size int64) error
 }
@@ -147,9 +146,7 @@ type Truncator interface {
 // File is the expected interface for file handles from drivers.
 //
 // This interface is intended to be more or less a drop-in replacement for
-// `os.File`, *however* not all functions need be implemented. In particular,
-// the deadline-related functions should be no-ops, and `SyscallConn()` should
-// return an ENOSYS error.
+// [os.File], *however* not all functions need be implemented.
 type File interface {
 	io.ReadWriteCloser
 	io.Seeker
@@ -207,7 +204,7 @@ type FormattingDriver interface {
 // Drivers need not implement all functionality for valid flags. For example,
 // read-only drivers must return an error if called with the disko.O_CREATE flag.
 type OpeningDriver interface {
-	// OpenFile is equivalent to os.OpenFile.
+	// OpenFile is equivalent to [os.OpenFile].
 	OpenFile(path string, flag IOFlags, perm os.FileMode) (File, error)
 }
 

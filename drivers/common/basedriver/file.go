@@ -11,8 +11,8 @@ import (
 )
 
 // FileInfo gives detailed information about a file or directory. It implements
-// both the `os.FileInfo` and `os.DirEntry` interfaces, and can be used as a
-// `disko.FileStat` object as well.
+// both the [os.FileInfo] and [os.DirEntry] interfaces, and can be used as a
+// [disko.FileStat] object as well.
 type FileInfo struct {
 	// Interfaces
 	os.FileInfo
@@ -28,7 +28,7 @@ type FileInfo struct {
 // os.FileInfo implementation --------------------------------------------------
 
 // Mode returns the mode flags for the file or directory. It's functionally
-// identical to Type(), but used to implement the `os.FileInfo` interface.
+// identical to Type(), but used to implement the [os.FileInfo] interface.
 func (info FileInfo) Mode() os.FileMode {
 	return info.FileStat.ModeFlags
 }
@@ -52,7 +52,7 @@ func (info *FileInfo) Name() string {
 }
 
 // Type returns the mode flags for the file or directory. It's functionally
-// identical to Mode(), but used to implement the `os.DirEntry` interface.
+// identical to Mode(), but used to implement the [os.DirEntry] interface.
 func (info *FileInfo) Type() os.FileMode {
 	return info.FileStat.ModeFlags
 }
@@ -61,7 +61,7 @@ func (info FileInfo) IsDir() bool {
 	return info.FileStat.ModeFlags&os.ModeDir != 0
 }
 
-// Info is part of the `os.DirEntry` interface. It returns the `FileInfo` it was
+// Info is part of the [os.DirEntry] interface. It returns the `FileInfo` it was
 // called on, since that implements both interfaces.
 func (info *FileInfo) Info() (os.FileInfo, error) {
 	return info, nil
@@ -87,7 +87,7 @@ type File struct {
 }
 
 // NewFileFromObjectHandle creates a Disko file object that is (more or less) a
-// drop-in replacement for os.File.
+// drop-in replacement for [os.File].
 func NewFileFromObjectHandle(
 	driver *CommonDriver,
 	object ObjectHandle,
