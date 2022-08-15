@@ -22,13 +22,19 @@ type ObjectHandle interface {
 	Resize(newSize uint64) disko.DriverError
 
 	// ReadBlocks fills `buffer` with data from a sequence of logical blocks
-	// beginning at `index`. `buffer` is guaranteed to be a nonzero multiple of
-	// the size of a block.
+	// beginning at `index`. The following guarantees apply:
+	//
+	//   - `buffer` is a nonzero multiple of the size of a block.
+	//   - The read range is guaranteed to be within the current boundaries of
+	//     the object.
 	ReadBlocks(index common.LogicalBlock, buffer []byte) disko.DriverError
 
-	// ReadBlocks writes bytes from `buffer` into a sequence of logical blocks
-	// beginning at `index`. `buffer` is guaranteed to be a nonzero multiple of
-	// the size of a block.
+	// WriteBlocks writes bytes from `buffer` into a sequence of logical blocks
+	// beginning at `index`. The following guarantees apply:
+	//
+	//   - `buffer` is a nonzero multiple of the size of a block.
+	//   - The write range is guaranteed to be within the current boundaries of
+	//     the object.
 	WriteBlocks(index common.LogicalBlock, data []byte) disko.DriverError
 
 	// ZeroOutBlocks tells the driver to treat `count` blocks beginning at
@@ -54,11 +60,15 @@ type ObjectHandle interface {
 	Unlink() disko.DriverError
 
 	// Chmod changes the permission bits of this file system object. Only the
+	// permissions bits will be set.
 	Chmod(mode os.FileMode) disko.DriverError
 	Chown(uid, gid int) disko.DriverError
 	Chtimes(createdAt, lastAccessed, lastModified, lastChanged, deletedAt time.Time) error
 
 	ListDir() (map[string]ObjectHandle, disko.DriverError)
+
+	// Name returns the name of the object itself without any path component.
+	// The root directory, which technically has no name, must return "/".
 	Name() string
 }
 
@@ -102,46 +112,6 @@ type DriverImplementation interface {
 }
 
 type CommonDriver struct {
-	/*
-		OpeningDriver:	DONE
-			OpenFile 	DONE
-
-		ReadingDriver:	DONE
-			Chdir		DONE
-			Open		DONE
-			ReadFile	DONE
-			SameFile	DONE
-			Stat		DONE
-
-		DirReadingDriver:	DONE
-			ReadDir			DONE
-
-		ReadingLinkingDriver:	DONE
-			Lstat			DONE
-			Readlink		DONE
-
-		WritingDriver:
-			Chmod
-			Chown
-			Chtimes
-			Create			DONE
-			Flush
-			Remove			DONE
-			Repath
-			Truncate		DONE
-			WriteFile		DONE
-
-		DirWritingDriver:	DONE
-			Mkdir			DONE
-			MkdirAll		DONE
-			RemoveAll		DONE
-
-		WritingLinkingDriver:
-			Lchown
-			Link
-			Symlink
-	*/
-
 	implementation DriverImplementation
 	mountFlags     disko.MountFlags
 	workingDirPath string
