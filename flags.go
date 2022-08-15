@@ -2,7 +2,6 @@ package disko
 
 import (
 	"os"
-	"syscall"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -66,7 +65,7 @@ const O_ACCMODE = O_RDONLY | O_RDWR | O_WRONLY
 func OSFlagsToIOFlags(flags int) IOFlags {
 	var ioFlags IOFlags
 
-	switch flags & syscall.O_ACCMODE {
+	switch flags & int(O_ACCMODE) {
 	case os.O_WRONLY:
 		ioFlags = O_WRONLY
 	case os.O_RDWR:
