@@ -62,6 +62,8 @@ const O_PATH = IOFlags(0x02000000)
 
 const O_ACCMODE = O_RDONLY | O_RDWR | O_WRONLY
 
+// OSFlagsToIOFlags converts mode flags used for [os.OpenFile] into [IOFlags]
+// recognized by Disko.
 func OSFlagsToIOFlags(flags int) IOFlags {
 	var ioFlags IOFlags
 
@@ -92,16 +94,18 @@ func OSFlagsToIOFlags(flags int) IOFlags {
 	return ioFlags
 }
 
+// Append indicates if the mode flags require appending to the end of a file
+// stream.
 func (flags IOFlags) Append() bool {
 	return flags&O_APPEND != 0
 }
 
-func (flags IOFlags) CanRead() bool {
+func (flags IOFlags) Read() bool {
 	masked := flags & O_ACCMODE
 	return masked == O_RDWR || masked == O_WRONLY
 }
 
-func (flags IOFlags) CanWrite() bool {
+func (flags IOFlags) Write() bool {
 	masked := flags & O_ACCMODE
 	return masked == O_RDWR || masked == O_RDONLY
 }
@@ -124,4 +128,8 @@ func (flags IOFlags) Synchronous() bool {
 
 func (flags IOFlags) NoFollow() bool {
 	return flags&O_NOFOLLOW != 0
+}
+
+func (flags IOFlags) RequiresWritePerm() bool {
+	return flags.Write() || flags.Truncate()
 }

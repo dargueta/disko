@@ -8,6 +8,7 @@ import (
 	"io"
 	"math"
 
+	"github.com/dargueta/disko"
 	c "github.com/dargueta/disko/drivers/common"
 	"github.com/dargueta/disko/drivers/common/blockcache"
 )
@@ -28,12 +29,23 @@ type BasicStream struct {
 	size     int64
 	position int64
 	data     *blockcache.BlockCache
+	ioFlags  disko.IOFlags
 }
 
 // New creates a BasicStream on top of a block cache. The `size` argument gives
 // the exact size of the stream, in bytes. The only requirement for this is that
 // it must be between 0 and `data.Size()` (inclusive).
-func New(size int64, data *blockcache.BlockCache) (*BasicStream, error) {
+//
+// All relevant behaviors of [disko.IOFlags] are implemented. In particular:
+//
+//   - Read/write permissions are enforced, e.g. attempting to write a file
+//     created with [disko.O_RDONLY] will fail with [disko.EPERM].
+//   - [disko.O_APPEND], [disko.O_SYNC], and [disko.O_TRUNC] are obeyed.
+func New(
+	size int64,
+	data *blockcache.BlockCache,
+	flags disko.IOFlags,
+) (*BasicStream, error) {
 	maxSize := data.Size()
 	if size < 0 || size > maxSize {
 		return nil, fmt.Errorf(
@@ -43,11 +55,17 @@ func New(size int64, data *blockcache.BlockCache) (*BasicStream, error) {
 		)
 	}
 
-	return &BasicStream{
+	stream := &BasicStream{
 		size:     size,
 		position: 0,
 		data:     data,
-	}, nil
+		ioFlags:  flags,
+	}
+
+	if flags.Truncate() {
+		return stream, stream.Truncate(0)
+	}
+	return stream, nil
 }
 
 func (stream *BasicStream) convertLinearAddr(offset int64) (c.LogicalBlock, uint) {
@@ -68,6 +86,10 @@ func (stream *BasicStream) Read(buffer []byte) (int, error) {
 }
 
 func (stream *BasicStream) ReadAt(buffer []byte, offset int64) (int, error) {
+	if !stream.ioFlags.Read() {
+		return 0, disko.NewDriverError(disko.EPERM)
+	}
+
 	bufLen := int64(len(buffer))
 
 	// Clamp the number of bytes to read to whichever is smaller; the length of
@@ -101,6 +123,10 @@ func (stream *BasicStream) ReadAt(buffer []byte, offset int64) (int, error) {
 }
 
 func (stream *BasicStream) ReadFrom(r io.Reader) (n int64, err error) {
+	if !stream.ioFlags.Write() {
+		return 0, disko.NewDriverError(disko.EPERM)
+	}
+
 	// If the argument is another BasicStream, make the read buffer be exactly
 	// one block in size to simplify reading. Otherwise, default to 512 bytes.
 	otherStream, ok := r.(*BasicStream)
@@ -183,6 +209,10 @@ func (stream *BasicStream) Tell() int64 {
 // Truncate resizes the stream to the given number of bytes but does not move
 // the stream pointer.
 func (stream *BasicStream) Truncate(size int64) error {
+	if !stream.ioFlags.Write() {
+		return disko.NewDriverError(disko.EPERM)
+	}
+
 	if size < 0 {
 		return fmt.Errorf("truncate failed: %d is not a valid file size", size)
 	} else if uint64(size) > math.MaxUint {
@@ -196,18 +226,43 @@ func (stream *BasicStream) Truncate(size int64) error {
 	}
 
 	stream.size = size
+
+	if stream.ioFlags.Synchronous() {
+		return stream.Sync()
+	}
 	return nil
 }
 
 func (stream *BasicStream) Write(buffer []byte) (int, error) {
-	totalWritten, err := stream.WriteAt(buffer, stream.position)
+	var err error
+
+	if !stream.ioFlags.Write() {
+		return 0, disko.NewDriverError(disko.EPERM)
+	}
+
+	// Force the stream pointer to the end of the file if O_APPEND was set.
+	if stream.ioFlags.Append() {
+		_, err = stream.Seek(0, io.SeekEnd)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	// NB we must call implWriteAt, not WriteAt, since WriteAt fails if the
+	// O_APPEND flag is set.
+	totalWritten, err := stream.implWriteAt(buffer, stream.position)
 	stream.position += int64(totalWritten)
 	return totalWritten, err
 }
 
-func (stream *BasicStream) WriteAt(buffer []byte, offset int64) (int, error) {
-	bufLen := int64(len(buffer))
+// implWriteAt implements the bulk of WriteAt with the exception that it doesn't
+// check for the O_APPEND flag.
+func (stream *BasicStream) implWriteAt(buffer []byte, offset int64) (int, error) {
+	if !stream.ioFlags.Write() {
+		return 0, disko.NewDriverError(disko.EPERM)
+	}
 
+	bufLen := int64(len(buffer))
 	startBlock, startOffset := stream.convertLinearAddr(offset)
 	lastBlock, _ := stream.convertLinearAddr(offset + bufLen)
 
@@ -226,7 +281,18 @@ func (stream *BasicStream) WriteAt(buffer []byte, offset int64) (int, error) {
 	}
 
 	copy(targetSlice[startOffset:], buffer)
+
+	if stream.ioFlags.Synchronous() {
+		return len(buffer), stream.Sync()
+	}
 	return len(buffer), nil
+}
+
+func (stream *BasicStream) WriteAt(buffer []byte, offset int64) (int, error) {
+	if stream.ioFlags.Append() {
+		return 0, disko.NewDriverError(disko.EPERM)
+	}
+	return stream.implWriteAt(buffer, offset)
 }
 
 // WriteString writes a string to the stream.

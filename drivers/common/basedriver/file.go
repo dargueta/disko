@@ -112,7 +112,7 @@ func NewFileFromObjectHandle(
 		resizeCb,
 	)
 
-	stream, err := basicstream.New(stat.Size, blockCache)
+	stream, err := basicstream.New(stat.Size, blockCache, ioFlags)
 	if err != nil {
 		return File{}, err
 	}
