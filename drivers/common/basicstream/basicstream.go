@@ -162,6 +162,10 @@ func (stream *BasicStream) ReadFrom(r io.Reader) (n int64, err error) {
 // Seeking past the end of the file is possible; the file will automatically be
 // resized upon the first write. Attempting to read past the end of the file
 // returns no data.
+//
+// If the stream was created with the `O_APPEND` flag, seeking will succeed, but
+// any write operation will automatically reposition the stream pointer to the
+// end of the file before writing.
 func (stream *BasicStream) Seek(offset int64, whence int) (int64, error) {
 	var absoluteOffset int64
 
