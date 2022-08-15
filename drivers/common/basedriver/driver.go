@@ -281,6 +281,16 @@ func (driver *CommonDriver) OpenFile(
 	absPath := driver.normalizePath(path)
 	ioFlags := disko.IOFlags(flags)
 
+	if ioFlags.RequiresWritePerm() && !driver.mountFlags.CanWrite() {
+		return File{}, disko.NewDriverErrorWithMessage(
+			disko.EPERM,
+			fmt.Sprintf(
+				"can't open `%s` for writing: image is mounted read-only",
+				absPath,
+			),
+		)
+	}
+
 	object, err := driver.getObjectAtPathFollowingLink(absPath)
 	if err != nil {
 		// An error occurred. If the file is missing we may be able to create it
