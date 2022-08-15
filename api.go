@@ -123,18 +123,24 @@ type FSStat struct {
 	Label string
 }
 
-// FSCapabilities indicates the features available for the file system. If a
-// file system supports a feature, driver implementations MUST set it as available
+// FSFeatures indicates the features available for the file system. If a file
+// system supports a feature, driver implementations MUST declare it as available
 // even if the driver hasn't implemented it yet.
-type FSCapabilities struct {
-	Directories     bool
-	Symlinks        bool
-	HardLinks       bool
-	CreatedTime     bool
-	AccessedTime    bool
-	ModifiedTime    bool
-	ChangedTime     bool
-	UnixPermissions bool
+type FSFeatures interface {
+	Directories() bool
+	SymbolicLinks() bool
+	HardLinks() bool
+	CreatedTime() bool
+	AccessedTime() bool
+	ModifiedTime() bool
+	ChangedTime() bool
+	DeletedTime() bool
+	UnixPermissions() bool
+	UserID() bool
+	GroupID() bool
+	UserPermissions() bool
+	GroupPermissions() bool
+	TimestampEpoch() time.Time
 }
 
 // Truncator is an interface for objects that support a Truncate() method. This

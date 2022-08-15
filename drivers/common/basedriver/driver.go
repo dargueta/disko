@@ -108,7 +108,7 @@ type DriverImplementation interface {
 	// to the file system.
 	FSStat() disko.FSStat
 
-	GetFSCapabilities() disko.FSCapabilities
+	GetFSFeatures() disko.FSFeatures
 }
 
 type CommonDriver struct {
