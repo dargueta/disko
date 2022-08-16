@@ -68,9 +68,15 @@ func New(
 	return stream, nil
 }
 
-func (stream *BasicStream) convertLinearAddr(offset int64) (c.LogicalBlock, uint) {
+// convertLinearAddr converts a byte offset into a block+block offset pair. It
+// disregards the actual size of the stream, so it's possible to generate
+// offsets beyond the end of the stream. `offs` is guaranteed to be in the
+// range [0, BytesPerBlock).
+func (stream *BasicStream) convertLinearAddr(offset int64) (blk c.LogicalBlock, offs uint) {
 	bytesPerBlock := int64(stream.data.BytesPerBlock())
-	return c.LogicalBlock(offset / bytesPerBlock), uint(offset % bytesPerBlock)
+	blk = c.LogicalBlock(offset / bytesPerBlock)
+	offs = uint(offset % bytesPerBlock)
+	return
 }
 
 // Close writes out all pending changes to the underlying storage. The stream
@@ -93,7 +99,7 @@ func (stream *BasicStream) ReadAt(buffer []byte, offset int64) (int, error) {
 	bufLen := int64(len(buffer))
 
 	// Clamp the number of bytes to read to whichever is smaller; the length of
-	// the buffer or the end of the file.
+	// the buffer or the number of bytes remaining in the file.
 	var numBytesToRead int64
 	if offset >= stream.size {
 		return 0, io.EOF
@@ -198,13 +204,13 @@ func (stream *BasicStream) Size() int64 {
 	return stream.size
 }
 
-// Sync writes out all pending changes to the backing storage. After calling this,
-// all loaded blocks will be marked clean.
+// Sync writes out all pending changes to the backing storage. After calling
+// this, all loaded blocks will be marked clean.
 func (stream *BasicStream) Sync() error {
 	return stream.data.FlushAll()
 }
 
-// Tell returns the current stream position. It's a more concise way of calling
+// Tell returns the current stream position. It's slightly more efficient than
 // `Seek(0, io.SeekCurrent)`.
 func (stream *BasicStream) Tell() int64 {
 	return stream.position
@@ -292,6 +298,8 @@ func (stream *BasicStream) implWriteAt(buffer []byte, offset int64) (int, error)
 	return len(buffer), nil
 }
 
+// WriteAt writes data at the given offset in the stream. It is an error to
+// use this function if the stream was created with the [disko.O_APPEND] flag.
 func (stream *BasicStream) WriteAt(buffer []byte, offset int64) (int, error) {
 	if stream.ioFlags.Append() {
 		return 0, disko.NewDriverError(disko.EPERM)
