@@ -141,6 +141,12 @@ type FSFeatures interface {
 	UserPermissions() bool
 	GroupPermissions() bool
 	TimestampEpoch() time.Time
+	DefaultNameEncoding() string
+
+	// BlockSize gives the default size of a single block in the file system,
+	// in bytes. File systems that don't have fixed block sizes (such as certain
+	// types of archives) should return 0.
+	DefaultBlockSize() int
 }
 
 // Truncator is an interface for objects that support a Truncate() method. This
