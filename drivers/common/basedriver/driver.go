@@ -2,6 +2,7 @@ package basedriver
 
 import (
 	"fmt"
+	"io"
 	"os"
 	posixpath "path"
 	"path/filepath"
@@ -109,12 +110,25 @@ type DriverImplementation interface {
 	FSStat() disko.FSStat
 
 	GetFSFeatures() disko.FSFeatures
+
+	FormatImage(
+		image io.ReadWriteSeeker,
+		totalSize int64,
+	) error
 }
 
 type CommonDriver struct {
 	implementation DriverImplementation
 	mountFlags     disko.MountFlags
 	workingDirPath string
+}
+
+func NewDriver(implementation DriverImplementation, mountFlags disko.MountFlags) *CommonDriver {
+	return &CommonDriver{
+		implementation: implementation,
+		mountFlags:     mountFlags,
+		workingDirPath: "/",
+	}
 }
 
 func (driver *CommonDriver) normalizePath(path string) string {
