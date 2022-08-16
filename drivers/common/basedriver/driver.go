@@ -297,7 +297,7 @@ func (driver *CommonDriver) OpenFile(
 
 	if ioFlags.RequiresWritePerm() && !driver.mountFlags.CanWrite() {
 		return File{}, disko.NewDriverErrorWithMessage(
-			disko.EPERM,
+			disko.EROFS,
 			fmt.Sprintf(
 				"can't open `%s` for writing: image is mounted read-only",
 				absPath,
