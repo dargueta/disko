@@ -93,24 +93,25 @@ File Systems
 The following table shows the file systems that drivers exist (or are planned)
 for, as well as the status of the capabilities.
 
-=============== ================ ==== ==================== ================ ============
-File System     Format New Image Read Write Existing Files Create New Files Delete Files
-=============== ================ ==== ==================== ================ ============
-CP/M 1.4
-CP/M 2.2
-CP/M 3.1
-CP/M 4.1
-FAT 8           B [#]_
-FAT 12
-FAT 16
-FAT 32
-MINIX 3
-Unix V1FS [#]_  ✔
-Unix V6FS
-Unix V7FS
-Unix V10FS
-XV6
-=============== ================ ==== ==================== ================ ============
+=============== ========== ================ ==== ==================== ================ ============
+File System     Introduced Format New Image Read Write Existing Files Create New Files Delete Files
+=============== ========== ================ ==== ==================== ================ ============
+Unix v1 [#]_    1971       ✔
+Unix v2         1972
+CP/M 1.4        1974
+Unix v6         1975
+FAT 8           1977       B [#]_
+CP/M 2.2        1979
+Unix v7         1979
+FAT 12          1980
+CP/M 3.1        1983
+FAT 16          1984
+CP/M 4.1 [#]_   1985
+MINIX 3 [#]_    1987
+Unix v10        1989
+FAT 32          1996
+XV6 (maybe)     2006
+=============== ========== ================ ==== ==================== ================ ============
 
 *Legend:*
 
@@ -141,14 +142,18 @@ Interactive editing
 Further Reading
 ---------------
 
-* `UNIX v1 Manual`_, relevant parts pages 171-174.
+* `UNIX v1 File System`_
+*  `Full UNIX v1 Manual`_, relevant parts pages 171-174.
+*  `Full UNIX v2 Manual`_, relevant parts pages 221-224.
 * `UNIX v6 File System`_
 * `Xerox BASIC-80 Manual`_, documenting FAT 8 on pages 172, 176, and 178.
 * `FAT 12/16/32 on Wikipedia`_
 * `CP/M file systems`_, including extensions.
 * `MINIX 3 <https://flylib.com/books/en/3.275.1.54/1/>`_, shorter explanation `here <http://ohm.hgesser.de/sp-ss2012/Intro-MinixFS.pdf>`_.
 
-.. _UNIX v1 Manual: http://www.bitsavers.org/pdf/bellLabs/unix/UNIX_ProgrammersManual_Nov71.pdf
+.. _UNIX v1 File System: http://man.cat-v.org/unix-1st/5/file
+.. _Full UNIX v1 Manual: http://www.bitsavers.org/pdf/bellLabs/unix/UNIX_ProgrammersManual_Nov71.pdf
+.. _Full UNIX v2 Manual: https://web.archive.org/web/20161006034736/http://sunsite.icm.edu.pl/pub/unix/UnixArchive/PDP-11/Distributions/research/1972_stuff/unix_2nd_edition_manual.pdf
 .. _UNIX v6 File System: http://man.cat-v.org/unix-6th/5/fs
 .. _FAT 12/16/32 on Wikipedia: https://en.wikipedia.org/wiki/File_Allocation_Table
 .. _Xerox BASIC-80 Manual: http://bitsavers.trailing-edge.com/pdf/xerox/820-II/BASIC-80_5.0.pdf
@@ -174,7 +179,9 @@ affiliation with the author.
 Footnotes
 ---------
 
-.. [#] Works for the larger image size; smaller image size is buggy.
 .. [#] Timestamps are stored using the 1973 revision that uses the canonical
        Unix epoch. The first specification can't represent timestamps past
        1973-04-08 12:06:28.250.
+.. [#] Works for the larger image size; smaller image size is buggy.
+.. [#] Note this version 3 of the file system, not MINIX version 3
+.. [#] Also known as "DOS Plus"
