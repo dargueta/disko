@@ -8,28 +8,33 @@ package blockcache
 
 import (
 	"fmt"
+	"io"
 
 	"github.com/boljen/go-bitmap"
+	"github.com/dargueta/disko"
 	c "github.com/dargueta/disko/drivers/common"
 )
 
 // FetchBlockCallback is a pointer to a function that writes the contents of a
-// single block from the backing storage into `buffer`. `buffer` is guaranteed
-// to be the size of exactly one block.
+// single block from the backing storage into `buffer`. The following guarantees
+// apply:
+//
+// - `blockIndex` is in the range [0, TotalBlocks).
+// - `buffer` is always BytesPerBlock bytes.
 type FetchBlockCallback func(blockIndex c.LogicalBlock, buffer []byte) error
 
 // FlushBlockCallback is a pointer to a function that writes the contents of the
-// given buffer to a block in the backing storage. `buffer` is guaranteed to be
-// the size of exactly one block.
+// given buffer to a block in the backing storage. All restrictions and
+// guarantees in [FetchBlockCallback] apply here too.
 type FlushBlockCallback func(blockIndex c.LogicalBlock, buffer []byte) error
 
 // ResizeCallback is a pointer to a function that is called to allocate or free
 // blocks in the backing storage. It takes one argument, the new total number of
 // blocks to occupy.
 //
-// The implementation of the function can do anything so long as 1) it doesn't
+// The implementation of the callback can do anything so long as 1) it doesn't
 // modify the data in the blocks; 2) at least the requested number of blocks are
-// available.
+// available once the function returns.
 type ResizeCallback func(newTotalBlocks c.LogicalBlock) error
 
 type BlockCache struct {
@@ -44,6 +49,14 @@ type BlockCache struct {
 }
 
 // New creates a new BlockCache.
+//
+// There are three callback functions:
+//
+//   - `fetchCb` reads a single block from the backing storage.
+//   - `flushCb` writes a single block to the backing storage.
+//   - `resizeCb` resizes the backing storage to a given number of blocks. If
+//     nil is passed for this argument, a stub function is provided that always
+//     returns an error with code [disko.ENOTSUP].
 func New(
 	bytesPerBlock uint,
 	totalBlocks uint,
@@ -51,6 +64,12 @@ func New(
 	flushCb FlushBlockCallback,
 	resizeCb ResizeCallback,
 ) *BlockCache {
+	if resizeCb == nil {
+		resizeCb = func(newTotalBlocks c.LogicalBlock) error {
+			return disko.NewDriverError(disko.ENOTSUP)
+		}
+	}
+
 	return &BlockCache{
 		loadedBlocks:  bitmap.NewSlice(int(totalBlocks)),
 		dirtyBlocks:   bitmap.NewSlice(int(totalBlocks)),
@@ -61,6 +80,84 @@ func New(
 		bytesPerBlock: bytesPerBlock,
 		totalBlocks:   totalBlocks,
 	}
+}
+
+// WrapStream creates a [BlockCache] that wraps any [io.ReadWriteSeeker],
+// optionally forbidding resizing the stream. To support resizing, `stream` must
+// implement [disko.Truncator], equivalent to [os.File.Truncate].
+func WrapStream(
+	stream io.ReadWriteSeeker,
+	bytesPerBlock uint,
+	totalBlocks uint,
+	allowResize bool,
+) *BlockCache {
+	// This function performs the function of the read and write callbacks. It's
+	// put into one function because reading and writing differ only by a single
+	// method call on the stream.
+	runCb := func(block c.LogicalBlock, buffer []byte, read bool) error {
+		err := seekToBlock(stream, block, c.LogicalBlock(totalBlocks), bytesPerBlock)
+		if err != nil {
+			return err
+		}
+
+		if read {
+			_, err = stream.Read(buffer)
+		} else {
+			_, err = stream.Write(buffer)
+		}
+
+		if err != nil && err != io.EOF {
+			return err
+		}
+		return nil
+	}
+
+	fetchCb := func(block c.LogicalBlock, buffer []byte) error {
+		return runCb(block, buffer, true)
+	}
+
+	flushCb := func(block c.LogicalBlock, buffer []byte) error {
+		return runCb(block, buffer, false)
+	}
+
+	var resizeCb ResizeCallback
+	_, streamHasTruncate := stream.(disko.Truncator)
+
+	if allowResize && streamHasTruncate {
+		// Resizing the stream is allowed.
+		resizeCb = func(newTotalBlocks c.LogicalBlock) error {
+			truncator := stream.(disko.Truncator)
+			return truncator.Truncate(int64(newTotalBlocks) * int64(bytesPerBlock))
+		}
+	} else {
+		// Resizing is not allowed, either because the caller forbade it or the
+		// stream doesn't support it. Note we don't return ENOSYS here because
+		// the functionality *is* supported by Disko, but not this specific
+		// stream.
+		resizeCb = func(newTotalBlocks c.LogicalBlock) error {
+			return disko.NewDriverError(disko.ENOTSUP)
+		}
+	}
+
+	return New(bytesPerBlock, totalBlocks, fetchCb, flushCb, resizeCb)
+}
+
+// seekToBlock sets the stream pointer for a stream to the offset of a block.
+func seekToBlock(stream io.Seeker, block, totalBlocks c.LogicalBlock, bytesPerBlock uint) error {
+	if block >= totalBlocks {
+		return disko.NewDriverErrorWithMessage(
+			disko.EINVAL,
+			fmt.Sprintf(
+				"invalid block number: %d not in range [0, %d)",
+				block,
+				totalBlocks,
+			),
+		)
+	}
+
+	blockOffset := int64(block) * int64(bytesPerBlock)
+	_, err := stream.Seek(blockOffset, io.SeekStart)
+	return err
 }
 
 // BytesPerBlock returns the size of a single block, in bytes.
@@ -74,11 +171,13 @@ func (cache *BlockCache) TotalBlocks() uint {
 	return cache.totalBlocks
 }
 
+// Size gives the size of the cache, in bytes (not blocks!).
 func (cache *BlockCache) Size() int64 {
 	return int64(cache.bytesPerBlock) * int64(cache.totalBlocks)
 }
 
-// LengthToNumBlocks gives the minimum number of blocks required to hold
+// LengthToNumBlocks gives the minimum number of blocks required to hold the
+// given number of bytes.
 func (cache *BlockCache) LengthToNumBlocks(size uint) uint {
 	return (size + cache.bytesPerBlock - 1) / cache.bytesPerBlock
 }
@@ -109,6 +208,9 @@ func (cache *BlockCache) GetSlice(
 	start c.LogicalBlock,
 	count uint,
 ) ([]byte, error) {
+	// Note: That warning in the documentation about the returned slice can't be
+	// modified is a lie. You *can* modify the slice, but you need to mark the
+	// corresponding blocks as dirty.
 	err := cache.loadBlockRange(start, count)
 	if err != nil {
 		return nil, err
