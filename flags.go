@@ -61,13 +61,14 @@ const O_NOATIME = IOFlags(0x01000000)
 const O_PATH = IOFlags(0x02000000)
 
 const O_ACCMODE = O_RDONLY | O_RDWR | O_WRONLY
+const osModeFlagMask = os.O_RDONLY | os.O_RDWR | os.O_WRONLY
 
 // OSFlagsToIOFlags converts mode flags used for [os.OpenFile] into [IOFlags]
 // recognized by Disko.
 func OSFlagsToIOFlags(flags int) IOFlags {
 	var ioFlags IOFlags
 
-	switch flags & int(O_ACCMODE) {
+	switch flags & osModeFlagMask {
 	case os.O_WRONLY:
 		ioFlags = O_WRONLY
 	case os.O_RDWR:
