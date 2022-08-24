@@ -19,25 +19,41 @@ At time of writing (July 2022) I'm doing an overhaul of the API. Ignore most of
 needing a much simpler (albeit more abstract) interface from file system
 implementations. This should greatly simplify adding new drivers.
 
-The base driver implements the following functions out of the box:
-
-Legend:
+**Symbols**
 
 * ✔: Supported
-* ⚠: Conditionally supported, depends on an API function I haven't settled on yet.
+* ⚠: Partial implementation, see notes
 * ✘: Doesn't make sense for this, so the function wasn't implemented.
 
-========= ======= ======
-Function  Support Notes
-========= ======= ======
-Chdir     ✔
-Chmod
-Chown
-Chtimes
+**Optional Features**
+
+Implementations of file systems may need to provide support for specific features.
+For convenience in the tables below, they are numbered thus:
+
+1. Directories
+2. File modes (Unix-style RWX)
+3. File ownership (Unix-style UID/GID)
+4. Timestamps
+5. Hard links
+6. Symbolic links
+
+
+Base Driver
+~~~~~~~~~~~
+
+The base driver implements the following functions out of the box:
+
+========= ======= ====================
+Function  Support Required FS Features
+========= ======= ====================
+Chdir     ✔       1
+Chmod             2
+Chown             3
+Chtimes           4
 Create    ✔
 Flush
-Lchown
-Link
+Lchown            2, 6
+Link              5
 Lstat     ✔
 Mkdir     ✔
 MkdirAll  ✔
@@ -51,27 +67,31 @@ RemoveAll ✔
 Repath
 SameFile  ✔
 Stat      ✔
-Symlink
+Symlink           6
 Truncate  ✔
 WriteFile ✔
-========= ======= ======
+========= ======= ====================
+
+
+Files
+~~~~~
 
 File handles support the following methods from ``os.File``:
 
-================ ======= =====
-Function         Support Notes
-================ ======= =====
-Chdir            ✔
-Chmod            ✔
-Chown            ✔
+================ ======= ==================== =====
+Function         Support Required FS Features Notes
+================ ======= ==================== =====
+Chdir            ✔       1
+Chmod            ✔       2
+Chown            ✔       3
 Close            ✔
 Fd               ✘
 Name             ✔
 Read             ✔
 ReadAt           ✔
-ReadDir
-Readdir
-Readdirnames
+ReadDir                  1
+Readdir                  1
+Readdirnames             1
 ReadFrom         ✔
 Seek             ✔
 SetDeadline      ✘
@@ -85,7 +105,7 @@ Write            ✔
 WriteAt          ✔
 WriteString      ✔
 WriteTo          ✔
-================ ======= =====
+================ ======= ==================== =====
 
 File Systems
 ------------
