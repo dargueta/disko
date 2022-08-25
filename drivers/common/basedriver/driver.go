@@ -86,12 +86,9 @@ func (driver *CommonDriver) normalizePath(path string) string {
 // resolveSymlink dereferences `object` (if it's a symlink), following multiple
 // levels of indirection if needed to get to a file  system object. If `object`
 // isn't a symlink, this becomes a no-op and returns the handle unmodified.
-//
-// `path` must be a normalized absolute path.
 func (driver *CommonDriver) resolveSymlink(
-	object ObjectHandle,
-	path string,
-) (ObjectHandle, disko.DriverError) {
+	object extObjectHandle,
+) (extObjectHandle, disko.DriverError) {
 	stat := object.Stat()
 	if !stat.IsSymlink() {
 		return object, nil
@@ -101,9 +98,10 @@ func (driver *CommonDriver) resolveSymlink(
 	// paths we visit. If we resolve a symlink to a path that's already in the
 	// dictionary, we found a loop and must fail.
 	pathCache := make(map[string]bool)
-	pathCache[path] = true
 
-	currentPath := path
+	currentPath := object.AbsolutePath()
+	pathCache[currentPath] = true
+
 	for stat.IsSymlink() {
 		symlinkText, err := driver.getContentsOfObject(object)
 		if err != nil {
@@ -156,7 +154,7 @@ func (driver *CommonDriver) resolveSymlink(
 // `path` must be a normalized absolute path.
 func (driver *CommonDriver) getObjectAtPathNoFollow(
 	path string,
-) (ObjectHandle, disko.DriverError) {
+) (extObjectHandle, disko.DriverError) {
 	if path == "/" || path == "" {
 		return driver.implementation.GetRootDirectory(), nil
 	}
@@ -181,12 +179,16 @@ func (driver *CommonDriver) getObjectAtPathNoFollow(
 
 	}
 
-	return driver.implementation.GetObject(baseName, parentObject)
+	object := driver.implementation.GetObject(baseName, parentObject)
+	return tExtObjectHandle{
+		baseHandle: object,
+		absolutePath: path,
+	}, nil
 }
 
 func (driver *CommonDriver) getObjectAtPathFollowingLink(
 	path string,
-) (ObjectHandle, disko.DriverError) {
+) (extObjectHandle, disko.DriverError) {
 	object, err := driver.getObjectAtPathNoFollow(path)
 	if err != nil {
 		return nil, err
@@ -194,7 +196,7 @@ func (driver *CommonDriver) getObjectAtPathFollowingLink(
 
 	stat := object.Stat()
 	for stat.IsSymlink() {
-		object, err = driver.resolveSymlink(object, path)
+		object, err = driver.resolveSymlink(object)
 		if err != nil {
 			return nil, err
 		}
@@ -208,7 +210,7 @@ func (driver *CommonDriver) getObjectAtPathFollowingLink(
 // file system, regardless of whether it's a file or directory. Symbolic links
 // are not followed.
 func (driver *CommonDriver) getContentsOfObject(
-	object ObjectHandle,
+	object extObjectHandle,
 ) ([]byte, disko.DriverError) {
 	handle, err := NewFileFromObjectHandle(driver, object, disko.O_RDONLY)
 	if err != nil {
@@ -302,7 +304,8 @@ func (driver *CommonDriver) Chdir(path string) error {
 	return driver.chdirToObject(object, absPath)
 }
 
-func (driver *CommonDriver) chdirToObject(object ObjectHandle, absPath string) error {
+func (driver *CommonDriver) chdirToObject(object extObjectHandle) error {
+	absPath := object.AbsolutePath()
 	stat := object.Stat()
 	if !stat.IsDir() {
 		return disko.NewDriverErrorWithMessage(
@@ -402,7 +405,7 @@ func (driver *CommonDriver) Lstat(path string) (disko.FileStat, error) {
 
 	// Unconditionally try to resolve `object` as a symlink. If it isn't one,
 	// nothing happens and we get `object` back.
-	object, err = driver.resolveSymlink(object, path)
+	object, err = driver.resolveSymlink(object)
 	if err != nil {
 		return disko.FileStat{}, err
 	}

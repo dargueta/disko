@@ -2,6 +2,7 @@ package basedriver
 
 import (
 	"os"
+	posixpath "path"
 	"time"
 
 	"github.com/dargueta/disko"
@@ -22,7 +23,7 @@ type FileInfo struct {
 	disko.FileStat
 
 	// Fields
-	name string
+	absolutePath string
 }
 
 // os.FileInfo implementation --------------------------------------------------
@@ -48,7 +49,7 @@ func (info *FileInfo) Sys() any {
 // os.DirEntry implementation --------------------------------------------------
 
 func (info *FileInfo) Name() string {
-	return info.name
+	return posixpath.Base(info.absolutePath)
 }
 
 // Type returns the mode flags for the file or directory. It's functionally
@@ -81,7 +82,7 @@ type File struct {
 
 	// Fields
 	owningDriver *CommonDriver
-	objectHandle ObjectHandle
+	objectHandle extObjectHandle
 	fileInfo     FileInfo
 	ioFlags      disko.IOFlags
 }
@@ -90,7 +91,7 @@ type File struct {
 // drop-in replacement for [os.File].
 func NewFileFromObjectHandle(
 	driver *CommonDriver,
-	object ObjectHandle,
+	object extObjectHandle,
 	ioFlags disko.IOFlags,
 ) (File, error) {
 	fetchCb := func(index common.LogicalBlock, buffer []byte) error {
@@ -123,17 +124,14 @@ func NewFileFromObjectHandle(
 		ioFlags:      ioFlags,
 		BasicStream:  stream,
 		fileInfo: FileInfo{
-			FileStat: stat,
-			name:     object.Name(),
+			FileStat:     stat,
+			absolutePath: object.AbsolutePath(),
 		},
 	}, nil
 }
 
 func (file *File) Chdir() error {
-	return file.owningDriver.chdirToObject(
-		file.objectHandle,
-		file.fileInfo.name,
-	)
+	return file.owningDriver.chdirToObject(file.objectHandle)
 }
 
 func (file *File) Chmod(mode os.FileMode) error {
