@@ -108,13 +108,13 @@ type FSStat struct {
 	// Drivers should set this to 0 if the information is not available.
 	Files uint64
 	// FilesFree is the number of remaining directory entries available for use.
-	// Drivers should set this to 0 for file systems that have no limit on the
-	// maximum number of directory entries.
+	// Drivers should set this to [math.MaxUint64] for file systems that have
+	// no limit on the maximum number of directory entries.
 	FilesFree uint64
 	// FileSystemID is the serial number for the disk image, if available.
 	FileSystemID uint64
 	// MaxNameLength is the longest possible name for a directory entry, in bytes.
-	// Drivers should set this to 0 if there is no limit.
+	// Drivers should set this to [math.MaxInt64] if there is no limit.
 	MaxNameLength int64
 	// Flags is free for drivers to use as they see fit, but mostly to preserve
 	// flags present in the boot block. Driver-agnostic functions will ignore it.
@@ -141,6 +141,11 @@ type FSFeatures interface {
 	UserPermissions() bool
 	GroupPermissions() bool
 	TimestampEpoch() time.Time
+
+	// DefaultNameEncoding gives the name of the text encoding natively used by
+	// the file system, in lowercase with no symbols (e.g. "utf8" not "UTF-8").
+	// For systems this old for the most part it will be either "ascii" or
+	// "ebcdic".
 	DefaultNameEncoding() string
 
 	// BlockSize gives the default size of a single block in the file system,
