@@ -123,23 +123,31 @@ type FSStat struct {
 	Label string
 }
 
+// UndefinedTimestamp is a timestamp that should be used as an invalid value,
+// like `nil` for pointers.
+var UndefinedTimestamp := time.UnixMicro(math.MaxInt64)
+
 // FSFeatures indicates the features available for the file system. If a file
 // system supports a feature, driver implementations MUST declare it as available
 // even if the driver hasn't implemented it yet.
 type FSFeatures interface {
-	Directories() bool
-	SymbolicLinks() bool
-	HardLinks() bool
-	CreatedTime() bool
-	AccessedTime() bool
-	ModifiedTime() bool
-	ChangedTime() bool
-	DeletedTime() bool
-	UnixPermissions() bool
-	UserID() bool
-	GroupID() bool
-	UserPermissions() bool
-	GroupPermissions() bool
+	HasDirectories() bool
+	HasSymbolicLinks() bool
+	HasHardLinks() bool
+	HasCreatedTime() bool
+	HasAccessedTime() bool
+	HasModifiedTime() bool
+	HasChangedTime() bool
+	HasDeletedTime() bool
+	HasUnixPermissions() bool
+	HasUserID() bool
+	HasGroupID() bool
+	HasUserPermissions() bool
+	HasGroupPermissions() bool
+
+	// TimestampEpoch returns the earliest representable timestamp on this file
+	// system. File systems that don't support timestamps of any kind should
+	// return [UndefinedTimestamp].
 	TimestampEpoch() time.Time
 
 	// DefaultNameEncoding gives the name of the text encoding natively used by
