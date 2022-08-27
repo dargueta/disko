@@ -43,10 +43,9 @@ type ObjectHandle interface {
 	// NOTE: It's the driver's responsibility to consolidate holes where possible.
 	ZeroOutBlocks(startIndex common.LogicalBlock, count uint) disko.DriverError
 
-	// Unlink deletes the file system object. This is guaranteed to not be called
-	// unless the object has no dependents. For directories, this means that the
-	// method will not be called unless the only entries are "." and ".." (if
-	// applicable).
+	// Unlink deletes the file system object. For directories, this is guaranteed
+	// to not be called unless [ListDir] returns an empty slice (ignoring "." and
+	// ".." if present).
 	Unlink() disko.DriverError
 
 	// Chmod changes the permission bits of this file system object. Only the
@@ -55,7 +54,9 @@ type ObjectHandle interface {
 	Chown(uid, gid int) disko.DriverError
 	Chtimes(createdAt, lastAccessed, lastModified, lastChanged, deletedAt time.Time) error
 
-	ListDir() (map[string]ObjectHandle, disko.DriverError)
+	// ListDir returns a list of the directory entries this object contains. "."
+	// and ".." are ignored if present.
+	ListDir() ([]string, disko.DriverError)
 
 	// Name returns the name of the object itself without any path component.
 	// The root directory, which technically has no name, must return "/".
@@ -69,7 +70,18 @@ type extObjectHandle interface {
 
 type tExtObjectHandle struct {
 	extObjectHandle
-
-	baseHandle ObjectHandle
 	absolutePath string
+}
+
+
+// wrapObjectHandle combines
+func wrapObjectHandle(handle ObjectHandle, absolutePath string) extObjectHandle {
+	return tExtObjectHandle{
+		ObjectHandle: handle,
+		absolutePath: absolutePath,
+	}
+}
+
+func (xh tExtObjectHandle) AbsolutePath() string {
+	return xh.absolutePath
 }

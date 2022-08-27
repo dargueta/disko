@@ -10,6 +10,7 @@ import (
 
 	"github.com/dargueta/disko"
 	"github.com/dargueta/disko/drivers/common"
+	"golang.org/x/exp/slices"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -180,10 +181,7 @@ func (driver *CommonDriver) getObjectAtPathNoFollow(
 	}
 
 	object := driver.implementation.GetObject(baseName, parentObject)
-	return tExtObjectHandle{
-		baseHandle: object,
-		absolutePath: path,
-	}, nil
+	return wrapObjectHandle(object, path), nil
 }
 
 func (driver *CommonDriver) getObjectAtPathFollowingLink(
@@ -351,20 +349,30 @@ func (driver *CommonDriver) Stat(path string) (disko.FileStat, error) {
 // DirReadingDriver ------------------------------------------------------------
 
 func (driver *CommonDriver) ReadDir(path string) ([]disko.DirectoryEntry, error) {
-	path = driver.normalizePath(path)
+	absPath := driver.normalizePath(path)
 
-	object, err := driver.getObjectAtPathFollowingLink(path)
+	directory, err := driver.getObjectAtPathFollowingLink(absPath)
 	if err != nil {
 		return nil, err
 	}
 
-	dirents, err := object.ListDir()
+	direntNames, err := directory.ListDir()
 	if err != nil {
 		return nil, err
 	}
 
 	output := make([]disko.DirectoryEntry, 0, len(dirents))
-	for _, direntObject := range dirents {
+	for _, name := range direntNames {
+		// Ignore "." and ".." entries if present
+		if name == "." || name == ".." {
+			continue
+		}
+
+		direntObject, err := driver.implementation.GetObject(name, directory)
+		if err != nil {
+			return output, err
+		}
+
 		dirent := NewDirectoryEntryFromHandle(direntObject)
 		output = append(output, dirent)
 	}
@@ -422,6 +430,18 @@ func (driver *CommonDriver) Create(path string) (File, error) {
 	)
 }
 
+func removeDotsFromSlice(arr []string) []string {
+	toRemove := []string{".", ".."}
+
+	for _, dotStr := range toRemove {
+		index := slices.Index(arr, dotStr)
+		if index >= 0 {
+			arr = slices.Delete(arr, index, 1)
+		}
+	}
+	return slices.Clip(arr)
+}
+
 func (driver *CommonDriver) Remove(path string) error {
 	absPath := driver.normalizePath(path)
 	object, err := driver.getObjectAtPathFollowingLink(absPath)
@@ -433,14 +453,13 @@ func (driver *CommonDriver) Remove(path string) error {
 	if stat.IsDir() {
 		// Caller wants to remove a directory. The directory must be empty, i.e.
 		// must at most only contain the "." and ".." entries.
-		dirents, err := object.ListDir()
+		names, err := object.ListDir()
 		if err != nil {
 			return err
 		}
 
 		// Remove the "." and ".." since we don't care about them.
-		delete(dirents, ".")
-		delete(dirents, "..")
+		names = removeDotsFromSlice(names)
 
 		// If there are any other entries in here the directory isn't empty and
 		// we must fail.
@@ -542,14 +561,15 @@ func (driver *CommonDriver) MkdirAll(path string, perm os.FileMode) error {
 	return err
 }
 
+
 func (driver *CommonDriver) RemoveAll(path string) error {
 	path = driver.normalizePath(path)
-	object, err := driver.getObjectAtPathFollowingLink(path)
+	directory, err := driver.getObjectAtPathFollowingLink(path)
 	if err != nil {
 		return err
 	}
 
-	stat := object.Stat()
+	stat := directory.Stat()
 	if !stat.IsDir() {
 		return disko.NewDriverErrorWithMessage(
 			disko.ENOTDIR,
@@ -557,30 +577,42 @@ func (driver *CommonDriver) RemoveAll(path string) error {
 		)
 	}
 
-	direntMap, err := object.ListDir()
+	return driver.removeDirectory(directory)
+}
+
+
+// removeDirectory is equivalent to `rm -rf` for a directory handle.
+//
+// Deletion is depth-first, and terminates on the first error encountered.
+// Ownership and other permissions are not checked.
+func (driver *CommonDriver) removeDirectory(directory extObjectHandle) error {
+	var err error
+
+	direntNames, err := directory.ListDir()
 	if err != nil {
 		return err
 	}
 
-	for name, dirent := range direntMap {
+	for _, name := range direntNames {
 		if name == "." || name == ".." {
 			continue
 		}
 
+		dirent, err := driver.implementation.GetObject(directory, name)
 		direntStat := dirent.Stat()
-		direntPath := posixpath.Join(path, name)
 
-		var rmErr error
+		// If this is a directory, recursively delete its contents.
 		if direntStat.IsDir() {
-			rmErr = driver.RemoveAll(direntPath)
-			if rmErr != nil {
-				return rmErr
+			err = driver.removeDirectory(dirent)
+			if err != nil {
+				return err
 			}
 		}
 
-		rmErr = dirent.Unlink()
-		if rmErr != nil {
-			return rmErr
+		// Delete the file or empty directory.
+		err = dirent.Unlink()
+		if err != nil {
+			return err
 		}
 	}
 
