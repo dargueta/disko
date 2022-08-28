@@ -13,21 +13,21 @@ import (
 
 ////////////////////////////////////////////////////////////////////////////////
 
-type CommonDriver struct {
+type Driver struct {
 	implementation disko.FileSystemImplementer
 	mountFlags     disko.MountFlags
 	workingDirPath string
 }
 
-func NewDriver(implementation disko.FileSystemImplementer, mountFlags disko.MountFlags) *CommonDriver {
-	return &CommonDriver{
+func NewDriver(implementation disko.FileSystemImplementer, mountFlags disko.MountFlags) *Driver {
+	return &Driver{
 		implementation: implementation,
 		mountFlags:     mountFlags,
 		workingDirPath: "/",
 	}
 }
 
-func (driver *CommonDriver) normalizePath(path string) string {
+func (driver *Driver) normalizePath(path string) string {
 	path = posixpath.Clean(filepath.ToSlash(path))
 	if path == "." {
 		path = "/"
@@ -41,7 +41,7 @@ func (driver *CommonDriver) normalizePath(path string) string {
 // resolveSymlink dereferences `object` (if it's a symlink), following multiple
 // levels of indirection if needed to get to a file  system object. If `object`
 // isn't a symlink, this becomes a no-op and returns the handle unmodified.
-func (driver *CommonDriver) resolveSymlink(
+func (driver *Driver) resolveSymlink(
 	object extObjectHandle,
 ) (extObjectHandle, errors.DriverError) {
 	stat := object.Stat()
@@ -108,7 +108,7 @@ func (driver *CommonDriver) resolveSymlink(
 // follow the final path component if it's a symbolic link.
 //
 // `path` must be a normalized absolute path.
-func (driver *CommonDriver) getObjectAtPathNoFollow(
+func (driver *Driver) getObjectAtPathNoFollow(
 	path string,
 ) (extObjectHandle, errors.DriverError) {
 	if path == "/" || path == "" {
@@ -139,7 +139,7 @@ func (driver *CommonDriver) getObjectAtPathNoFollow(
 	return driver.getExtObjectInDir(baseName, parentObject)
 }
 
-func (driver *CommonDriver) getObjectAtPathFollowingLink(
+func (driver *Driver) getObjectAtPathFollowingLink(
 	path string,
 ) (extObjectHandle, errors.DriverError) {
 	object, err := driver.getObjectAtPathNoFollow(path)
@@ -162,7 +162,7 @@ func (driver *CommonDriver) getObjectAtPathFollowingLink(
 // getContentsOfObject returns the contents of an object as it exists on the
 // file system, regardless of whether it's a file or directory. Symbolic links
 // are not followed.
-func (driver *CommonDriver) getContentsOfObject(
+func (driver *Driver) getContentsOfObject(
 	object extObjectHandle,
 ) ([]byte, errors.DriverError) {
 	handle, err := NewFileFromObjectHandle(driver, object, disko.O_RDONLY)
@@ -183,7 +183,7 @@ func (driver *CommonDriver) getContentsOfObject(
 
 // getExtObjectInDir is a wrapper around [DriverImplementation.GetObject] that
 // returns an [extObjectHandle].
-func (driver *CommonDriver) getExtObjectInDir(
+func (driver *Driver) getExtObjectInDir(
 	baseName string, parentObject extObjectHandle,
 ) (extObjectHandle, errors.DriverError) {
 	object, err := driver.implementation.GetObject(baseName, parentObject)
@@ -197,7 +197,7 @@ func (driver *CommonDriver) getExtObjectInDir(
 
 // createExtObject is a wrapper around [DriverImplementation.CreateObject] that
 // returns an [extObjectHandle].
-func (driver *CommonDriver) createExtObject(
+func (driver *Driver) createExtObject(
 	baseName string, parentObject extObjectHandle, perm os.FileMode,
 ) (extObjectHandle, errors.DriverError) {
 	rawObject, err := driver.implementation.CreateObject(
@@ -216,7 +216,7 @@ func (driver *CommonDriver) createExtObject(
 
 // OpeningDriver ---------------------------------------------------------------
 
-func (driver *CommonDriver) OpenFile(
+func (driver *Driver) OpenFile(
 	path string,
 	flags disko.IOFlags,
 	perm os.FileMode,
@@ -280,7 +280,7 @@ func (driver *CommonDriver) OpenFile(
 
 // ReadingDriver ---------------------------------------------------------------
 
-func (driver *CommonDriver) Chdir(path string) error {
+func (driver *Driver) Chdir(path string) error {
 	absPath := driver.normalizePath(path)
 
 	object, err := driver.getObjectAtPathFollowingLink(absPath)
@@ -290,7 +290,7 @@ func (driver *CommonDriver) Chdir(path string) error {
 	return driver.chdirToObject(object)
 }
 
-func (driver *CommonDriver) chdirToObject(object extObjectHandle) error {
+func (driver *Driver) chdirToObject(object extObjectHandle) error {
 	absPath := object.AbsolutePath()
 	stat := object.Stat()
 	if !stat.IsDir() {
@@ -304,11 +304,11 @@ func (driver *CommonDriver) chdirToObject(object extObjectHandle) error {
 	return nil
 }
 
-func (driver *CommonDriver) Open(path string) (File, error) {
+func (driver *Driver) Open(path string) (File, error) {
 	return driver.OpenFile(path, disko.O_RDONLY, 0)
 }
 
-func (driver *CommonDriver) ReadFile(path string) ([]byte, error) {
+func (driver *Driver) ReadFile(path string) ([]byte, error) {
 	path = driver.normalizePath(path)
 
 	object, err := driver.getObjectAtPathFollowingLink(path)
@@ -318,13 +318,13 @@ func (driver *CommonDriver) ReadFile(path string) ([]byte, error) {
 	return driver.getContentsOfObject(object)
 }
 
-func (driver *CommonDriver) SameFile(fi1, fi2 os.FileInfo) bool {
+func (driver *Driver) SameFile(fi1, fi2 os.FileInfo) bool {
 	stat1 := fi1.Sys().(disko.FileStat)
 	stat2 := fi2.Sys().(disko.FileStat)
 	return stat1.InodeNumber == stat2.InodeNumber
 }
 
-func (driver *CommonDriver) Stat(path string) (disko.FileStat, error) {
+func (driver *Driver) Stat(path string) (disko.FileStat, error) {
 	path = driver.normalizePath(path)
 
 	object, err := driver.getObjectAtPathFollowingLink(path)
@@ -336,7 +336,7 @@ func (driver *CommonDriver) Stat(path string) (disko.FileStat, error) {
 
 // DirReadingDriver ------------------------------------------------------------
 
-func (driver *CommonDriver) ReadDir(path string) ([]disko.DirectoryEntry, error) {
+func (driver *Driver) ReadDir(path string) ([]disko.DirectoryEntry, error) {
 	absPath := driver.normalizePath(path)
 
 	directory, err := driver.getObjectAtPathFollowingLink(absPath)
@@ -370,7 +370,7 @@ func (driver *CommonDriver) ReadDir(path string) ([]disko.DirectoryEntry, error)
 
 // ReadingLinkingDriver --------------------------------------------------------
 
-func (driver *CommonDriver) Readlink(path string) (string, error) {
+func (driver *Driver) Readlink(path string) (string, error) {
 	path = driver.normalizePath(path)
 	object, err := driver.getObjectAtPathNoFollow(path)
 	if err != nil {
@@ -392,7 +392,7 @@ func (driver *CommonDriver) Readlink(path string) (string, error) {
 	return string(contents), nil
 }
 
-func (driver *CommonDriver) Lstat(path string) (disko.FileStat, error) {
+func (driver *Driver) Lstat(path string) (disko.FileStat, error) {
 	path = driver.normalizePath(path)
 	object, err := driver.getObjectAtPathNoFollow(path)
 	if err != nil {
@@ -410,7 +410,7 @@ func (driver *CommonDriver) Lstat(path string) (disko.FileStat, error) {
 
 // WritingDriver ---------------------------------------------------------------
 
-func (driver *CommonDriver) Create(path string) (File, error) {
+func (driver *Driver) Create(path string) (File, error) {
 	return driver.OpenFile(
 		path,
 		disko.O_RDWR|disko.O_CREATE|disko.O_EXCL,
@@ -430,7 +430,7 @@ func removeDotsFromSlice(arr []string) []string {
 	return slices.Clip(arr)
 }
 
-func (driver *CommonDriver) Remove(path string) error {
+func (driver *Driver) Remove(path string) error {
 	absPath := driver.normalizePath(path)
 	object, err := driver.getObjectAtPathFollowingLink(absPath)
 	if err != nil {
@@ -467,7 +467,7 @@ func (driver *CommonDriver) Remove(path string) error {
 	return object.Unlink()
 }
 
-func (driver *CommonDriver) Truncate(path string) error {
+func (driver *Driver) Truncate(path string) error {
 	absPath := driver.normalizePath(path)
 	object, err := driver.getObjectAtPathFollowingLink(absPath)
 	if err != nil {
@@ -476,7 +476,7 @@ func (driver *CommonDriver) Truncate(path string) error {
 	return object.Resize(0)
 }
 
-func (driver *CommonDriver) WriteFile(
+func (driver *Driver) WriteFile(
 	path string,
 	data []byte,
 	perm os.FileMode,
@@ -497,7 +497,7 @@ func (driver *CommonDriver) WriteFile(
 
 // DirWritingDriver ------------------------------------------------------------
 
-func (driver *CommonDriver) Mkdir(path string, perm os.FileMode) error {
+func (driver *Driver) Mkdir(path string, perm os.FileMode) error {
 	// Force the permissions flags to indicate this is a directory
 	perm &^= os.ModeType
 	perm |= os.ModeDir
@@ -526,7 +526,7 @@ func (driver *CommonDriver) Mkdir(path string, perm os.FileMode) error {
 	return err
 }
 
-func (driver *CommonDriver) MkdirAll(path string, perm os.FileMode) error {
+func (driver *Driver) MkdirAll(path string, perm os.FileMode) error {
 	absPath := driver.normalizePath(path)
 	parentDir, baseName := posixpath.Split(absPath)
 
@@ -549,7 +549,7 @@ func (driver *CommonDriver) MkdirAll(path string, perm os.FileMode) error {
 	return err
 }
 
-func (driver *CommonDriver) RemoveAll(path string) error {
+func (driver *Driver) RemoveAll(path string) error {
 	path = driver.normalizePath(path)
 	directory, err := driver.getObjectAtPathFollowingLink(path)
 	if err != nil {
@@ -571,7 +571,7 @@ func (driver *CommonDriver) RemoveAll(path string) error {
 //
 // Deletion is depth-first, and terminates on the first error encountered.
 // Ownership and other permissions are not checked.
-func (driver *CommonDriver) removeDirectory(directory extObjectHandle) error {
+func (driver *Driver) removeDirectory(directory extObjectHandle) error {
 	var err error
 
 	direntNames, err := directory.ListDir()
