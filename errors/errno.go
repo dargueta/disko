@@ -2,7 +2,7 @@
 // The syscall package doesn't define all the values we need on all systems,
 // particularly things like EUCLEAN.
 
-package disko
+package errors
 
 import (
 	"fmt"

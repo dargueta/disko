@@ -4,3 +4,9 @@ package common
 
 type LogicalBlock uint
 type PhysicalBlock uint
+
+// Truncator is an interface for objects that support a Truncate() method. This
+// method must behave just like [os.File.Truncate].
+type Truncator interface {
+	Truncate(size int64) error
+}

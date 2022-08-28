@@ -1,4 +1,4 @@
-package disko
+package errors
 
 import (
 	"fmt"

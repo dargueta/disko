@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/dargueta/disko/errors"
 	"github.com/dargueta/disko/file_systems/common"
 	"github.com/dargueta/disko/file_systems/common/blockcache"
 )
@@ -177,22 +178,16 @@ type FSFeatures interface {
 	DefaultBlockSize() int
 }
 
-// Truncator is an interface for objects that support a Truncate() method. This
-// method must behave just like [os.File.Truncate].
-type Truncator interface {
-	Truncate(size int64) error
-}
-
 // FileSystemImplementer is the interface required for all file system
 // implementations.
 type FileSystemImplementer interface {
 	// Mount initializes the driver implementation. `image` is owned by the
 	// main driver
-	Initialize(image *blockcache.BlockCache, flags MountFlags) DriverError
+	Initialize(image *blockcache.BlockCache, flags MountFlags) errors.DriverError
 
 	// Close writes out all pending changes to the disk image and releases any
 	// resources the implementation may be holding.
-	Close() DriverError
+	Close() errors.DriverError
 
 	// CreateObject creates an object on the file system that is *not* a
 	// directory.
@@ -205,7 +200,7 @@ type FileSystemImplementer interface {
 		name string,
 		parent ObjectHandle,
 		perm os.FileMode,
-	) (ObjectHandle, DriverError)
+	) (ObjectHandle, errors.DriverError)
 
 	// GetObject returns a handle to an object with the given name in a directory
 	// specified by `parent`.
@@ -217,7 +212,7 @@ type FileSystemImplementer interface {
 	GetObject(
 		name string,
 		parent ObjectHandle,
-	) (ObjectHandle, DriverError)
+	) (ObjectHandle, errors.DriverError)
 
 	// GetRootDirectory returns a handle to the root directory of the disk image.
 	// This must always be a valid object handle, even if directories are not
@@ -237,7 +232,7 @@ type FileSystemImplementer interface {
 	FormatImage(
 		image io.ReadWriteSeeker,
 		stat FSStat,
-	) DriverError
+	) errors.DriverError
 
 	// SetBootCode sets the machine code that is executed on startup if the disk
 	// image is used as a boot volume. This function will never be called if the
@@ -246,11 +241,11 @@ type FileSystemImplementer interface {
 	// If the file system doesn't have explicit support for this defined in the
 	// standard (such as FAT8), it should do nothing and immediately return an
 	// error with [ENOSYS] as the error code.
-	SetBootCode(code []byte) DriverError
+	SetBootCode(code []byte) errors.DriverError
 
 	// GetBootCode returns the machine code that is executed on startup. It will
 	// never be called if [FSFeatures.SupportsBootCode] returns false.
-	GetBootCode() ([]byte, DriverError)
+	GetBootCode() ([]byte, errors.DriverError)
 }
 
 // ObjectHandle is an interface for a way to interact with on-disk file system
@@ -261,7 +256,7 @@ type ObjectHandle interface {
 
 	// Resize changes the size of the object, in bytes. Drivers are responsible
 	// for ensuring the needed number of blocks are allocated or freed.
-	Resize(newSize uint64) DriverError
+	Resize(newSize uint64) errors.DriverError
 
 	// ReadBlocks fills `buffer` with data from a sequence of logical blocks
 	// beginning at `index`. The following guarantees apply:
@@ -269,7 +264,7 @@ type ObjectHandle interface {
 	//   - `buffer` is a nonzero multiple of the size of a block.
 	//   - The read range is guaranteed to be within the current boundaries of
 	//     the object.
-	ReadBlocks(index common.LogicalBlock, buffer []byte) DriverError
+	ReadBlocks(index common.LogicalBlock, buffer []byte) errors.DriverError
 
 	// WriteBlocks writes bytes from `buffer` into a sequence of logical blocks
 	// beginning at `index`. The following guarantees apply:
@@ -277,7 +272,7 @@ type ObjectHandle interface {
 	//   - `buffer` is a nonzero multiple of the size of a block.
 	//   - The write range is guaranteed to be within the current boundaries of
 	//     the object.
-	WriteBlocks(index common.LogicalBlock, data []byte) DriverError
+	WriteBlocks(index common.LogicalBlock, data []byte) errors.DriverError
 
 	// ZeroOutBlocks tells the driver to treat `count` blocks beginning at
 	// `startIndex` as consisting entirely of null bytes (0). It does not change
@@ -293,28 +288,28 @@ type ObjectHandle interface {
 	// the driver *must* set all bytes in these blocks to 0.
 	//
 	// NOTE: It's the driver's responsibility to consolidate holes where possible.
-	ZeroOutBlocks(startIndex common.LogicalBlock, count uint) DriverError
+	ZeroOutBlocks(startIndex common.LogicalBlock, count uint) errors.DriverError
 
 	// Unlink deletes the file system object. For directories, this is guaranteed
 	// to not be called unless [ListDir] returns an empty slice (ignoring "." and
 	// ".." if present).
-	Unlink() DriverError
+	Unlink() errors.DriverError
 
 	// Chmod changes the permission bits of this file system object. Only the
 	// permissions bits will be set in `mode`. File systems that support access
 	// controls but not all aspects (e.g. no executable bit, or no group
 	// permissions) must silently ignore anything they don't recognize.
-	Chmod(mode os.FileMode) DriverError
+	Chmod(mode os.FileMode) errors.DriverError
 
 	// Chown sets the ID of the owning user and group for this object. This
 	// function will never be called if user IDs are not supported. If the file
 	// system doesn't support group IDs, it must ignore `gid`.
-	Chown(uid, gid int) DriverError
+	Chown(uid, gid int) errors.DriverError
 	Chtimes(createdAt, lastAccessed, lastModified, lastChanged, deletedAt time.Time) error
 
 	// ListDir returns a list of the directory entries this object contains. "."
 	// and ".." are ignored if present.
-	ListDir() ([]string, DriverError)
+	ListDir() ([]string, errors.DriverError)
 
 	// Name returns the name of the object itself without any path component.
 	// The root directory, which technically has no name, must return "/".
@@ -334,7 +329,7 @@ type File interface {
 	io.ReaderFrom
 	io.WriterAt
 	io.StringWriter
-	Truncator
+	common.Truncator
 
 	Chdir() error
 	Chmod(mode os.FileMode) error

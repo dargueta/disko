@@ -11,7 +11,7 @@ import (
 	"io"
 
 	"github.com/boljen/go-bitmap"
-	"github.com/dargueta/disko"
+	"github.com/dargueta/disko/errors"
 	c "github.com/dargueta/disko/file_systems/common"
 )
 
@@ -56,7 +56,7 @@ type BlockCache struct {
 //   - `flushCb` writes a single block to the backing storage.
 //   - `resizeCb` resizes the backing storage to a given number of blocks. If
 //     nil is passed for this argument, a stub function is provided that always
-//     returns an error with code [disko.ENOTSUP].
+//     returns an error with code [errors.ENOTSUP].
 func New(
 	bytesPerBlock uint,
 	totalBlocks uint,
@@ -66,7 +66,7 @@ func New(
 ) *BlockCache {
 	if resizeCb == nil {
 		resizeCb = func(newTotalBlocks c.LogicalBlock) error {
-			return disko.NewDriverError(disko.ENOTSUP)
+			return errors.NewDriverError(errors.ENOTSUP)
 		}
 	}
 
@@ -84,7 +84,7 @@ func New(
 
 // WrapStream creates a [BlockCache] that wraps any [io.ReadWriteSeeker],
 // optionally forbidding resizing the stream. To support resizing, `stream` must
-// implement [disko.Truncator], equivalent to [os.File.Truncate].
+// implement [common.Truncator], equivalent to [os.File.Truncate].
 func WrapStream(
 	stream io.ReadWriteSeeker,
 	bytesPerBlock uint,
@@ -121,12 +121,12 @@ func WrapStream(
 	}
 
 	var resizeCb ResizeCallback
-	_, streamHasTruncate := stream.(disko.Truncator)
+	_, streamHasTruncate := stream.(c.Truncator)
 
 	if allowResize && streamHasTruncate {
 		// Resizing the stream is allowed.
 		resizeCb = func(newTotalBlocks c.LogicalBlock) error {
-			truncator := stream.(disko.Truncator)
+			truncator := stream.(c.Truncator)
 			return truncator.Truncate(int64(newTotalBlocks) * int64(bytesPerBlock))
 		}
 	} else {
@@ -135,7 +135,7 @@ func WrapStream(
 		// the functionality *is* supported by Disko, but not this specific
 		// stream.
 		resizeCb = func(newTotalBlocks c.LogicalBlock) error {
-			return disko.NewDriverError(disko.ENOTSUP)
+			return errors.NewDriverError(errors.ENOTSUP)
 		}
 	}
 
@@ -145,8 +145,8 @@ func WrapStream(
 // seekToBlock sets the stream pointer for a stream to the offset of a block.
 func seekToBlock(stream io.Seeker, block, totalBlocks c.LogicalBlock, bytesPerBlock uint) error {
 	if block >= totalBlocks {
-		return disko.NewDriverErrorWithMessage(
-			disko.EINVAL,
+		return errors.NewDriverErrorWithMessage(
+			errors.EINVAL,
 			fmt.Sprintf(
 				"invalid block number: %d not in range [0, %d)",
 				block,

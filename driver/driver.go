@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/dargueta/disko"
+	"github.com/dargueta/disko/errors"
 	"golang.org/x/exp/slices"
 )
 
@@ -42,7 +43,7 @@ func (driver *CommonDriver) normalizePath(path string) string {
 // isn't a symlink, this becomes a no-op and returns the handle unmodified.
 func (driver *CommonDriver) resolveSymlink(
 	object extObjectHandle,
-) (extObjectHandle, disko.DriverError) {
+) (extObjectHandle, errors.DriverError) {
 	stat := object.Stat()
 	if !stat.IsSymlink() {
 		return object, nil
@@ -61,7 +62,7 @@ func (driver *CommonDriver) resolveSymlink(
 		symlinkText, err := driver.getContentsOfObject(object)
 		if err != nil {
 			return nil,
-				disko.NewDriverErrorWithMessage(
+				errors.NewDriverErrorWithMessage(
 					err.Errno(),
 					fmt.Sprintf(
 						"can't resolve path `%s`, failed to read symlink `%s`: %s",
@@ -78,8 +79,8 @@ func (driver *CommonDriver) resolveSymlink(
 		_, exists := pathCache[nextPath]
 		if exists {
 			return nil,
-				disko.NewDriverErrorWithMessage(
-					disko.ELOOP,
+				errors.NewDriverErrorWithMessage(
+					errors.ELOOP,
 					fmt.Sprintf(
 						"found cycle resolving symlink `%s`: hit `%s` twice",
 						originalPath,
@@ -109,7 +110,7 @@ func (driver *CommonDriver) resolveSymlink(
 // `path` must be a normalized absolute path.
 func (driver *CommonDriver) getObjectAtPathNoFollow(
 	path string,
-) (extObjectHandle, disko.DriverError) {
+) (extObjectHandle, errors.DriverError) {
 	if path == "/" || path == "" {
 		root := driver.implementation.GetRootDirectory()
 		return wrapObjectHandle(root, path), nil
@@ -124,8 +125,8 @@ func (driver *CommonDriver) getObjectAtPathNoFollow(
 	parentStat := parentObject.Stat()
 	if !parentStat.IsDir() {
 		return nil,
-			disko.NewDriverErrorWithMessage(
-				disko.ENOTDIR,
+			errors.NewDriverErrorWithMessage(
+				errors.ENOTDIR,
 				fmt.Sprintf(
 					"cannot resolve path `%s`: `%s` is not a directory",
 					path,
@@ -140,7 +141,7 @@ func (driver *CommonDriver) getObjectAtPathNoFollow(
 
 func (driver *CommonDriver) getObjectAtPathFollowingLink(
 	path string,
-) (extObjectHandle, disko.DriverError) {
+) (extObjectHandle, errors.DriverError) {
 	object, err := driver.getObjectAtPathNoFollow(path)
 	if err != nil {
 		return nil, err
@@ -163,10 +164,10 @@ func (driver *CommonDriver) getObjectAtPathFollowingLink(
 // are not followed.
 func (driver *CommonDriver) getContentsOfObject(
 	object extObjectHandle,
-) ([]byte, disko.DriverError) {
+) ([]byte, errors.DriverError) {
 	handle, err := NewFileFromObjectHandle(driver, object, disko.O_RDONLY)
 	if err != nil {
-		return nil, disko.NewDriverErrorFromError(disko.EIO, err)
+		return nil, errors.NewDriverErrorFromError(errors.EIO, err)
 	}
 	defer handle.Close()
 
@@ -175,7 +176,7 @@ func (driver *CommonDriver) getContentsOfObject(
 
 	_, readError := handle.Read(buffer)
 	if readError != nil {
-		return nil, disko.NewDriverErrorFromError(disko.EIO, readError)
+		return nil, errors.NewDriverErrorFromError(errors.EIO, readError)
 	}
 	return buffer, nil
 }
@@ -184,7 +185,7 @@ func (driver *CommonDriver) getContentsOfObject(
 // returns an [extObjectHandle].
 func (driver *CommonDriver) getExtObjectInDir(
 	baseName string, parentObject extObjectHandle,
-) (extObjectHandle, disko.DriverError) {
+) (extObjectHandle, errors.DriverError) {
 	object, err := driver.implementation.GetObject(baseName, parentObject)
 	if err != nil {
 		return nil, err
@@ -198,7 +199,7 @@ func (driver *CommonDriver) getExtObjectInDir(
 // returns an [extObjectHandle].
 func (driver *CommonDriver) createExtObject(
 	baseName string, parentObject extObjectHandle, perm os.FileMode,
-) (extObjectHandle, disko.DriverError) {
+) (extObjectHandle, errors.DriverError) {
 	rawObject, err := driver.implementation.CreateObject(
 		baseName,
 		parentObject,
@@ -224,8 +225,8 @@ func (driver *CommonDriver) OpenFile(
 	ioFlags := disko.IOFlags(flags)
 
 	if ioFlags.RequiresWritePerm() && !driver.mountFlags.CanWrite() {
-		return File{}, disko.NewDriverErrorWithMessage(
-			disko.EROFS,
+		return File{}, errors.NewDriverErrorWithMessage(
+			errors.EROFS,
 			fmt.Sprintf(
 				"can't open `%s` for writing: image is mounted read-only",
 				absPath,
@@ -237,7 +238,7 @@ func (driver *CommonDriver) OpenFile(
 	if err != nil {
 		// An error occurred. If the file is missing we may be able to create it
 		// and proceed.
-		if err.Errno() == disko.ENOENT {
+		if err.Errno() == errors.ENOENT {
 			// File does not exist, can we create it?
 			if ioFlags.Create() {
 				// To create the missing file, we need to get a handle for its
@@ -268,8 +269,8 @@ func (driver *CommonDriver) OpenFile(
 	stat := object.Stat()
 	if !stat.IsFile() {
 		return File{},
-			disko.NewDriverErrorWithMessage(
-				disko.EISDIR,
+			errors.NewDriverErrorWithMessage(
+				errors.EISDIR,
 				fmt.Sprintf("`%s` isn't a regular file", absPath),
 			)
 	}
@@ -293,8 +294,8 @@ func (driver *CommonDriver) chdirToObject(object extObjectHandle) error {
 	absPath := object.AbsolutePath()
 	stat := object.Stat()
 	if !stat.IsDir() {
-		return disko.NewDriverErrorWithMessage(
-			disko.ENOTDIR,
+		return errors.NewDriverErrorWithMessage(
+			errors.ENOTDIR,
 			fmt.Sprintf("not a directory: `%s`", absPath),
 		)
 	}
@@ -378,8 +379,8 @@ func (driver *CommonDriver) Readlink(path string) (string, error) {
 
 	stat := object.Stat()
 	if !stat.IsSymlink() {
-		return "", disko.NewDriverErrorWithMessage(
-			disko.EINVAL,
+		return "", errors.NewDriverErrorWithMessage(
+			errors.EINVAL,
 			fmt.Sprintf("`%s` is not a symlink", path),
 		)
 	}
@@ -451,14 +452,14 @@ func (driver *CommonDriver) Remove(path string) error {
 		// If there are any other entries in here the directory isn't empty and
 		// we must fail.
 		if len(names) > 0 {
-			return disko.NewDriverErrorWithMessage(
-				disko.ENOTEMPTY,
+			return errors.NewDriverErrorWithMessage(
+				errors.ENOTEMPTY,
 				fmt.Sprintf("can't remove `%s`: directory not empty", absPath),
 			)
 		}
 	} else if !stat.IsFile() {
-		return disko.NewDriverErrorWithMessage(
-			disko.EINVAL,
+		return errors.NewDriverErrorWithMessage(
+			errors.EINVAL,
 			fmt.Sprintf("can't remove `%s`: not a file or directory", absPath),
 		)
 	}
@@ -511,8 +512,8 @@ func (driver *CommonDriver) Mkdir(path string, perm os.FileMode) error {
 
 	parentStat := parentObject.Stat()
 	if !parentStat.IsDir() {
-		return disko.NewDriverErrorWithMessage(
-			disko.ENOTDIR,
+		return errors.NewDriverErrorWithMessage(
+			errors.ENOTDIR,
 			fmt.Sprintf(
 				"cannot create `%s`: `%s is not a directory",
 				absPath,
@@ -535,7 +536,7 @@ func (driver *CommonDriver) MkdirAll(path string, perm os.FileMode) error {
 
 	parentObject, err := driver.getObjectAtPathFollowingLink(parentDir)
 	if err != nil {
-		if err.Errno() == disko.ENOENT {
+		if err.Errno() == errors.ENOENT {
 			// Parent directory doesn't exist, create it.
 			driver.MkdirAll(parentDir, perm)
 		} else {
@@ -557,8 +558,8 @@ func (driver *CommonDriver) RemoveAll(path string) error {
 
 	stat := directory.Stat()
 	if !stat.IsDir() {
-		return disko.NewDriverErrorWithMessage(
-			disko.ENOTDIR,
+		return errors.NewDriverErrorWithMessage(
+			errors.ENOTDIR,
 			fmt.Sprintf("cannot remove `%s`: not a directory", path),
 		)
 	}
