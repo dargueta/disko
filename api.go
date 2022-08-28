@@ -70,20 +70,20 @@ const MountFlagsMask = MountFlagsCustomStart - 1
 // FileSystemImplementer is the interface required for all file system
 // implementations.
 type FileSystemImplementer interface {
-	// Mount initializes the driver implementation. `image` is owned by the
-	// main driver
-	Initialize(image *blockcache.BlockCache, flags MountFlags) errors.DriverError
+	// Mount initializes the file system implementation. `image` is owned by the
+	// main driver.
+	Mount(image *blockcache.BlockCache, flags MountFlags) errors.DriverError
 
-	// Close writes out all pending changes to the disk image and releases any
+	// Unmount writes out all pending changes to the disk image and releases any
 	// resources the implementation may be holding.
-	Close() errors.DriverError
+	Unmount() errors.DriverError
 
 	// CreateObject creates an object on the file system that is *not* a
 	// directory.
 	//
 	// The following guarantees apply:
 	//
-	// 	- This will never be called for an object that already exists
+	// 	- This will never be called for an object that already exists;
 	//  - `parent` will always be a valid object handle.
 	CreateObject(
 		name string,
@@ -96,7 +96,7 @@ type FileSystemImplementer interface {
 	//
 	// The following guarantees apply:
 	//
-	// 	- This will never be called for a nonexistent object
+	// 	- This will never be called for a nonexistent object;
 	//	- `parent` will always be a valid object handle.
 	GetObject(
 		name string,
