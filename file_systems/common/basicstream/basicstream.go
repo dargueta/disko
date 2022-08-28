@@ -18,6 +18,7 @@ import (
 // subset of the functionality provided by an [os.File] instance.
 type BasicStream struct {
 	// Interfaces
+	c.Truncator
 	io.Closer
 	io.ReaderAt
 	io.ReaderFrom
@@ -71,8 +72,8 @@ func New(
 
 // convertLinearAddr converts a byte offset into a block+block offset pair. It
 // disregards the actual size of the stream, so it's possible to generate
-// offsets beyond the end of the stream. `offs` is guaranteed to be in the
-// range [0, BytesPerBlock).
+// offsets beyond the end of the stream. `offs` is guaranteed to be in the range
+// [0, BytesPerBlock).
 func (stream *BasicStream) convertLinearAddr(offset int64) (blk c.LogicalBlock, offs uint) {
 	bytesPerBlock := int64(stream.data.BytesPerBlock())
 	blk = c.LogicalBlock(offset / bytesPerBlock)
@@ -86,6 +87,7 @@ func (stream *BasicStream) Close() error {
 	return stream.Sync()
 }
 
+// Read implements [io.Reader].
 func (stream *BasicStream) Read(buffer []byte) (int, error) {
 	totalRead, err := stream.ReadAt(buffer, stream.position)
 	stream.position += int64(totalRead)
@@ -217,8 +219,8 @@ func (stream *BasicStream) Tell() int64 {
 	return stream.position
 }
 
-// Truncate resizes the stream to the given number of bytes but does not move
-// the stream pointer.
+// Truncate resizes the stream to the given number of bytes but doesn't move the
+// stream pointer.
 func (stream *BasicStream) Truncate(size int64) error {
 	if !stream.ioFlags.Write() {
 		return errors.New(errors.EPERM)

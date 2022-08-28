@@ -4,7 +4,8 @@ import (
 	"fmt"
 )
 
-// DriverError is a wrapper around system errno codes, with a customizable error message.
+// DriverError is a wrapper around system errno codes, with a customizable error
+// message.
 type DriverError interface {
 	error
 	Errno() Errno

@@ -118,6 +118,10 @@ type FileSystemImplementer interface {
 	// features or not.
 	GetFSFeatures() FSFeatures
 
+	// FormatImage creates a new blank file system on the given image, using
+	// characteristics defined in `stat`. `image` will be the correct size and
+	// filled with null bytes before this function is called, and the stream
+	// pointer will be set to 0.
 	FormatImage(
 		image io.ReadWriteSeeker,
 		stat FSStat,
