@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dargueta/disko/drivers/common"
+	"github.com/dargueta/disko/drivers/common/blockcache"
 )
 
 type MountFlags int
@@ -182,9 +183,17 @@ type Truncator interface {
 	Truncate(size int64) error
 }
 
-// DriverImplementation is an interface that drivers must implement to get all
-// default functionality from the CommonDriver.
-type DriverImplementation interface {
+// FileSystemImplementer is the interface required for all file system
+// implementations.
+type FileSystemImplementer interface {
+	// Mount initializes the driver implementation. `image` is owned by the
+	// main driver
+	Initialize(image *blockcache.BlockCache, flags MountFlags) DriverError
+
+	// Close writes out all pending changes to the disk image and releases any
+	// resources the implementation may be holding.
+	Close() DriverError
+
 	// CreateObject creates an object on the file system that is *not* a
 	// directory.
 	//
@@ -238,6 +247,9 @@ type DriverImplementation interface {
 	// standard (such as FAT8), it should do nothing and immediately return an
 	// error with [ENOSYS] as the error code.
 	SetBootCode(code []byte) DriverError
+
+	// GetBootCode returns the machine code that is executed on startup. It will
+	// never be called if [FSFeatures.SupportsBootCode] returns false.
 	GetBootCode() ([]byte, DriverError)
 }
 

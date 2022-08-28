@@ -13,12 +13,12 @@ import (
 ////////////////////////////////////////////////////////////////////////////////
 
 type CommonDriver struct {
-	implementation disko.DriverImplementation
+	implementation disko.FileSystemImplementer
 	mountFlags     disko.MountFlags
 	workingDirPath string
 }
 
-func NewDriver(implementation disko.DriverImplementation, mountFlags disko.MountFlags) *CommonDriver {
+func NewDriver(implementation disko.FileSystemImplementer, mountFlags disko.MountFlags) *CommonDriver {
 	return &CommonDriver{
 		implementation: implementation,
 		mountFlags:     mountFlags,
