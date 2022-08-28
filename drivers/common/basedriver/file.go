@@ -143,8 +143,7 @@ func (file *File) Chown(uid, gid int) error {
 }
 
 func (file *File) Close() error {
-	file.BasicStream.Close()
-	return file.owningDriver.implementation.MarkFileClosed(file)
+	return file.BasicStream.Close()
 }
 
 func (file *File) Name() string {

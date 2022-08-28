@@ -16,7 +16,7 @@ type DirectoryEntry struct {
 	stat disko.FileStat
 }
 
-func NewDirectoryEntryFromHandle(object ObjectHandle) DirectoryEntry {
+func NewDirectoryEntryFromHandle(object disko.ObjectHandle) DirectoryEntry {
 	return DirectoryEntry{
 		name: object.Name(),
 		stat: object.Stat(),

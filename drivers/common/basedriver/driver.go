@@ -2,7 +2,6 @@ package basedriver
 
 import (
 	"fmt"
-	"io"
 	"os"
 	posixpath "path"
 	"path/filepath"
@@ -13,72 +12,13 @@ import (
 
 ////////////////////////////////////////////////////////////////////////////////
 
-// DriverImplementation is an interface that drivers must implement to get all
-// default functionality from the CommonDriver.
-type DriverImplementation interface {
-	// CreateObject creates an object on the file system that is *not* a
-	// directory. The following guarantees apply: A) this will never be called
-	// for an object that already exists; B) `parent` will always be a valid
-	// object handle.
-	CreateObject(
-		name string,
-		parent ObjectHandle,
-		perm os.FileMode,
-	) (ObjectHandle, disko.DriverError)
-
-	// GetObject returns a handle to an object with the given name in a directory
-	// specified by `parent`. The following guarantees apply: A) this will never
-	// be called for a nonexistent object; B) `parent` will always be a valid
-	// object handle.
-	GetObject(
-		name string,
-		parent ObjectHandle,
-	) (ObjectHandle, disko.DriverError)
-
-	// GetRootDirectory returns a handle to the root directory of the disk image.
-	// This must always be a valid object handle, even if directories are not
-	// supported by the file system (e.g. FAT8).
-	GetRootDirectory() ObjectHandle
-
-	// MarkFileClosed is a provisional function and should be ignored for the
-	// time being.
-	MarkFileClosed(file *File) disko.DriverError
-
-	// FSStat returns information about the file system. Multiple calls to this
-	// function should return identical data if no modifications have been made
-	// to the file system.
-	FSStat() disko.FSStat
-
-	// GetFSFeatures returns an interface that gives the various features the
-	// file system supports, regardless of whether the driver implements these
-	// features or not.
-	GetFSFeatures() disko.FSFeatures
-
-	FormatImage(
-		image io.ReadWriteSeeker,
-		stat disko.FSStat,
-	) disko.DriverError
-
-	// SetBootCode sets the machine code that is executed on startup if the disk
-	// image is used as a boot volume. This function will never be called if the
-	// [disko.FSFeatures.SupportsBootCode] returns false.
-
-	// If the file system doesn't have explicit
-	// support for this defined in the standard (such as FAT8), it should do
-	// nothing and immediately return an error with ENOSYS as the error code.
-	//
-	//
-	SetBootCode(code []byte) disko.DriverError
-	GetBootCode() ([]byte, disko.DriverError)
-}
-
 type CommonDriver struct {
-	implementation DriverImplementation
+	implementation disko.DriverImplementation
 	mountFlags     disko.MountFlags
 	workingDirPath string
 }
 
-func NewDriver(implementation DriverImplementation, mountFlags disko.MountFlags) *CommonDriver {
+func NewDriver(implementation disko.DriverImplementation, mountFlags disko.MountFlags) *CommonDriver {
 	return &CommonDriver{
 		implementation: implementation,
 		mountFlags:     mountFlags,

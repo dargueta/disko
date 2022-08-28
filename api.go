@@ -5,6 +5,8 @@ import (
 	"math"
 	"os"
 	"time"
+
+	"github.com/dargueta/disko/drivers/common"
 )
 
 type MountFlags int
@@ -176,6 +178,123 @@ type Truncator interface {
 	Truncate(size int64) error
 }
 
+// DriverImplementation is an interface that drivers must implement to get all
+// default functionality from the CommonDriver.
+type DriverImplementation interface {
+	// CreateObject creates an object on the file system that is *not* a
+	// directory. The following guarantees apply: A) this will never be called
+	// for an object that already exists; B) `parent` will always be a valid
+	// object handle.
+	CreateObject(
+		name string,
+		parent ObjectHandle,
+		perm os.FileMode,
+	) (ObjectHandle, DriverError)
+
+	// GetObject returns a handle to an object with the given name in a directory
+	// specified by `parent`. The following guarantees apply: A) this will never
+	// be called for a nonexistent object; B) `parent` will always be a valid
+	// object handle.
+	GetObject(
+		name string,
+		parent ObjectHandle,
+	) (ObjectHandle, DriverError)
+
+	// GetRootDirectory returns a handle to the root directory of the disk image.
+	// This must always be a valid object handle, even if directories are not
+	// supported by the file system (e.g. FAT8).
+	GetRootDirectory() ObjectHandle
+
+	// FSStat returns information about the file system. Multiple calls to this
+	// function should return identical data if no modifications have been made
+	// to the file system.
+	FSStat() FSStat
+
+	// GetFSFeatures returns an interface that gives the various features the
+	// file system supports, regardless of whether the driver implements these
+	// features or not.
+	GetFSFeatures() FSFeatures
+
+	FormatImage(
+		image io.ReadWriteSeeker,
+		stat FSStat,
+	) DriverError
+
+	// SetBootCode sets the machine code that is executed on startup if the disk
+	// image is used as a boot volume. This function will never be called if the
+	// [FSFeatures.SupportsBootCode] returns false.
+
+	// If the file system doesn't have explicit
+	// support for this defined in the standard (such as FAT8), it should do
+	// nothing and immediately return an error with ENOSYS as the error code.
+	//
+	//
+	SetBootCode(code []byte) DriverError
+	GetBootCode() ([]byte, DriverError)
+}
+
+// ObjectHandle is an interface for a way to interact with on-disk file system
+// objects.
+type ObjectHandle interface {
+	// Stat returns information on the status of the file as it appears on disk.
+	Stat() FileStat
+
+	// Resize changes the size of the object, in bytes. Drivers are responsible
+	// for ensuring the needed number of blocks are allocated or freed.
+	Resize(newSize uint64) DriverError
+
+	// ReadBlocks fills `buffer` with data from a sequence of logical blocks
+	// beginning at `index`. The following guarantees apply:
+	//
+	//   - `buffer` is a nonzero multiple of the size of a block.
+	//   - The read range is guaranteed to be within the current boundaries of
+	//     the object.
+	ReadBlocks(index common.LogicalBlock, buffer []byte) DriverError
+
+	// WriteBlocks writes bytes from `buffer` into a sequence of logical blocks
+	// beginning at `index`. The following guarantees apply:
+	//
+	//   - `buffer` is a nonzero multiple of the size of a block.
+	//   - The write range is guaranteed to be within the current boundaries of
+	//     the object.
+	WriteBlocks(index common.LogicalBlock, data []byte) DriverError
+
+	// ZeroOutBlocks tells the driver to treat `count` blocks beginning at
+	// `startIndex` as consisting entirely of null bytes (0). It does not change
+	// the size of the object.
+	//
+	// Functionally, it's equivalent to:
+	//
+	//		buffer := make([]byte, BlockSize * NUM_BLOCKS)
+	//		WriteBlocks(START_BLOCK, buffer)
+	//
+	// However, some file systems have optimizations for such "holes" that can
+	// save disk space. If the file system doesn't support hole optimization,
+	// the driver *must* set all bytes in these blocks to 0.
+	//
+	// NOTE: It's the driver's responsibility to consolidate holes where possible.
+	ZeroOutBlocks(startIndex common.LogicalBlock, count uint) DriverError
+
+	// Unlink deletes the file system object. For directories, this is guaranteed
+	// to not be called unless [ListDir] returns an empty slice (ignoring "." and
+	// ".." if present).
+	Unlink() DriverError
+
+	// Chmod changes the permission bits of this file system object. Only the
+	// permissions bits will be set.
+	Chmod(mode os.FileMode) DriverError
+	Chown(uid, gid int) DriverError
+	Chtimes(createdAt, lastAccessed, lastModified, lastChanged, deletedAt time.Time) error
+
+	// ListDir returns a list of the directory entries this object contains. "."
+	// and ".." are ignored if present.
+	ListDir() ([]string, DriverError)
+
+	// Name returns the name of the object itself without any path component.
+	// The root directory, which technically has no name, must return "/".
+	Name() string
+}
+
 // File is the expected interface for file handles from drivers.
 //
 // This interface is intended to be more or less a drop-in replacement for
@@ -235,7 +354,7 @@ type FormattingDriver interface {
 // OpeningDriver is the interface for drivers implementing the POSIX open(3) function.
 //
 // Drivers need not implement all functionality for valid flags. For example,
-// read-only drivers must return an error if called with the disko.O_CREATE flag.
+// read-only drivers must return an error if called with the O_CREATE flag.
 type OpeningDriver interface {
 	// OpenFile is equivalent to [os.OpenFile].
 	OpenFile(path string, flag IOFlags, perm os.FileMode) (File, error)
