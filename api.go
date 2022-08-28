@@ -287,33 +287,30 @@ func (stat *FileStat) IsSymlink() bool {
 }
 
 // FSStat is a platform-independent form of [syscall.Statfs_t].
-type FSStat struct {
+type FSStat interface {
 	// BlockSize is the size of a logical block on the file system, in bytes.
-	BlockSize int64
+	BlockSize() uint
 	// TotalBlocks is the total number of blocks on the disk image.
-	TotalBlocks uint64
+	TotalBlocks() uint64
 	// BlocksFree is the number of unallocated blocks on the image.
-	BlocksFree uint64
+	BlocksFree() uint64
 	// BlocksAvailable is the number of blocks available for use by user data.
-	// This should always be less than or equal to BlocksFree.
-	BlocksAvailable uint64
+	// This should always be less than or equal to [FSStat.BlocksFree].
+	BlocksAvailable() uint64
 	// Files is the total number of used directory entries on the file system.
-	// Drivers should set this to 0 if the information is not available.
-	Files uint64
+	// Implementations should return 0 if the information is not available.
+	Files() uint64
 	// FilesFree is the number of remaining directory entries available for use.
-	// Drivers should set this to [math.MaxUint64] for file systems that have
+	// Implementations should return [math.MaxUint64] for file systems that have
 	// no limit on the maximum number of directory entries.
-	FilesFree uint64
+	FilesFree() uint64
 	// FileSystemID is the serial number for the disk image, if available.
-	FileSystemID uint64
-	// MaxNameLength is the longest possible name for a directory entry, in bytes.
-	// Drivers should set this to [math.MaxInt64] if there is no limit.
-	MaxNameLength int64
-	// Flags is free for drivers to use as they see fit, but mostly to preserve
-	// flags present in the boot block. Driver-agnostic functions will ignore it.
-	Flags int64
+	FileSystemID() string
+	// MaxNameLength is the longest possible name for a directory entry, in
+	// bytes. Implementations should return [math.MaxUint] if there is no limit.
+	MaxNameLength() uint
 	// Label is the volume label, if available.
-	Label string
+	Label() string
 }
 
 // File is the expected interface for file handles from drivers.
