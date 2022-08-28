@@ -9,6 +9,8 @@ import (
 	"github.com/boljen/go-bitmap"
 	"github.com/dargueta/disko"
 	"github.com/dargueta/disko/drivers/common"
+	"github.com/dargueta/disko/drivers/common/blockcache"
+	"github.com/dargueta/disko/errors"
 )
 
 type PhysicalBlock uint16
@@ -41,15 +43,12 @@ const CanonicalDefaultDirectoryPermissions = disko.S_IFDIR | disko.S_IRUSR |
 var fsEpoch time.Time = time.Date(1971, 1, 1, 0, 0, 0, 0, nil)
 
 type UnixV1Driver struct {
-	disko.FormattingDriver // Done
-	disko.OpeningDriver
-	disko.ReadingDriver // Done
-	BlockFreeMap        bitmap.Bitmap
-	Inodes              []Inode
-	isMounted           bool
-	rawStream           io.ReadWriteSeeker
-	image               common.BlockStream
-	currentMountFlags   disko.MountFlags
+	BlockFreeMap      bitmap.Bitmap
+	Inodes            []Inode
+	isMounted         bool
+	rawStream         io.ReadWriteSeeker
+	image             *blockcache.BlockCache
+	currentMountFlags disko.MountFlags
 }
 
 const TimestampResolution time.Duration = time.Second / 60
@@ -84,7 +83,7 @@ func (driver *UnixV1Driver) Mount(flags disko.MountFlags) error {
 		if driver.currentMountFlags == flags {
 			return nil
 		}
-		return disko.NewDriverError(disko.EALREADY)
+		return errors.NewDriverError(errors.EALREADY)
 	}
 
 	driver.currentMountFlags = flags
@@ -113,7 +112,7 @@ func (driver *UnixV1Driver) Mount(flags disko.MountFlags) error {
 				" bytes together, got %d",
 			blockBitmapSize+inodeBitmapSize,
 		)
-		return disko.NewDriverErrorWithMessage(disko.EUCLEAN, message)
+		return errors.NewDriverErrorWithMessage(errors.EUCLEAN, message)
 	}
 
 	inodeBitmap := make([]byte, inodeBitmapSize)
@@ -145,11 +144,11 @@ func (driver *UnixV1Driver) Unmount() error {
 
 func (driver *UnixV1Driver) GetFSInfo() (disko.FSStat, error) {
 	if !driver.isMounted {
-		return disko.FSStat{}, disko.NewDriverError(disko.EIO)
+		return disko.FSStat{}, errors.NewDriverError(errors.EIO)
 	}
 
 	freeBlocks := uint64(0)
-	for i := 0; i < int(driver.image.TotalBlocks); i++ {
+	for i := 0; i < int(driver.image.TotalBlocks()); i++ {
 		if driver.BlockFreeMap.Get(i) {
 			freeBlocks++
 		}
@@ -164,9 +163,9 @@ func (driver *UnixV1Driver) GetFSInfo() (disko.FSStat, error) {
 
 	return disko.FSStat{
 		BlockSize:       512,
-		TotalBlocks:     uint64(driver.image.TotalBlocks),
+		TotalBlocks:     uint64(driver.image.TotalBlocks()),
 		BlocksFree:      freeBlocks,
-		BlocksAvailable: uint64(driver.image.TotalBlocks) - freeBlocks,
+		BlocksAvailable: uint64(driver.image.TotalBlocks()) - freeBlocks,
 		Files:           totalFiles,
 		FilesFree:       uint64(len(driver.Inodes)),
 		MaxNameLength:   8,

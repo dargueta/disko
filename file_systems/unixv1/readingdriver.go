@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/dargueta/disko"
+	"github.com/dargueta/disko/errors"
 )
 
 func (driver *UnixV1Driver) SameFile(fi1, fi2 os.FileInfo) bool {
@@ -25,8 +26,8 @@ func (driver *UnixV1Driver) ReadDir(path string) ([]disko.DirectoryEntry, error)
 	}
 
 	if !inode.IsDir() {
-		err = disko.NewDriverErrorWithMessage(
-			disko.ENOTDIR,
+		err = errors.NewDriverErrorWithMessage(
+			errors.ENOTDIR,
 			fmt.Sprintf("`%s` is not a directory", path),
 		)
 	}
@@ -57,8 +58,8 @@ func (driver *UnixV1Driver) ReadFile(path string) ([]byte, error) {
 	}
 
 	if !inode.IsFile() {
-		err = disko.NewDriverErrorWithMessage(
-			disko.EISDIR,
+		err = errors.NewDriverErrorWithMessage(
+			errors.EISDIR,
 			fmt.Sprintf("`%s` is not a file", path),
 		)
 	}
