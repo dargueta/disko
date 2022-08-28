@@ -14,10 +14,9 @@ Why the name? Disk + Go -> DiskGo -> Disko. Obviously.
 API
 ---
 
-At time of writing (July 2022) I'm doing an overhaul of the API. Ignore most of
-``api.go``; I've managed to implement most of the ``Driver`` interface while
-needing a much simpler (albeit more abstract) interface from file system
-implementations. This should greatly simplify adding new drivers.
+Disko's ``Driver`` type requires a file system implementation with a minimal
+interface. For details on the functions that need to be implemented, see
+``DriverImplementation`` in ``api.go``.
 
 **Symbols**
 
