@@ -6,10 +6,8 @@ import (
 	"os"
 	posixpath "path"
 	"path/filepath"
-	"time"
 
 	"github.com/dargueta/disko"
-	"github.com/dargueta/disko/drivers/common"
 	"golang.org/x/exp/slices"
 )
 
@@ -51,12 +49,27 @@ type DriverImplementation interface {
 	// to the file system.
 	FSStat() disko.FSStat
 
+	// GetFSFeatures returns an interface that gives the various features the
+	// file system supports, regardless of whether the driver implements these
+	// features or not.
 	GetFSFeatures() disko.FSFeatures
 
 	FormatImage(
 		image io.ReadWriteSeeker,
-		totalSize int64,
-	) error
+		stat disko.FSStat,
+	) disko.DriverError
+
+	// SetBootCode sets the machine code that is executed on startup if the disk
+	// image is used as a boot volume. This function will never be called if the
+	// [disko.FSFeatures.SupportsBootCode] returns false.
+
+	// If the file system doesn't have explicit
+	// support for this defined in the standard (such as FAT8), it should do
+	// nothing and immediately return an error with ENOSYS as the error code.
+	//
+	//
+	SetBootCode(code []byte) disko.DriverError
+	GetBootCode() ([]byte, disko.DriverError)
 }
 
 type CommonDriver struct {
@@ -100,7 +113,8 @@ func (driver *CommonDriver) resolveSymlink(
 	// dictionary, we found a loop and must fail.
 	pathCache := make(map[string]bool)
 
-	currentPath := object.AbsolutePath()
+	originalPath := object.AbsolutePath()
+	currentPath := originalPath
 	pathCache[currentPath] = true
 
 	for stat.IsSymlink() {
@@ -111,7 +125,7 @@ func (driver *CommonDriver) resolveSymlink(
 					err.Errno(),
 					fmt.Sprintf(
 						"can't resolve path `%s`, failed to read symlink `%s`: %s",
-						path,
+						originalPath,
 						currentPath,
 						err.Error(),
 					),
@@ -128,7 +142,7 @@ func (driver *CommonDriver) resolveSymlink(
 					disko.ELOOP,
 					fmt.Sprintf(
 						"found cycle resolving symlink `%s`: hit `%s` twice",
-						path,
+						originalPath,
 						nextPath,
 					),
 				)
@@ -157,7 +171,8 @@ func (driver *CommonDriver) getObjectAtPathNoFollow(
 	path string,
 ) (extObjectHandle, disko.DriverError) {
 	if path == "/" || path == "" {
-		return driver.implementation.GetRootDirectory(), nil
+		root := driver.implementation.GetRootDirectory()
+		return wrapObjectHandle(root, path), nil
 	}
 
 	parentPath, baseName := posixpath.Split(path)
@@ -180,8 +195,7 @@ func (driver *CommonDriver) getObjectAtPathNoFollow(
 
 	}
 
-	object := driver.implementation.GetObject(baseName, parentObject)
-	return wrapObjectHandle(object, path), nil
+	return driver.getExtObjectInDir(baseName, parentObject)
 }
 
 func (driver *CommonDriver) getObjectAtPathFollowingLink(
@@ -226,6 +240,39 @@ func (driver *CommonDriver) getContentsOfObject(
 	return buffer, nil
 }
 
+// getExtObjectInDir is a wrapper around [DriverImplementation.GetObject] that
+// returns an [extObjectHandle].
+func (driver *CommonDriver) getExtObjectInDir(
+	baseName string, parentObject extObjectHandle,
+) (extObjectHandle, disko.DriverError) {
+	object, err := driver.implementation.GetObject(baseName, parentObject)
+	if err != nil {
+		return nil, err
+	}
+
+	absPath := posixpath.Join(parentObject.AbsolutePath(), baseName)
+	return wrapObjectHandle(object, absPath), nil
+}
+
+// createExtObject is a wrapper around [DriverImplementation.CreateObject] that
+// returns an [extObjectHandle].
+func (driver *CommonDriver) createExtObject(
+	baseName string, parentObject extObjectHandle, perm os.FileMode,
+) (extObjectHandle, disko.DriverError) {
+	rawObject, err := driver.implementation.CreateObject(
+		baseName,
+		parentObject,
+		perm,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	absPath := posixpath.Join(parentObject.AbsolutePath(), baseName)
+	object := wrapObjectHandle(rawObject, absPath)
+	return object, nil
+}
+
 // OpeningDriver ---------------------------------------------------------------
 
 func (driver *CommonDriver) OpenFile(
@@ -262,7 +309,7 @@ func (driver *CommonDriver) OpenFile(
 					// Parent directory doesn't exist
 					return File{}, err
 				}
-				object, err = driver.implementation.CreateObject(
+				object, err = driver.createExtObject(
 					baseName,
 					parentObject,
 					perm,
@@ -299,7 +346,7 @@ func (driver *CommonDriver) Chdir(path string) error {
 	if err != nil {
 		return err
 	}
-	return driver.chdirToObject(object, absPath)
+	return driver.chdirToObject(object)
 }
 
 func (driver *CommonDriver) chdirToObject(object extObjectHandle) error {
@@ -361,7 +408,7 @@ func (driver *CommonDriver) ReadDir(path string) ([]disko.DirectoryEntry, error)
 		return nil, err
 	}
 
-	output := make([]disko.DirectoryEntry, 0, len(dirents))
+	output := make([]disko.DirectoryEntry, 0, len(direntNames))
 	for _, name := range direntNames {
 		// Ignore "." and ".." entries if present
 		if name == "." || name == ".." {
@@ -463,7 +510,7 @@ func (driver *CommonDriver) Remove(path string) error {
 
 		// If there are any other entries in here the directory isn't empty and
 		// we must fail.
-		if len(dirents) > 0 {
+		if len(names) > 0 {
 			return disko.NewDriverErrorWithMessage(
 				disko.ENOTEMPTY,
 				fmt.Sprintf("can't remove `%s`: directory not empty", absPath),
@@ -561,7 +608,6 @@ func (driver *CommonDriver) MkdirAll(path string, perm os.FileMode) error {
 	return err
 }
 
-
 func (driver *CommonDriver) RemoveAll(path string) error {
 	path = driver.normalizePath(path)
 	directory, err := driver.getObjectAtPathFollowingLink(path)
@@ -580,7 +626,6 @@ func (driver *CommonDriver) RemoveAll(path string) error {
 	return driver.removeDirectory(directory)
 }
 
-
 // removeDirectory is equivalent to `rm -rf` for a directory handle.
 //
 // Deletion is depth-first, and terminates on the first error encountered.
@@ -598,14 +643,20 @@ func (driver *CommonDriver) removeDirectory(directory extObjectHandle) error {
 			continue
 		}
 
-		dirent, err := driver.implementation.GetObject(directory, name)
+		dirent, err := driver.getExtObjectInDir(name, directory)
+		if err != nil {
+			return err
+		}
+
 		direntStat := dirent.Stat()
 
 		// If this is a directory, recursively delete its contents.
 		if direntStat.IsDir() {
-			err = driver.removeDirectory(dirent)
-			if err != nil {
-				return err
+			absPath := posixpath.Join(directory.AbsolutePath(), name)
+			wrappedDirent := wrapObjectHandle(dirent, absPath)
+			rmErr := driver.removeDirectory(wrappedDirent)
+			if rmErr != nil {
+				return rmErr
 			}
 		}
 
