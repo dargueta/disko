@@ -1,5 +1,12 @@
 package basedriver
 
+import (
+	"os"
+	"time"
+
+	"github.com/dargueta/disko"
+	"github.com/dargueta/disko/drivers/common"
+)
 
 // ObjectHandle is an interface for a way to interact with on-disk file system
 // objects.
@@ -73,11 +80,11 @@ type tExtObjectHandle struct {
 	absolutePath string
 }
 
-
 // wrapObjectHandle combines
 func wrapObjectHandle(handle ObjectHandle, absolutePath string) extObjectHandle {
 	return tExtObjectHandle{
-		ObjectHandle: handle,
+		// FIXME (dargueta): This is hella wrong
+		//extObjectHandle.ObjectHandle: handle,
 		absolutePath: absolutePath,
 	}
 }

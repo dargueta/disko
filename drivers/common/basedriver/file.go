@@ -148,7 +148,7 @@ func (file *File) Close() error {
 }
 
 func (file *File) Name() string {
-	return file.fileInfo.name
+	return file.objectHandle.Name()
 }
 
 func (file *File) Stat() (os.FileInfo, error) {
