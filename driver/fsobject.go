@@ -1,4 +1,4 @@
-package basedriver
+package driver
 
 import "github.com/dargueta/disko"
 

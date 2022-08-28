@@ -12,7 +12,7 @@ import (
 
 	"github.com/boljen/go-bitmap"
 	"github.com/dargueta/disko"
-	c "github.com/dargueta/disko/drivers/common"
+	c "github.com/dargueta/disko/file_systems/common"
 )
 
 // FetchBlockCallback is a pointer to a function that writes the contents of a

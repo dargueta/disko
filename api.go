@@ -6,8 +6,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/dargueta/disko/drivers/common"
-	"github.com/dargueta/disko/drivers/common/blockcache"
+	"github.com/dargueta/disko/file_systems/common"
+	"github.com/dargueta/disko/file_systems/common/blockcache"
 )
 
 type MountFlags int

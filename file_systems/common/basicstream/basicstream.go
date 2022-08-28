@@ -9,8 +9,8 @@ import (
 	"math"
 
 	"github.com/dargueta/disko"
-	c "github.com/dargueta/disko/drivers/common"
-	"github.com/dargueta/disko/drivers/common/blockcache"
+	c "github.com/dargueta/disko/file_systems/common"
+	"github.com/dargueta/disko/file_systems/common/blockcache"
 )
 
 // BasicStream is a file-like wrapper around a BlockCache that emulates a

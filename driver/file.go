@@ -1,4 +1,4 @@
-package basedriver
+package driver
 
 import (
 	"os"
@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/dargueta/disko"
-	"github.com/dargueta/disko/drivers/common"
-	"github.com/dargueta/disko/drivers/common/basicstream"
-	"github.com/dargueta/disko/drivers/common/blockcache"
+	"github.com/dargueta/disko/file_systems/common"
+	"github.com/dargueta/disko/file_systems/common/basicstream"
+	"github.com/dargueta/disko/file_systems/common/blockcache"
 )
 
 // FileInfo gives detailed information about a file or directory. It implements
