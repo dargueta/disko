@@ -350,7 +350,13 @@ func (driver *Driver) ReadDir(path string) ([]disko.DirectoryEntry, error) {
 	if err != nil {
 		return nil, err
 	}
+	return driver.readDir(directory)
+}
 
+// readDir implements [ReadDir] for any directory object handle.
+func (driver *Driver) readDir(
+	directory extObjectHandle,
+) ([]disko.DirectoryEntry, error) {
 	direntNames, err := directory.ListDir()
 	if err != nil {
 		return nil, err

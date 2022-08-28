@@ -335,6 +335,7 @@ type File interface {
 	Chmod(mode os.FileMode) error
 	Chown(uid, gid int) error
 	Name() string
+	ReadDir(n int) ([]os.DirEntry, error)
 	Readdir(n int) ([]os.FileInfo, error)
 	Readdirnames(n int) ([]string, error)
 	Stat() (os.FileInfo, error)
