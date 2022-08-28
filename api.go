@@ -66,6 +66,10 @@ const MountFlagsAllowAll = (MountFlagsAllowRead |
 const MountFlagsMask = MountFlagsCustomStart - 1
 
 // FileStat is a platform-independent form of [syscall.Stat_t].
+//
+// If a file system doesn't support a particular feature, drivers should use a
+// reasonable default value. For most of these 0 is fine, but for compatibility
+// drivers should use 1 for `Nlinks` and 0o777 for `ModeFlags`.
 type FileStat struct {
 	DeviceID     uint64
 	InodeNumber  uint64
@@ -182,9 +186,12 @@ type Truncator interface {
 // default functionality from the CommonDriver.
 type DriverImplementation interface {
 	// CreateObject creates an object on the file system that is *not* a
-	// directory. The following guarantees apply: A) this will never be called
-	// for an object that already exists; B) `parent` will always be a valid
-	// object handle.
+	// directory.
+	//
+	// The following guarantees apply:
+	//
+	// 	- This will never be called for an object that already exists
+	//  - `parent` will always be a valid object handle.
 	CreateObject(
 		name string,
 		parent ObjectHandle,
@@ -192,9 +199,12 @@ type DriverImplementation interface {
 	) (ObjectHandle, DriverError)
 
 	// GetObject returns a handle to an object with the given name in a directory
-	// specified by `parent`. The following guarantees apply: A) this will never
-	// be called for a nonexistent object; B) `parent` will always be a valid
-	// object handle.
+	// specified by `parent`.
+	//
+	// The following guarantees apply:
+	//
+	// 	- This will never be called for a nonexistent object
+	//	- `parent` will always be a valid object handle.
 	GetObject(
 		name string,
 		parent ObjectHandle,
@@ -223,12 +233,10 @@ type DriverImplementation interface {
 	// SetBootCode sets the machine code that is executed on startup if the disk
 	// image is used as a boot volume. This function will never be called if the
 	// [FSFeatures.SupportsBootCode] returns false.
-
-	// If the file system doesn't have explicit
-	// support for this defined in the standard (such as FAT8), it should do
-	// nothing and immediately return an error with ENOSYS as the error code.
 	//
-	//
+	// If the file system doesn't have explicit support for this defined in the
+	// standard (such as FAT8), it should do nothing and immediately return an
+	// error with [ENOSYS] as the error code.
 	SetBootCode(code []byte) DriverError
 	GetBootCode() ([]byte, DriverError)
 }
@@ -281,8 +289,14 @@ type ObjectHandle interface {
 	Unlink() DriverError
 
 	// Chmod changes the permission bits of this file system object. Only the
-	// permissions bits will be set.
+	// permissions bits will be set in `mode`. File systems that support access
+	// controls but not all aspects (e.g. no executable bit, or no group
+	// permissions) must silently ignore anything they don't recognize.
 	Chmod(mode os.FileMode) DriverError
+
+	// Chown sets the ID of the owning user and group for this object. This
+	// function will never be called if user IDs are not supported. If the file
+	// system doesn't support group IDs, it must ignore `gid`.
 	Chown(uid, gid int) DriverError
 	Chtimes(createdAt, lastAccessed, lastModified, lastChanged, deletedAt time.Time) error
 
@@ -298,7 +312,9 @@ type ObjectHandle interface {
 // File is the expected interface for file handles from drivers.
 //
 // This interface is intended to be more or less a drop-in replacement for
-// [os.File], *however* not all functions need be implemented.
+// [os.File], *however* not all functions are implemented. In particular,
+// all deadline-related functions and `Fd` are excluded. For a full list, see
+// the documentation in the README.
 type File interface {
 	io.ReadWriteCloser
 	io.Seeker
@@ -318,14 +334,9 @@ type File interface {
 	Sync() error
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// Directory Entries
-
 // DirectoryEntry represents a file, directory, device, or other entity
 // encountered on the file system. It must implement the os.FileInfo interface
 // but only needs to fill values in Stat for the features it supports.
-//
-// For recommendations for how to fill the fields in Stat, see ReadingDriver.Stat().
 type DirectoryEntry interface {
 	os.DirEntry
 	Stat() FileStat
