@@ -26,7 +26,7 @@ func (driver *UnixV1Driver) ReadDir(path string) ([]disko.DirectoryEntry, error)
 	}
 
 	if !inode.IsDir() {
-		err = errors.NewDriverErrorWithMessage(
+		err = errors.NewWithMessage(
 			errors.ENOTDIR,
 			fmt.Sprintf("`%s` is not a directory", path),
 		)
@@ -58,7 +58,7 @@ func (driver *UnixV1Driver) ReadFile(path string) ([]byte, error) {
 	}
 
 	if !inode.IsFile() {
-		err = errors.NewDriverErrorWithMessage(
+		err = errors.NewWithMessage(
 			errors.EISDIR,
 			fmt.Sprintf("`%s` is not a file", path),
 		)

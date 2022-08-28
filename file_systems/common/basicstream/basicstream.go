@@ -94,7 +94,7 @@ func (stream *BasicStream) Read(buffer []byte) (int, error) {
 
 func (stream *BasicStream) ReadAt(buffer []byte, offset int64) (int, error) {
 	if !stream.ioFlags.Read() {
-		return 0, errors.NewDriverError(errors.EPERM)
+		return 0, errors.New(errors.EPERM)
 	}
 
 	bufLen := int64(len(buffer))
@@ -131,7 +131,7 @@ func (stream *BasicStream) ReadAt(buffer []byte, offset int64) (int, error) {
 
 func (stream *BasicStream) ReadFrom(r io.Reader) (n int64, err error) {
 	if !stream.ioFlags.Write() {
-		return 0, errors.NewDriverError(errors.EACCES)
+		return 0, errors.New(errors.EACCES)
 	}
 
 	// If the argument is another BasicStream, make the read buffer be exactly
@@ -221,7 +221,7 @@ func (stream *BasicStream) Tell() int64 {
 // the stream pointer.
 func (stream *BasicStream) Truncate(size int64) error {
 	if !stream.ioFlags.Write() {
-		return errors.NewDriverError(errors.EPERM)
+		return errors.New(errors.EPERM)
 	}
 
 	if size < 0 {
@@ -248,7 +248,7 @@ func (stream *BasicStream) Write(buffer []byte) (int, error) {
 	var err error
 
 	if !stream.ioFlags.Write() {
-		return 0, errors.NewDriverError(errors.EACCES)
+		return 0, errors.New(errors.EACCES)
 	}
 
 	// Force the stream pointer to the end of the file if O_APPEND was set.
@@ -270,7 +270,7 @@ func (stream *BasicStream) Write(buffer []byte) (int, error) {
 // check for the O_APPEND flag.
 func (stream *BasicStream) implWriteAt(buffer []byte, offset int64) (int, error) {
 	if !stream.ioFlags.Write() {
-		return 0, errors.NewDriverError(errors.EPERM)
+		return 0, errors.New(errors.EPERM)
 	}
 
 	bufLen := int64(len(buffer))
@@ -303,7 +303,7 @@ func (stream *BasicStream) implWriteAt(buffer []byte, offset int64) (int, error)
 // use this function if the stream was created with the [disko.O_APPEND] flag.
 func (stream *BasicStream) WriteAt(buffer []byte, offset int64) (int, error) {
 	if stream.ioFlags.Append() {
-		return 0, errors.NewDriverError(errors.EACCES)
+		return 0, errors.New(errors.EACCES)
 	}
 	return stream.implWriteAt(buffer, offset)
 }

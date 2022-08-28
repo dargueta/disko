@@ -30,7 +30,7 @@ func IsValidBlockAndInodeCount(numBlocks, numInodes uint) bool {
 
 func (driver *UnixV1Driver) Format(stat disko.FSStat) error {
 	if driver.isMounted {
-		return errors.NewDriverError(errors.EBUSY)
+		return errors.New(errors.EBUSY)
 	}
 
 	// stat.Files tells us the number of inodes on the disk.
@@ -38,7 +38,7 @@ func (driver *UnixV1Driver) Format(stat disko.FSStat) error {
 		msg := fmt.Sprintf(
 			"`stat.Files` must be a non-zero multiple of 16, got %d",
 			stat.Files)
-		return errors.NewDriverErrorWithMessage(errors.EINVAL, msg)
+		return errors.NewWithMessage(errors.EINVAL, msg)
 	}
 
 	// The free block bitmap contains one bit per block, rounded up to the
@@ -63,7 +63,7 @@ func (driver *UnixV1Driver) Format(stat disko.FSStat) error {
 			blockBitmapSize,
 			inodeBitmapSize,
 		)
-		return errors.NewDriverErrorWithMessage(errors.E2BIG, msg)
+		return errors.NewWithMessage(errors.E2BIG, msg)
 	}
 
 	// The upper 32KiB is reserved for the system (boot image and all that), and
@@ -80,7 +80,7 @@ func (driver *UnixV1Driver) Format(stat disko.FSStat) error {
 			stat.TotalBlocks,
 			float64(stat.TotalBlocks)/2.0,
 		)
-		return errors.NewDriverErrorWithMessage(errors.EINVAL, msg)
+		return errors.NewWithMessage(errors.EINVAL, msg)
 	}
 
 	driver.image.Resize(uint(stat.TotalBlocks))
@@ -176,7 +176,7 @@ func DetermineMaxInodeCount(totalBlocks uint) (uint, error) {
 	// The block allocation and inode allocation bitmaps must be at most 1000
 	// bytes together.
 	if blockBitmapSize >= 1000 {
-		return 0, errors.NewDriverErrorWithMessage(
+		return 0, errors.NewWithMessage(
 			errors.EINVAL,
 			"block allocation bitmap doesn't fit into the superblock",
 		)
@@ -191,7 +191,7 @@ func DetermineMaxInodeCount(totalBlocks uint) (uint, error) {
 	}
 
 	if inodeBitmapSize == 0 {
-		return 0, errors.NewDriverErrorWithMessage(
+		return 0, errors.NewWithMessage(
 			errors.EINVAL,
 			"block allocation bitmap leaves no space for inode bitmap",
 		)

@@ -66,7 +66,7 @@ func New(
 ) *BlockCache {
 	if resizeCb == nil {
 		resizeCb = func(newTotalBlocks c.LogicalBlock) error {
-			return errors.NewDriverError(errors.ENOTSUP)
+			return errors.New(errors.ENOTSUP)
 		}
 	}
 
@@ -135,7 +135,7 @@ func WrapStream(
 		// the functionality *is* supported by Disko, but not this specific
 		// stream.
 		resizeCb = func(newTotalBlocks c.LogicalBlock) error {
-			return errors.NewDriverError(errors.ENOTSUP)
+			return errors.New(errors.ENOTSUP)
 		}
 	}
 
@@ -145,7 +145,7 @@ func WrapStream(
 // seekToBlock sets the stream pointer for a stream to the offset of a block.
 func seekToBlock(stream io.Seeker, block, totalBlocks c.LogicalBlock, bytesPerBlock uint) error {
 	if block >= totalBlocks {
-		return errors.NewDriverErrorWithMessage(
+		return errors.NewWithMessage(
 			errors.EINVAL,
 			fmt.Sprintf(
 				"invalid block number: %d not in range [0, %d)",

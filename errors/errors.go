@@ -34,16 +34,16 @@ func (e driverError) Unwrap() error {
 	return e.originalError
 }
 
-// NewDriverError creates a new DriverError with a default message derived from the
+// New creates a new [DriverError] with a default message derived from the
 // system's error code.
-func NewDriverError(errnoCode Errno) DriverError {
+func New(errnoCode Errno) DriverError {
 	return driverError{
 		errno:   errnoCode,
 		message: StrError(errnoCode),
 	}
 }
 
-func NewDriverErrorFromError(errnoCode Errno, originalError error) DriverError {
+func NewFromError(errnoCode Errno, originalError error) DriverError {
 	return driverError{
 		errno:         errnoCode,
 		message:       fmt.Sprintf("%s: %s", StrError(errnoCode), originalError.Error()),
@@ -51,9 +51,9 @@ func NewDriverErrorFromError(errnoCode Errno, originalError error) DriverError {
 	}
 }
 
-// NewDriverErrorWithMessage creates a new DriverError from a system error code with a
+// NewWithMessage creates a new DriverError from a system error code with a
 // custom message.
-func NewDriverErrorWithMessage(errnoCode Errno, message string) DriverError {
+func NewWithMessage(errnoCode Errno, message string) DriverError {
 	return driverError{
 		errno:   errnoCode,
 		message: fmt.Sprintf("%s: %s", StrError(errnoCode), message),

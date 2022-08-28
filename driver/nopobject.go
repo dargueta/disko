@@ -24,43 +24,43 @@ func (obj NopObjectHandle) Stat() disko.FileStat {
 
 // Resize does nothing.
 func (obj NopObjectHandle) Resize(newSize uint64) errors.DriverError {
-	return errors.NewDriverError(errors.ENOSYS)
+	return errors.New(errors.ENOSYS)
 }
 
 // ReadBlocks does nothing.
 func (obj NopObjectHandle) ReadBlocks(
 	index common.LogicalBlock, buffer []byte,
 ) errors.DriverError {
-	return errors.NewDriverError(errors.ENOSYS)
+	return errors.New(errors.ENOSYS)
 }
 
 // WriteBlocks does nothing.
 func (obj NopObjectHandle) WriteBlocks(
 	index common.LogicalBlock, data []byte,
 ) errors.DriverError {
-	return errors.NewDriverError(errors.ENOSYS)
+	return errors.New(errors.ENOSYS)
 }
 
 // ZeroOutBlocks does nothing.
 func (obj NopObjectHandle) ZeroOutBlocks(
 	startIndex common.LogicalBlock, count uint,
 ) errors.DriverError {
-	return errors.NewDriverError(errors.ENOSYS)
+	return errors.New(errors.ENOSYS)
 }
 
 // Unlink does nothing.
 func (obj NopObjectHandle) Unlink() errors.DriverError {
-	return errors.NewDriverError(errors.ENOSYS)
+	return errors.New(errors.ENOSYS)
 }
 
 // Chmod does nothing.
 func (obj NopObjectHandle) Chmod(mode os.FileMode) errors.DriverError {
-	return errors.NewDriverError(errors.ENOSYS)
+	return errors.New(errors.ENOSYS)
 }
 
 // Chown does nothing.
 func (obj NopObjectHandle) Chown(uid, gid int) errors.DriverError {
-	return errors.NewDriverError(errors.ENOSYS)
+	return errors.New(errors.ENOSYS)
 }
 
 // Chtimes does nothing.
@@ -71,12 +71,12 @@ func (obj NopObjectHandle) Chtimes(
 	lastChanged,
 	deletedAt time.Time,
 ) error {
-	return errors.NewDriverError(errors.ENOSYS)
+	return errors.New(errors.ENOSYS)
 }
 
 // ListDir does nothing, and returns a nil list of names.
 func (obj NopObjectHandle) ListDir() ([]string, errors.DriverError) {
-	return nil, errors.NewDriverError(errors.ENOSYS)
+	return nil, errors.New(errors.ENOSYS)
 }
 
 // Name returns an empty string.

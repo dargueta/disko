@@ -83,7 +83,7 @@ func (driver *UnixV1Driver) Mount(flags disko.MountFlags) error {
 		if driver.currentMountFlags == flags {
 			return nil
 		}
-		return errors.NewDriverError(errors.EALREADY)
+		return errors.New(errors.EALREADY)
 	}
 
 	driver.currentMountFlags = flags
@@ -112,7 +112,7 @@ func (driver *UnixV1Driver) Mount(flags disko.MountFlags) error {
 				" bytes together, got %d",
 			blockBitmapSize+inodeBitmapSize,
 		)
-		return errors.NewDriverErrorWithMessage(errors.EUCLEAN, message)
+		return errors.NewWithMessage(errors.EUCLEAN, message)
 	}
 
 	inodeBitmap := make([]byte, inodeBitmapSize)
@@ -144,7 +144,7 @@ func (driver *UnixV1Driver) Unmount() error {
 
 func (driver *UnixV1Driver) GetFSInfo() (disko.FSStat, error) {
 	if !driver.isMounted {
-		return disko.FSStat{}, errors.NewDriverError(errors.EIO)
+		return disko.FSStat{}, errors.New(errors.EIO)
 	}
 
 	freeBlocks := uint64(0)
