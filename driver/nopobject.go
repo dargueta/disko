@@ -13,7 +13,7 @@ import (
 // error with code [errors.ENOSYS] for all operations. Any non-error return values
 // are the corresponding zero value for that type.
 type NopObjectHandle struct {
-	disko.ObjectHandle
+	extObjectHandle
 }
 
 // Stat returns an empty [disko.FileStat] struct with all members initialized to
@@ -81,5 +81,10 @@ func (obj NopObjectHandle) ListDir() ([]string, errors.DriverError) {
 
 // Name returns an empty string.
 func (obj NopObjectHandle) Name() string {
+	return ""
+}
+
+// AbsolutePath returns an empty string.
+func (obj NopObjectHandle) AbsolutePath() string {
 	return ""
 }

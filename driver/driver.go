@@ -11,22 +11,29 @@ import (
 	"golang.org/x/exp/slices"
 )
 
-////////////////////////////////////////////////////////////////////////////////
-
+// Driver is a file system driver wrapping an implementation of a specific file
+// system to provide a unified interface for interacting with any file system.
 type Driver struct {
 	implementation disko.FileSystemImplementer
 	mountFlags     disko.MountFlags
 	workingDirPath string
 }
 
-func NewDriver(implementation disko.FileSystemImplementer, mountFlags disko.MountFlags) *Driver {
+// New creates a new [Driver] from the given implementation.
+func New(
+	impl disko.FileSystemImplementer,
+	mountFlags disko.MountFlags,
+) *Driver {
 	return &Driver{
-		implementation: implementation,
+		implementation: impl,
 		mountFlags:     mountFlags,
 		workingDirPath: "/",
 	}
 }
 
+// normalizePath converts a path from the user's native file system syntax to
+// an absolute normalized path using forward slashes (/) as the component
+// separator. The return value is always an absolute path.
 func (driver *Driver) normalizePath(path string) string {
 	path = posixpath.Clean(filepath.ToSlash(path))
 	if path == "." {
