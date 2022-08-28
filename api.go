@@ -67,117 +67,6 @@ const MountFlagsAllowAll = (MountFlagsAllowRead |
 	MountFlagsAllowAdminister)
 const MountFlagsMask = MountFlagsCustomStart - 1
 
-// FileStat is a platform-independent form of [syscall.Stat_t].
-//
-// If a file system doesn't support a particular feature, drivers should use a
-// reasonable default value. For most of these 0 is fine, but for compatibility
-// drivers should use 1 for `Nlinks` and 0o777 for `ModeFlags`.
-type FileStat struct {
-	DeviceID     uint64
-	InodeNumber  uint64
-	Nlinks       uint64
-	ModeFlags    os.FileMode
-	Uid          uint32
-	Gid          uint32
-	Rdev         uint64
-	Size         int64
-	BlockSize    int64
-	NumBlocks    int64
-	CreatedAt    time.Time
-	LastChanged  time.Time
-	LastAccessed time.Time
-	LastModified time.Time
-	DeletedAt    time.Time
-}
-
-func (stat *FileStat) IsDir() bool {
-	return stat.ModeFlags.IsDir()
-}
-
-func (stat *FileStat) IsFile() bool {
-	return stat.ModeFlags.IsRegular()
-}
-
-func (stat *FileStat) IsSymlink() bool {
-	return stat.ModeFlags&os.ModeType == os.ModeSymlink
-}
-
-// FSStat is a platform-independent form of [syscall.Statfs_t].
-type FSStat struct {
-	// BlockSize is the size of a logical block on the file system, in bytes.
-	BlockSize int64
-	// TotalBlocks is the total number of blocks on the disk image.
-	TotalBlocks uint64
-	// BlocksFree is the number of unallocated blocks on the image.
-	BlocksFree uint64
-	// BlocksAvailable is the number of blocks available for use by user data.
-	// This should always be less than or equal to BlocksFree.
-	BlocksAvailable uint64
-	// Files is the total number of used directory entries on the file system.
-	// Drivers should set this to 0 if the information is not available.
-	Files uint64
-	// FilesFree is the number of remaining directory entries available for use.
-	// Drivers should set this to [math.MaxUint64] for file systems that have
-	// no limit on the maximum number of directory entries.
-	FilesFree uint64
-	// FileSystemID is the serial number for the disk image, if available.
-	FileSystemID uint64
-	// MaxNameLength is the longest possible name for a directory entry, in bytes.
-	// Drivers should set this to [math.MaxInt64] if there is no limit.
-	MaxNameLength int64
-	// Flags is free for drivers to use as they see fit, but mostly to preserve
-	// flags present in the boot block. Driver-agnostic functions will ignore it.
-	Flags int64
-	// Label is the volume label, if available.
-	Label string
-}
-
-// UndefinedTimestamp is a timestamp that should be used as an invalid value,
-// like `nil` for pointers.
-var UndefinedTimestamp = time.UnixMicro(math.MaxInt64)
-
-// FSFeatures indicates the features available for the file system. If a file
-// system supports a feature, driver implementations MUST declare it as available
-// even if the driver hasn't implemented it yet.
-type FSFeatures interface {
-	HasDirectories() bool
-	HasSymbolicLinks() bool
-	HasHardLinks() bool
-	HasCreatedTime() bool
-	HasAccessedTime() bool
-	HasModifiedTime() bool
-	HasChangedTime() bool
-	HasDeletedTime() bool
-	HasUnixPermissions() bool
-	HasUserID() bool
-	HasGroupID() bool
-	HasUserPermissions() bool
-	HasGroupPermissions() bool
-
-	// TimestampEpoch returns the earliest representable timestamp on this file
-	// system. File systems that don't support timestamps of any kind should
-	// return [UndefinedTimestamp].
-	TimestampEpoch() time.Time
-
-	// DefaultNameEncoding gives the name of the text encoding natively used by
-	// the file system, in lowercase with no symbols (e.g. "utf8" not "UTF-8").
-	// For systems this old for the most part it will be either "ascii" or
-	// "ebcdic".
-	DefaultNameEncoding() string
-	SupportsBootCode() bool
-
-	// MaxBootCodeSize returns the maximum number of bytes that can be stored as
-	// boot code in the file system. File systems that don't support boot code
-	// must return 0. File systems that don't have a theoretical upper limit
-	// should return [math.MaxInt].
-	MaxBootCodeSize() int
-
-	// BlockSize gives the default size of a single block in the file system,
-	// in bytes. File systems that don't have fixed block sizes (such as certain
-	// types of archives) should return 0.
-	DefaultBlockSize() int
-}
-
 // FileSystemImplementer is the interface required for all file system
 // implementations.
 type FileSystemImplementer interface {
@@ -314,6 +203,117 @@ type ObjectHandle interface {
 	// Name returns the name of the object itself without any path component.
 	// The root directory, which technically has no name, must return "/".
 	Name() string
+}
+
+// UndefinedTimestamp is a timestamp that should be used as an invalid value,
+// like `nil` for pointers.
+var UndefinedTimestamp = time.UnixMicro(math.MaxInt64)
+
+// FSFeatures indicates the features available for the file system. If a file
+// system supports a feature, driver implementations MUST declare it as available
+// even if the driver hasn't implemented it yet.
+type FSFeatures interface {
+	HasDirectories() bool
+	HasSymbolicLinks() bool
+	HasHardLinks() bool
+	HasCreatedTime() bool
+	HasAccessedTime() bool
+	HasModifiedTime() bool
+	HasChangedTime() bool
+	HasDeletedTime() bool
+	HasUnixPermissions() bool
+	HasUserID() bool
+	HasGroupID() bool
+	HasUserPermissions() bool
+	HasGroupPermissions() bool
+
+	// TimestampEpoch returns the earliest representable timestamp on this file
+	// system. File systems that don't support timestamps of any kind should
+	// return [UndefinedTimestamp].
+	TimestampEpoch() time.Time
+
+	// DefaultNameEncoding gives the name of the text encoding natively used by
+	// the file system, in lowercase with no symbols (e.g. "utf8" not "UTF-8").
+	// For systems this old for the most part it will be either "ascii" or
+	// "ebcdic".
+	DefaultNameEncoding() string
+	SupportsBootCode() bool
+
+	// MaxBootCodeSize returns the maximum number of bytes that can be stored as
+	// boot code in the file system. File systems that don't support boot code
+	// must return 0. File systems that don't have a theoretical upper limit
+	// should return [math.MaxInt].
+	MaxBootCodeSize() int
+
+	// BlockSize gives the default size of a single block in the file system,
+	// in bytes. File systems that don't have fixed block sizes (such as certain
+	// types of archives) should return 0.
+	DefaultBlockSize() int
+}
+
+// FileStat is a platform-independent form of [syscall.Stat_t].
+//
+// If a file system doesn't support a particular feature, drivers should use a
+// reasonable default value. For most of these 0 is fine, but for compatibility
+// drivers should use 1 for `Nlinks` and 0o777 for `ModeFlags`.
+type FileStat struct {
+	DeviceID     uint64
+	InodeNumber  uint64
+	Nlinks       uint64
+	ModeFlags    os.FileMode
+	Uid          uint32
+	Gid          uint32
+	Rdev         uint64
+	Size         int64
+	BlockSize    int64
+	NumBlocks    int64
+	CreatedAt    time.Time
+	LastChanged  time.Time
+	LastAccessed time.Time
+	LastModified time.Time
+	DeletedAt    time.Time
+}
+
+func (stat *FileStat) IsDir() bool {
+	return stat.ModeFlags.IsDir()
+}
+
+func (stat *FileStat) IsFile() bool {
+	return stat.ModeFlags.IsRegular()
+}
+
+func (stat *FileStat) IsSymlink() bool {
+	return stat.ModeFlags&os.ModeType == os.ModeSymlink
+}
+
+// FSStat is a platform-independent form of [syscall.Statfs_t].
+type FSStat struct {
+	// BlockSize is the size of a logical block on the file system, in bytes.
+	BlockSize int64
+	// TotalBlocks is the total number of blocks on the disk image.
+	TotalBlocks uint64
+	// BlocksFree is the number of unallocated blocks on the image.
+	BlocksFree uint64
+	// BlocksAvailable is the number of blocks available for use by user data.
+	// This should always be less than or equal to BlocksFree.
+	BlocksAvailable uint64
+	// Files is the total number of used directory entries on the file system.
+	// Drivers should set this to 0 if the information is not available.
+	Files uint64
+	// FilesFree is the number of remaining directory entries available for use.
+	// Drivers should set this to [math.MaxUint64] for file systems that have
+	// no limit on the maximum number of directory entries.
+	FilesFree uint64
+	// FileSystemID is the serial number for the disk image, if available.
+	FileSystemID uint64
+	// MaxNameLength is the longest possible name for a directory entry, in bytes.
+	// Drivers should set this to [math.MaxInt64] if there is no limit.
+	MaxNameLength int64
+	// Flags is free for drivers to use as they see fit, but mostly to preserve
+	// flags present in the boot block. Driver-agnostic functions will ignore it.
+	Flags int64
+	// Label is the volume label, if available.
+	Label string
 }
 
 // File is the expected interface for file handles from drivers.
