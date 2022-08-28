@@ -35,6 +35,15 @@ type FlushBlockCallback func(blockIndex c.LogicalBlock, buffer []byte) error
 // The implementation of the callback can do anything so long as 1) it doesn't
 // modify the data in the blocks; 2) at least the requested number of blocks are
 // available once the function returns.
+//
+// Standard conditions for error codes:
+//
+//   - [errors.EFBIG]: Can't increase the size of the object because it would
+//     exceed some technical limit.
+//   - [errors.ENOSPC]: Can't increase the size of the object because there's no
+//     space left on the volume.
+//   - [errors.ENOTSUP]: The object can't be resized as a general rule. This is
+//     mostly only seen in systems with fixed-size directories, like FAT8/12/16.
 type ResizeCallback func(newTotalBlocks c.LogicalBlock) error
 
 type BlockCache struct {
@@ -66,7 +75,13 @@ func New(
 ) *BlockCache {
 	if resizeCb == nil {
 		resizeCb = func(newTotalBlocks c.LogicalBlock) error {
-			return errors.New(errors.ENOTSUP)
+			return errors.NewWithMessage(
+				errors.ENOTSUP,
+				fmt.Sprintf(
+					"resizing is not supported; size fixed at %d bytes",
+					bytesPerBlock*totalBlocks,
+				),
+			)
 		}
 	}
 

@@ -227,9 +227,15 @@ func (stream *BasicStream) Truncate(size int64) error {
 	}
 
 	if size < 0 {
-		return fmt.Errorf("truncate failed: %d is not a valid file size", size)
+		return errors.NewWithMessage(
+			errors.EINVAL,
+			fmt.Sprintf("truncate failed: %d is not a valid file size", size),
+		)
 	} else if uint64(size) > math.MaxUint {
-		return fmt.Errorf("truncate failed: new file size %d is too large", size)
+		return errors.NewWithMessage(
+			errors.EINVAL,
+			fmt.Sprintf("truncate failed: new file size %d is too large", size),
+		)
 	}
 	newTotalBlocks := stream.data.LengthToNumBlocks(uint(size))
 
@@ -246,6 +252,9 @@ func (stream *BasicStream) Truncate(size int64) error {
 	return nil
 }
 
+// Write writes bytes into the stream. If the stream was created with the
+// [disko.O_APPEND] flag set, the stream pointer is repositioned to the end
+// first before writing.
 func (stream *BasicStream) Write(buffer []byte) (int, error) {
 	var err error
 
