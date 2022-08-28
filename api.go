@@ -2,6 +2,7 @@ package disko
 
 import (
 	"io"
+	"math"
 	"os"
 	"time"
 )
@@ -125,7 +126,7 @@ type FSStat struct {
 
 // UndefinedTimestamp is a timestamp that should be used as an invalid value,
 // like `nil` for pointers.
-var UndefinedTimestamp := time.UnixMicro(math.MaxInt64)
+var UndefinedTimestamp = time.UnixMicro(math.MaxInt64)
 
 // FSFeatures indicates the features available for the file system. If a file
 // system supports a feature, driver implementations MUST declare it as available
@@ -155,6 +156,13 @@ type FSFeatures interface {
 	// For systems this old for the most part it will be either "ascii" or
 	// "ebcdic".
 	DefaultNameEncoding() string
+	SupportsBootCode() bool
+
+	// MaxBootCodeSize returns the maximum number of bytes that can be stored as
+	// boot code in the file system. File systems that don't support boot code
+	// must return 0. File systems that don't have a theoretical upper limit
+	// should return [math.MaxInt].
+	MaxBootCodeSize() int
 
 	// BlockSize gives the default size of a single block in the file system,
 	// in bytes. File systems that don't have fixed block sizes (such as certain
