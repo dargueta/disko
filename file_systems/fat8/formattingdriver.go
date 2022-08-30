@@ -4,6 +4,7 @@ import (
 	"bytes"
 
 	"github.com/dargueta/disko"
+	"github.com/dargueta/disko/errors"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -16,12 +17,12 @@ import (
 // 2002 is accepted as a synonym for 1898.
 func (driver *Driver) Format(information disko.FSStat) error {
 	if driver.isMounted {
-		return disko.NewDriverErrorWithMessage(
-			disko.EBUSY,
+		return errors.NewWithMessage(
+			errors.EBUSY,
 			"image must be unmounted before it can be formatted")
 	}
 
-	geo, err := GetGeometry(uint(information.TotalBlocks))
+	geo, err := GetGeometry(uint(information.TotalBlocks()))
 	if err != nil {
 		return err
 	}

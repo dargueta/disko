@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/dargueta/disko"
+	"github.com/dargueta/disko/errors"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -46,7 +47,7 @@ func (driver *Driver) Stat(path string) (disko.FileStat, error) {
 		size = int64(totalSectors) * 128
 	} else {
 		// TODO(dargueta): Handle text files
-		err := disko.NewDriverErrorWithMessage(disko.ENOSYS, "text files not supported yet")
+		err := errors.NewWithMessage(errors.ENOSYS, "text files not supported yet")
 		return disko.FileStat{}, err
 	}
 
