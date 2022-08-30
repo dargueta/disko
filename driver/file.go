@@ -87,6 +87,9 @@ type File struct {
 	objectHandle extObjectHandle
 	fileInfo     FileInfo
 	ioFlags      disko.IOFlags
+
+	lastReadDirResult    []disko.DirectoryEntry
+	readDirResultPointer int
 }
 
 // NewFileFromObjectHandle creates a Disko file object that is (more or less) a
@@ -153,7 +156,47 @@ func (file *File) Name() string {
 }
 
 func (file *File) ReadDir(n int) ([]os.DirEntry, error) {
-	return nil, errors.New(errors.ENOSYS)
+	stat := file.objectHandle.Stat()
+	if !stat.IsDir() {
+		return nil, errors.New(errors.ENOTDIR)
+	}
+
+	if file.lastReadDirResult == nil {
+		// The function has never been called or was exhausted on a previous
+		// call. Read the contents of the directory and set up the queue.
+		entries, err := file.owningDriver.readDir(file.objectHandle)
+		if err != nil {
+			return nil, err
+		}
+
+		file.lastReadDirResult = entries
+		file.readDirResultPointer = 0
+	}
+
+	entriesRemaining := len(file.lastReadDirResult) - file.readDirResultPointer
+	var numToCopy int
+	if n <= 0 || n > entriesRemaining {
+		numToCopy = entriesRemaining
+	} else {
+		numToCopy = n
+	}
+
+	result := make([]os.DirEntry, numToCopy)
+
+	// If there are no entries remaining, return an empty slice and io.EOF.
+	if entriesRemaining == 0 {
+		file.lastReadDirResult = nil
+		file.readDirResultPointer = 0
+		return result, io.EOF
+	}
+
+	// TODO (dargueta): Is there a way to use copy() for a slice of a superset interface?
+	// It shouldn't be a performance problem but this feels clunky.
+	for i := 0; i < numToCopy; i++ {
+		result[i] = file.lastReadDirResult[file.readDirResultPointer]
+		file.readDirResultPointer++
+	}
+	return result, nil
 }
 
 func (file *File) Readdir(n int) ([]os.FileInfo, error) {
@@ -175,7 +218,6 @@ func (file *File) Readdir(n int) ([]os.FileInfo, error) {
 			return infoList[:i], err
 		}
 	}
-
 	return infoList, nil
 }
 
