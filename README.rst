@@ -89,8 +89,8 @@ Name             ✔
 Read             ✔
 ReadAt           ✔
 ReadDir                  1
-Readdir                  1
-Readdirnames             1
+Readdir          ✔       1
+Readdirnames     ✔       1
 ReadFrom         ✔
 Seek             ✔
 SetDeadline      ✘

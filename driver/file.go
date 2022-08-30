@@ -1,11 +1,13 @@
 package driver
 
 import (
+	"io"
 	"os"
 	posixpath "path"
 	"time"
 
 	"github.com/dargueta/disko"
+	"github.com/dargueta/disko/errors"
 	"github.com/dargueta/disko/file_systems/common"
 	"github.com/dargueta/disko/file_systems/common/basicstream"
 	"github.com/dargueta/disko/file_systems/common/blockcache"
@@ -148,6 +150,50 @@ func (file *File) Close() error {
 
 func (file *File) Name() string {
 	return file.objectHandle.Name()
+}
+
+func (file *File) ReadDir(n int) ([]os.DirEntry, error) {
+	return nil, errors.New(errors.ENOSYS)
+}
+
+func (file *File) Readdir(n int) ([]os.FileInfo, error) {
+	dirents, err := file.ReadDir(n)
+	if err == io.EOF {
+		// If we hit EOF, return an empty slice, not nil.
+		return make([]os.FileInfo, 0), err
+	} else if err != nil {
+		// Unknown error
+		return nil, err
+	}
+
+	infoList := make([]os.FileInfo, len(dirents))
+	for i, dirent := range dirents {
+		infoList[i], err = dirent.Info()
+		if err != nil {
+			// Hit an error, return what we have so far instead of tossing the
+			// entire result.
+			return infoList[:i], err
+		}
+	}
+
+	return infoList, nil
+}
+
+func (file *File) Readdirnames(n int) ([]string, error) {
+	dirents, err := file.ReadDir(n)
+	if err == io.EOF {
+		// If we hit EOF, return an empty slice not nil.
+		return make([]string, 0), err
+	} else if err != nil {
+		// Unknown error
+		return nil, err
+	}
+
+	names := make([]string, len(dirents))
+	for i, dirent := range dirents {
+		names[i] = dirent.Name()
+	}
+	return names, nil
 }
 
 func (file *File) Stat() (os.FileInfo, error) {
