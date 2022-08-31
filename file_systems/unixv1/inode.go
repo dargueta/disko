@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/dargueta/disko"
-	"github.com/dargueta/disko/drivers/common"
 )
 
 type RawInode struct {
@@ -21,8 +20,12 @@ type RawInode struct {
 
 type Inode struct {
 	disko.FileStat
-	IsAllocated bool
-	blocks      []PhysicalBlock
+	rawFlags uint16
+	blocks   []PhysicalBlock
+}
+
+func (inode *Inode) IsAllocated() bool {
+	return inode.rawFlags&FlagFileAllocated != 0
 }
 
 func (inode *Inode) GetInodeType() os.FileMode {
@@ -32,8 +35,8 @@ func (inode *Inode) GetInodeType() os.FileMode {
 func RawInodeToInode(inumber Inumber, raw RawInode) Inode {
 	sizeInBlocks := (raw.Size + (-raw.Size % 512)) / 512
 	return Inode{
-		IsAllocated: raw.Flags&FlagFileAllocated != 0,
-		blocks:      raw.Blocks[:],
+		blocks:   raw.Blocks[:],
+		rawFlags: raw.Flags,
 		FileStat: disko.FileStat{
 			InodeNumber:  uint64(inumber),
 			Nlinks:       uint64(raw.Nlinks),
@@ -57,16 +60,4 @@ func InodeToRawInode(inode Inode) (Inumber, RawInode) {
 	}
 	copy(raw.Blocks[:], inode.blocks)
 	return Inumber(inode.InodeNumber), raw
-}
-
-type InodeManager struct {
-	allocator   common.Allocator
-	blockStream common.BlockStream
-}
-
-func InodeManagerFromBitmap(blockStream common.BlockStream, allocationMap []byte) InodeManager {
-	return InodeManager{
-		blockStream: blockStream,
-		allocator:   common.NewAllocatorFromInUseBitmap(allocationMap),
-	}
 }

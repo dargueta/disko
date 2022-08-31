@@ -1,6 +1,7 @@
 package unixv1
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -8,9 +9,8 @@ import (
 
 	"github.com/boljen/go-bitmap"
 	"github.com/dargueta/disko"
-	"github.com/dargueta/disko/drivers/common"
-	"github.com/dargueta/disko/drivers/common/blockcache"
 	"github.com/dargueta/disko/errors"
+	"github.com/dargueta/disko/file_systems/common/blockcache"
 )
 
 type PhysicalBlock uint16
@@ -43,28 +43,12 @@ const CanonicalDefaultDirectoryPermissions = disko.S_IFDIR | disko.S_IRUSR |
 var fsEpoch time.Time = time.Date(1971, 1, 1, 0, 0, 0, 0, nil)
 
 type UnixV1Driver struct {
-	BlockFreeMap      bitmap.Bitmap
-	Inodes            []Inode
+	blockFreeMap      bitmap.Bitmap
+	inodes            []Inode
 	isMounted         bool
 	rawStream         io.ReadWriteSeeker
 	image             *blockcache.BlockCache
 	currentMountFlags disko.MountFlags
-}
-
-const TimestampResolution time.Duration = time.Second / 60
-
-func NewDriverFromStream(stream io.ReadWriteSeeker) (UnixV1Driver, error) {
-	totalBlocks, err := common.DetermineBlockCount(stream, 512)
-	if err != nil {
-		return UnixV1Driver{}, err
-	}
-
-	blockStream := common.NewBasicBlockStream(stream, totalBlocks)
-	driver := UnixV1Driver{
-		rawStream: stream,
-		image:     blockStream,
-	}
-	return driver, nil
 }
 
 func SerializeTimestamp(tstamp time.Time) uint32 {
@@ -76,9 +60,12 @@ func DeserializeTimestamp(tstamp uint32) time.Time {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Implementing Driver interface
+// Implementing DriverImplementer interface
 
-func (driver *UnixV1Driver) Mount(flags disko.MountFlags) error {
+func (driver *UnixV1Driver) Mount(
+	image *blockcache.BlockCache,
+	flags disko.MountFlags,
+) errors.DriverError {
 	if driver.isMounted {
 		if driver.currentMountFlags == flags {
 			return nil
@@ -88,24 +75,40 @@ func (driver *UnixV1Driver) Mount(flags disko.MountFlags) error {
 
 	driver.currentMountFlags = flags
 
-	var blockBitmapSize uint16
-	err := binary.Read(driver.rawStream, binary.LittleEndian, &blockBitmapSize)
+	// Wrap the block device with a stream for ease of reading the stuff in it.
+	// For our current purposes we only need the boot block.
+	bootSectorSlice, err := image.GetSlice(0, 1)
 	if err != nil {
-		return err
+		return errors.NewFromError(errors.EIO, err)
+	}
+	rawStream := bytes.NewReader(bootSectorSlice)
+
+	// blockBitmapSize gives the size of the bitmap showing which blocks are in
+	// use, in bytes. It's always an even number.
+	var blockBitmapSize uint16
+	err = binary.Read(rawStream, binary.LittleEndian, &blockBitmapSize)
+	if err != nil {
+		return errors.NewFromError(errors.EIO, err)
 	}
 
+	// blockBitmap is the actual bitmap.
 	blockBitmap := make([]byte, blockBitmapSize)
 	_, err = driver.rawStream.Read(blockBitmap)
 	if err != nil {
-		return err
+		return errors.NewFromError(errors.EIO, err)
 	}
 
+	// inodeBitmapSize is the size of the bitmap for which bitmaps are currently
+	// in use, in bytes. It also is always an even number.
 	var inodeBitmapSize uint16
 	err = binary.Read(driver.rawStream, binary.LittleEndian, &inodeBitmapSize)
 	if err != nil {
-		return err
+		return errors.NewFromError(errors.EIO, err)
 	}
 
+	// Together, the bitmaps can't exceed 1000 bytes because there are 24 other
+	// bytes of information in the superblock that we need space for. (The
+	// superblock occupies 1024 bytes, i.e. two 512-byte logical sectors.)
 	if (blockBitmapSize + inodeBitmapSize) > 1000 {
 		message := fmt.Sprintf(
 			"corruption detected: Inode and block bitmaps can't exceed 1000"+
@@ -118,27 +121,27 @@ func (driver *UnixV1Driver) Mount(flags disko.MountFlags) error {
 	inodeBitmap := make([]byte, inodeBitmapSize)
 	_, err = driver.rawStream.Read(inodeBitmap)
 	if err != nil {
-		return err
+		return errors.NewFromError(errors.EIO, err)
 	}
 
 	rawInodes := make([]RawInode, inodeBitmapSize*8)
 	err = binary.Read(driver.rawStream, binary.LittleEndian, rawInodes[:])
 	if err != nil {
-		return err
+		return errors.NewFromError(errors.EIO, err)
 	}
 
-	driver.Inodes = make([]Inode, inodeBitmapSize*8)
+	driver.inodes = make([]Inode, inodeBitmapSize*8)
 
+	// TODO (dargueta): Parse all raw inodes into processed ones
+
+	driver.image = image
 	driver.isMounted = true
 	return nil
 }
 
-func (driver *UnixV1Driver) CurrentMountFlags() disko.MountFlags {
-	return driver.currentMountFlags
-}
-
-func (driver *UnixV1Driver) Unmount() error {
+func (driver *UnixV1Driver) Unmount() errors.DriverError {
 	driver.currentMountFlags = 0
+	driver.isMounted = false
 	return nil
 }
 
@@ -149,14 +152,14 @@ func (driver *UnixV1Driver) GetFSInfo() (disko.FSStat, error) {
 
 	freeBlocks := uint64(0)
 	for i := 0; i < int(driver.image.TotalBlocks()); i++ {
-		if driver.BlockFreeMap.Get(i) {
+		if driver.blockFreeMap.Get(i) {
 			freeBlocks++
 		}
 	}
 
 	totalFiles := uint64(0)
-	for _, inode := range driver.Inodes {
-		if inode.IsAllocated {
+	for _, inode := range driver.inodes {
+		if inode.IsAllocated() {
 			totalFiles++
 		}
 	}
@@ -167,7 +170,7 @@ func (driver *UnixV1Driver) GetFSInfo() (disko.FSStat, error) {
 		BlocksFree:      freeBlocks,
 		BlocksAvailable: uint64(driver.image.TotalBlocks()) - freeBlocks,
 		Files:           totalFiles,
-		FilesFree:       uint64(len(driver.Inodes)),
+		FilesFree:       uint64(len(driver.inodes)),
 		MaxNameLength:   8,
 	}, nil
 }

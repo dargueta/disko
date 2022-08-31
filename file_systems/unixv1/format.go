@@ -142,7 +142,7 @@ func (driver *UnixV1Driver) Format(stat disko.FSStat) error {
 
 	// The ilist has been completely written out. Seek into the first data block
 	// and write the "." and ".." entries for the root directory.
-	driver.rawStream.Seek(stat.BlockSize*int64(firstDataBlock), io.SeekStart)
+	driver.rawStream.Seek(int64(stat.BlockSize)*int64(firstDataBlock), io.SeekStart)
 	binary.Write(
 		driver.rawStream,
 		binary.LittleEndian,
