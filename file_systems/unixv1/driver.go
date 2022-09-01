@@ -59,6 +59,16 @@ func DeserializeTimestamp(tstamp uint32) time.Time {
 
 ////////////////////////////////////////////////////////////////////////////////
 // Implementing DriverImplementer interface
+// [x] Mount
+// [x] Unmount
+// [ ] CreateObject
+// [ ] GetObject
+// [ ] GetRootDirectory
+// [x] FSStat
+// [ ] GetFSFeatures
+// [ ] FormatImage
+// [ ] SetBootCode
+// [ ] GetBootCode
 
 func (driver *UnixV1Driver) Mount(
 	image *blockcache.BlockCache,
@@ -138,16 +148,16 @@ func (driver *UnixV1Driver) Mount(
 }
 
 func (driver *UnixV1Driver) Unmount() errors.DriverError {
+	err := driver.image.FlushAll()
+	if err != nil {
+		return errors.NewFromError(errors.EIO, err)
+	}
 	driver.currentMountFlags = 0
 	driver.isMounted = false
 	return nil
 }
 
-func (driver *UnixV1Driver) GetFSInfo() (disko.FSStat, error) {
-	if !driver.isMounted {
-		return disko.FSStat{}, errors.New(errors.EIO)
-	}
-
+func (driver *UnixV1Driver) FSStat() disko.FSStat {
 	freeBlocks := uint64(0)
 	for i := 0; i < int(driver.image.TotalBlocks()); i++ {
 		if driver.blockFreeMap.Get(i) {
@@ -170,5 +180,5 @@ func (driver *UnixV1Driver) GetFSInfo() (disko.FSStat, error) {
 		Files:           totalFiles,
 		FilesFree:       uint64(len(driver.inodes)),
 		MaxNameLength:   8,
-	}, nil
+	}
 }
