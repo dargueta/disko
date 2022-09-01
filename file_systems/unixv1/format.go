@@ -4,27 +4,36 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"io"
 	"time"
 
 	bitmap "github.com/boljen/go-bitmap"
 	"github.com/dargueta/disko"
 	"github.com/dargueta/disko/errors"
+	"github.com/noxer/bytewriter"
 )
 
-// IsValidBlockAndInodeCount determines if the number of inodes is valid given
+// getBitmapSizeInBytes returns the minimum number of bytes required to store a
+// block or inode bitmap with the given number of bits.
+func getBitmapSizeInBytes(bits uint) uint {
+	// Round up the number of blocks and inodes to the nearest multiple of 8,
+	// then divide by 8 to give the total number of bytes each bitmap requires
+	// to be stored in.
+	rounded := (bits + (-bits % 8)) / 8
+
+	// Bitmaps must be an even number of bytes.
+	if rounded%2 != 0 {
+		return rounded + 1
+	}
+	return rounded
+}
+
+// isValidBlockAndInodeCount determines if the number of inodes is valid given
 // a disk of size `numBlocks`. This assumes that `numBlocks` is greater than 66.
-func IsValidBlockAndInodeCount(numBlocks, numInodes uint) bool {
-	blockBitmapSize := (numBlocks + (-numBlocks % 8)) / 8
-	inodeBitmapSize := (numInodes + (-numInodes % 8)) / 8
+func isValidBlockAndInodeCount(numBlocks, numInodes uint) bool {
+	blockBitmapSize := getBitmapSizeInBytes(numBlocks)
+	inodeBitmapSize := getBitmapSizeInBytes(numInodes)
 
-	if blockBitmapSize%2 != 0 {
-		blockBitmapSize++
-	}
-	if inodeBitmapSize%2 != 0 {
-		inodeBitmapSize++
-	}
-
+	// The total size of both must be at most 1000 bytes.
 	return (blockBitmapSize + inodeBitmapSize) <= 1000
 }
 
@@ -34,28 +43,20 @@ func (driver *UnixV1Driver) Format(stat disko.FSStat) error {
 	}
 
 	// stat.Files tells us the number of inodes on the disk.
-	if (stat.Files == 0) || (stat.Files%16 != 0) {
+	if (stat.Files == 0) || (stat.Files%NumInodesPerBlock != 0) {
 		msg := fmt.Sprintf(
-			"`stat.Files` must be a non-zero multiple of 16, got %d",
-			stat.Files)
+			"`stat.Files` must be a non-zero multiple of %d, got %d",
+			NumInodesPerBlock,
+			stat.Files,
+		)
 		return errors.NewWithMessage(errors.EINVAL, msg)
 	}
 
-	// The free block bitmap contains one bit per block, rounded up to the
-	// nearest even number of bytes.
-	blockBitmapSize := (stat.TotalBlocks + (-stat.TotalBlocks % 8)) / 8
-	if blockBitmapSize%2 != 0 {
-		blockBitmapSize++
-	}
+	blockBitmapSize := getBitmapSizeInBytes(uint(stat.TotalBlocks))
+	inodeBitmapSize := getBitmapSizeInBytes(uint(stat.Files))
+	firstDataBlock := 2 + uint(stat.Files/NumInodesPerBlock)
 
-	// Same deal with the inode free bitmap -- one bit per inode, rounded up to
-	// the nearest even number of bytes.
-	inodeBitmapSize := (stat.Files + (-stat.Files % 8)) / 8
-	if inodeBitmapSize%2 != 0 {
-		inodeBitmapSize++
-	}
-
-	if !IsValidBlockAndInodeCount(uint(stat.TotalBlocks), uint(stat.Files)) {
+	if !isValidBlockAndInodeCount(uint(stat.TotalBlocks), uint(stat.Files)) {
 		msg := fmt.Sprintf(
 			"combined free block bitmap & inode bitmaps can't exceed 1000 bytes,"+
 				" got %dB (%dB and %dB respectively)",
@@ -71,7 +72,7 @@ func (driver *UnixV1Driver) Format(stat disko.FSStat) error {
 	// bitmap. Immediately following the bitmaps is the inode array. Thus, an
 	// image must be 33 KiB (66 blocks) plus however many blocks it takes to
 	// store `stat.Files` inodes.
-	minBlocks := 66 + (stat.Files / 16)
+	minBlocks := 66 + (stat.Files / NumInodesPerBlock)
 	if stat.TotalBlocks < minBlocks {
 		msg := fmt.Sprintf(
 			"minimum disk image size is %d blocks (%.1f KiB), got %d (%.1f KiB)",
@@ -83,14 +84,20 @@ func (driver *UnixV1Driver) Format(stat disko.FSStat) error {
 		return errors.NewWithMessage(errors.EINVAL, msg)
 	}
 
-	driver.image.Resize(uint(stat.TotalBlocks))
-	driver.rawStream.Seek(0, io.SeekStart)
+	err := driver.image.Resize(uint(stat.TotalBlocks))
+	if err != nil {
+		return err
+	}
 
-	var wbuf [2]byte
+	outputSlice, err := driver.image.GetSlice(0, firstDataBlock)
+	if err != nil {
+		return err
+	}
+
+	writer := bytewriter.New(outputSlice)
 
 	// Write free block bitmap size
-	binary.LittleEndian.PutUint16(wbuf[:], uint16(blockBitmapSize))
-	driver.rawStream.Write(wbuf[:])
+	binary.Write(writer, binary.LittleEndian, uint16(blockBitmapSize))
 
 	blockBitmap := bitmap.New(int(stat.TotalBlocks))
 	for i := 0; i < int(stat.TotalBlocks); i++ {
@@ -100,78 +107,77 @@ func (driver *UnixV1Driver) Format(stat disko.FSStat) error {
 	}
 
 	// Write free block bitmap
-	driver.rawStream.Write(blockBitmap.Data(false))
+	writer.Write(blockBitmap.Data(false))
 
 	// Write size of inode bitmap
-	binary.LittleEndian.PutUint16(wbuf[:], uint16(inodeBitmapSize))
-	driver.rawStream.Write(wbuf[:])
+	binary.Write(writer, binary.LittleEndian, uint16(inodeBitmapSize))
 
 	// Write free inode bitmap. Since a 1 indicates the inode is in use, this is
 	// all null bytes.
-	driver.rawStream.Write(bytes.Repeat([]byte{0}, int(inodeBitmapSize)))
+	writer.Write(bytes.Repeat([]byte{0}, int(inodeBitmapSize)))
 
 	// Write miscellaneous disk statistics, a total of 20 bytes. Since this is a
 	// new disk, all of it is zeroes. That makes the last cold boot timestamp be
 	// the Unix epoch (midnight UTC 1970-01-01) but how much do we really care?
-	driver.rawStream.Write(bytes.Repeat([]byte{0}, 20))
-
-	firstDataBlock := 2 + (inodeBitmapSize / 2)
+	writer.Write(bytes.Repeat([]byte{0}, 20))
 
 	// Write inode list. The root directory's inode always goes first.
 	nowTs := SerializeTimestamp(time.Now())
 	rootDirectoryInode := RawInode{
-		Flags:            RawDefaultDirectoryPermissions,
-		Nlinks:           1,
-		UserID:           0,
-		Size:             16, // Two directory entries, "." and ".."
-		Blocks:           [8]PhysicalBlock{0, 0, 0, 0, 0, 0, 0, 0},
+		Flags:  RawDefaultDirectoryPermissions,
+		Nlinks: 1,
+		UserID: 0,
+		Size:   16, // Two directory entries, "." and ".."
+		Blocks: [8]PhysicalBlock{
+			PhysicalBlock(firstDataBlock), 0, 0, 0, 0, 0, 0, 0,
+		},
 		CreatedTime:      nowTs,
 		LastModifiedTime: nowTs,
 	}
-	rootDirectoryInode.Blocks[0] = PhysicalBlock(firstDataBlock)
-	binary.Write(driver.rawStream, binary.LittleEndian, &rootDirectoryInode)
+	binary.Write(writer, binary.LittleEndian, &rootDirectoryInode)
 
 	// Subsequent inodes go here
 	inode := RawInode{Flags: FlagIsModified}
-	for i := 1; i < int(inodeBitmapSize)*8; i++ {
-		err := binary.Write(driver.rawStream, binary.LittleEndian, &inode)
-		if err != nil {
-			return err
-		}
+	for i := uint64(1); i < stat.Files; i++ {
+		binary.Write(writer, binary.LittleEndian, &inode)
 	}
 
-	// The ilist has been completely written out. Seek into the first data block
-	// and write the "." and ".." entries for the root directory.
-	driver.rawStream.Seek(int64(stat.BlockSize)*int64(firstDataBlock), io.SeekStart)
+	// The ilist has been completely written out. Because the number of files is
+	// a multiple of NumInodesPerBlock, we're guaranteed to be at the beginning
+	// of another block. This is the first data block, which we're using for the
+	// root directory.
+	//
+	// n.b. these are directory entries for the root directory, so "." and ".."
+	// are supposed to be the same. That is not a bug.
 	binary.Write(
-		driver.rawStream,
+		writer,
 		binary.LittleEndian,
 		RawDirent{Inumber: 41, Name: [8]byte{'.'}})
 	binary.Write(
-		driver.rawStream,
+		writer,
 		binary.LittleEndian,
-		RawDirent{Inumber: 41, Name: [8]byte{'.', '.'}})
+		RawDirent{Inumber: 41, Name: [8]byte{'.', '.'}},
+	)
 
-	return nil
+	driver.image.MarkBlockRangeDirty(0, firstDataBlock)
+	return driver.image.FlushAll()
 }
 
-// DetermineMaxInodeCount gives the maximum number of inodes that can be stored
+/*
+// determineMaxInodeCount gives the maximum number of inodes that can be stored
 // on a disk given the size of the disk, in blocks.
 //
 // This gives an upper bound on the number of inodes that can be stored; it does
 // *not* ensure that there will be any blocks left over for storing file data.
 // It's highly unlikely you'll want to set the inode count this high.
-func DetermineMaxInodeCount(totalBlocks uint) (uint, error) {
+func determineMaxInodeCount(totalBlocks uint) (uint, error) {
 	if totalBlocks < 66 {
 		return 0, fmt.Errorf("disk must be at least 66 blocks, got %d", totalBlocks)
 	}
 
 	// Determine the size of the block allocation bitmap on disk. We have one
 	// bit per block, rounded up to the nearest multiple of two bytes (16).
-	blockBitmapSize := (totalBlocks + (-totalBlocks % 8)) / 8
-	if blockBitmapSize%2 != 0 {
-		blockBitmapSize++
-	}
+	blockBitmapSize := getBitmapSizeInBytes(totalBlocks)
 
 	// The block allocation and inode allocation bitmaps must be at most 1000
 	// bytes together.
@@ -207,17 +213,18 @@ func DetermineMaxInodeCount(totalBlocks uint) (uint, error) {
 	// 2. Multiply by 32 bytes per inode to get total bytes used by ilist
 	// 3. Divide by 512 to get number of blocks
 	//
-	// That gives us: inodeBitmapSize * 8 * 32 / 512 --> inodeBitmapSize / 2
+	// That gives us: inodeBitmapSize * 8 * NumInodesPerBlock / 512 --> inodeBitmapSize / 2
 	//
 	// We know that the inode bitmap size is always an even number, so we don't
 	// need to take a remainder into account.
-	inodeBlocksUsed := inodeBitmapSize / 2
+	inodeBlocksUsed := inodeBitmapSize * 8 * NumInodesPerBlock / 512
 	availableBlocks := totalBlocks - 66
 
 	if inodeBlocksUsed > availableBlocks {
 		// The computed size of the ilist exceeds the number of blocks left on
 		// the disk. Adjust the number down.
-		return availableBlocks * 16, nil
+		return availableBlocks * NumInodesPerBlock, nil
 	}
-	return inodeBlocksUsed * 16, nil
+	return inodeBlocksUsed * NumInodesPerBlock, nil
 }
+*/

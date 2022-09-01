@@ -433,3 +433,23 @@ func (cache *BlockCache) Resize(newTotalBlocks uint) error {
 	cache.totalBlocks = newTotalBlocks
 	return nil
 }
+
+// MarkBlockRangeDirty marks a range of blocks as modified. They will be written
+// out to the backing storage on the next call to [FlushAll].
+func (cache *BlockCache) MarkBlockRangeDirty(
+	start c.LogicalBlock,
+	count uint,
+) error {
+	err := cache.checkBounds(start, count*cache.bytesPerBlock)
+	if err != nil {
+		return err
+	}
+
+	for i := uint(0); i < count; i++ {
+		// FIXME(dargueta): We can end up with integer overflow here
+		bitIndex := int(start) + int(i)
+		cache.dirtyBlocks.Set(bitIndex, true)
+		cache.loadedBlocks.Set(bitIndex, true)
+	}
+	return nil
+}

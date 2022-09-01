@@ -7,6 +7,8 @@ import (
 	"github.com/dargueta/disko"
 )
 
+const NumInodesPerBlock = 16
+
 type RawInode struct {
 	Flags            uint16
 	Nlinks           uint8

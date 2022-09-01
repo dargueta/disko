@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"io"
 	"time"
 
 	"github.com/boljen/go-bitmap"
@@ -46,7 +45,6 @@ type UnixV1Driver struct {
 	blockFreeMap      bitmap.Bitmap
 	inodes            []Inode
 	isMounted         bool
-	rawStream         io.ReadWriteSeeker
 	image             *blockcache.BlockCache
 	currentMountFlags disko.MountFlags
 }
@@ -93,7 +91,7 @@ func (driver *UnixV1Driver) Mount(
 
 	// blockBitmap is the actual bitmap.
 	blockBitmap := make([]byte, blockBitmapSize)
-	_, err = driver.rawStream.Read(blockBitmap)
+	_, err = rawStream.Read(blockBitmap)
 	if err != nil {
 		return errors.NewFromError(errors.EIO, err)
 	}
@@ -101,7 +99,7 @@ func (driver *UnixV1Driver) Mount(
 	// inodeBitmapSize is the size of the bitmap for which bitmaps are currently
 	// in use, in bytes. It also is always an even number.
 	var inodeBitmapSize uint16
-	err = binary.Read(driver.rawStream, binary.LittleEndian, &inodeBitmapSize)
+	err = binary.Read(rawStream, binary.LittleEndian, &inodeBitmapSize)
 	if err != nil {
 		return errors.NewFromError(errors.EIO, err)
 	}
@@ -119,13 +117,13 @@ func (driver *UnixV1Driver) Mount(
 	}
 
 	inodeBitmap := make([]byte, inodeBitmapSize)
-	_, err = driver.rawStream.Read(inodeBitmap)
+	_, err = rawStream.Read(inodeBitmap)
 	if err != nil {
 		return errors.NewFromError(errors.EIO, err)
 	}
 
 	rawInodes := make([]RawInode, inodeBitmapSize*8)
-	err = binary.Read(driver.rawStream, binary.LittleEndian, rawInodes[:])
+	err = binary.Read(rawStream, binary.LittleEndian, rawInodes[:])
 	if err != nil {
 		return errors.NewFromError(errors.EIO, err)
 	}
