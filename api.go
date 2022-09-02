@@ -141,6 +141,8 @@ type FileSystemImplementer interface {
 	GetBootCode() ([]byte, errors.DriverError)
 }
 
+type ImplementerConstructor func(stream io.ReadWriteSeeker) (FileSystemImplementer, errors.DriverError)
+
 // ObjectHandle is an interface for a way to interact with on-disk file system
 // objects.
 type ObjectHandle interface {
@@ -191,17 +193,25 @@ type ObjectHandle interface {
 	// Chmod changes the permission bits of this file system object. Only the
 	// permissions bits will be set in `mode`. File systems that support access
 	// controls but not all aspects (e.g. no executable bit, or no group
-	// permissions) must silently ignore anything they don't recognize.
+	// permissions) must silently ignore flags they don't recognize.
 	Chmod(mode os.FileMode) errors.DriverError
 
 	// Chown sets the ID of the owning user and group for this object. This
 	// function will never be called if user IDs are not supported. If the file
 	// system doesn't support group IDs, it must ignore `gid`.
 	Chown(uid, gid int) errors.DriverError
-	Chtimes(createdAt, lastAccessed, lastModified, lastChanged, deletedAt time.Time) error
+	Chtimes(
+		createdAt,
+		lastAccessed,
+		lastModified,
+		lastChanged,
+		deletedAt time.Time,
+	) errors.DriverError
 
 	// ListDir returns a list of the directory entries this object contains. "."
 	// and ".." are ignored if present.
+	//
+	// This is guaranteed to never be called unless this is a directory.
 	ListDir() ([]string, errors.DriverError)
 
 	// Name returns the name of the object itself without any path component.

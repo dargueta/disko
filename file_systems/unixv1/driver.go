@@ -66,7 +66,7 @@ func DeserializeTimestamp(tstamp uint32) time.Time {
 // [ ] GetRootDirectory
 // [x] FSStat
 // [ ] GetFSFeatures
-// [ ] FormatImage
+// [x] FormatImage
 // [ ] SetBootCode
 // [ ] GetBootCode
 
