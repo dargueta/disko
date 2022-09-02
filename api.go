@@ -78,8 +78,8 @@ type FileSystemImplementer interface {
 	// resources the implementation may be holding.
 	Unmount() errors.DriverError
 
-	// CreateObject creates an object on the file system that is *not* a
-	// directory.
+	// CreateObject creates an object on the file system, such as a file or
+	// directory. You can tell the what it is based on the flags.
 	//
 	// The following guarantees apply:
 	//
