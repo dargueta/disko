@@ -218,14 +218,12 @@ func (cache *BlockCache) checkBounds(start c.LogicalBlock, bufferSize uint) erro
 // GetSlice returns a slice pointing to the cache's storage, beginning at block
 // `start` and continuing for `count` blocks.
 //
-// The returned slice MUST NOT be modified.
+// If the returned slice is modified, the modified blocks MUST be marked as
+// dirty.
 func (cache *BlockCache) GetSlice(
 	start c.LogicalBlock,
 	count uint,
 ) ([]byte, error) {
-	// Note: That warning in the documentation about the returned slice can't be
-	// modified is a lie. You *can* modify the slice, but you need to mark the
-	// corresponding blocks as dirty.
 	err := cache.loadBlockRange(start, count)
 	if err != nil {
 		return nil, err
@@ -240,13 +238,14 @@ func (cache *BlockCache) GetSlice(
 // blocks not yet in the cache, so it may incur a one-time performance penalty
 // for large files or with inefficient driver implementations.
 //
-// The returned slice MUST NOT be modified.
+// If the returned slice is modified, the modified blocks MUST be marked as
+// dirty.
 func (cache *BlockCache) Data() ([]byte, error) {
 	err := cache.LoadAll()
 	if err != nil {
 		return nil, err
 	}
-	return cache.data, nil
+	return cache.data[:], nil
 }
 
 // loadBlockRange ensures that all blocks in the range [start, start + count) are
@@ -327,9 +326,9 @@ func (cache *BlockCache) LoadAll() error {
 	return cache.loadBlockRange(0, cache.totalBlocks)
 }
 
-// FlushAll flushes all dirty blocks from the cache into storage, and marks them
+// Flush flushes all dirty blocks from the cache into storage, and marks them
 // as clean.
-func (cache *BlockCache) FlushAll() error {
+func (cache *BlockCache) Flush() error {
 	return cache.flushBlockRange(0, cache.totalBlocks)
 }
 
@@ -431,5 +430,25 @@ func (cache *BlockCache) Resize(newTotalBlocks uint) error {
 	cache.dirtyBlocks = newDirtyBlocks
 	cache.loadedBlocks = newLoadedBlocks
 	cache.totalBlocks = newTotalBlocks
+	return nil
+}
+
+// MarkBlockRangeDirty marks a range of blocks as modified. They will be written
+// out to the backing storage on the next call to [FlushAll].
+func (cache *BlockCache) MarkBlockRangeDirty(
+	start c.LogicalBlock,
+	count uint,
+) error {
+	err := cache.checkBounds(start, count*cache.bytesPerBlock)
+	if err != nil {
+		return err
+	}
+
+	for i := uint(0); i < count; i++ {
+		// FIXME(dargueta): We can end up with integer overflow here
+		bitIndex := int(start) + int(i)
+		cache.dirtyBlocks.Set(bitIndex, true)
+		cache.loadedBlocks.Set(bitIndex, true)
+	}
 	return nil
 }
