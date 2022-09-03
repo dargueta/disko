@@ -10,7 +10,7 @@ import (
 // BLOCK-LEVEL ACCESS ==========================================================
 
 func (driver *Driver) ReadDiskBlocks(start PhysicalBlock, count uint) ([]byte, error) {
-	if (uint(start) + count) >= uint(driver.stat.TotalBlocks()) {
+	if (uint(start) + count) >= uint(driver.stat.TotalBlocks) {
 		return nil, fmt.Errorf(
 			"refusing to read past end of image: %d blocks at %d exceeds limit of %d",
 			start,
@@ -36,7 +36,7 @@ func (driver *Driver) WriteDiskBlocks(start PhysicalBlock, data []byte) error {
 	}
 
 	numBlocksToWrite := uint64(len(data) / 128)
-	if uint64(start)+numBlocksToWrite > driver.stat.TotalBlocks() {
+	if uint64(start)+numBlocksToWrite > driver.stat.TotalBlocks {
 		return errors.NewWithMessage(
 			errors.EIO,
 			fmt.Sprintf(
