@@ -22,7 +22,7 @@ func (driver *Driver) Format(information disko.FSStat) error {
 			"image must be unmounted before it can be formatted")
 	}
 
-	geo, err := GetGeometry(uint(information.TotalBlocks()))
+	geo, err := GetGeometry(uint(information.TotalBlocks))
 	if err != nil {
 		return err
 	}
