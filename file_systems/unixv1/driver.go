@@ -8,9 +8,9 @@ import (
 
 	"github.com/boljen/go-bitmap"
 	"github.com/dargueta/disko"
-	"github.com/dargueta/disko/drivers/common"
-	"github.com/dargueta/disko/drivers/common/blockcache"
 	"github.com/dargueta/disko/errors"
+	"github.com/dargueta/disko/file_systems/common"
+	"github.com/dargueta/disko/file_systems/common/blockcache"
 )
 
 type PhysicalBlock uint16

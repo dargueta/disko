@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/dargueta/disko"
-	"github.com/dargueta/disko/drivers/common"
+	"github.com/dargueta/disko/file_systems/common"
 )
 
 type RawInode struct {
