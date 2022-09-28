@@ -40,6 +40,8 @@ func (info *FileInfo) Size() int64 {
 	return info.FileStat.Size
 }
 
+// ModTime returns the timestamp of when the file was last modified. If the file
+// system doesn't record this information, implementations MUST return zero time
 func (info FileInfo) ModTime() time.Time {
 	return info.FileStat.LastModified
 }

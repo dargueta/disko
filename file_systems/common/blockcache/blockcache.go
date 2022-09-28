@@ -39,7 +39,8 @@ type FlushBlockCallback func(blockIndex c.LogicalBlock, buffer []byte) error
 // Standard conditions for error codes:
 //
 //   - [errors.EFBIG]: Can't increase the size of the object because it would
-//     exceed some technical limit.
+//     exceed some technical limit. For example, the Unix v6 file system has
+//     24-bit file sizes, so no file can be 16 MiB or greater.
 //   - [errors.ENOSPC]: Can't increase the size of the object because there's no
 //     space left on the volume.
 //   - [errors.ENOTSUP]: The object can't be resized as a general rule. This is

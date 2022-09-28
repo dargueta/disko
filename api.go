@@ -259,7 +259,8 @@ type FSFeatures struct {
 //
 // If a file system doesn't support a particular feature, drivers should use a
 // reasonable default value. For most of these 0 is fine, but for compatibility
-// drivers should use 1 for `Nlinks` and 0o777 for `ModeFlags`.
+// drivers should use 1 for `Nlinks` and 0o777 for `ModeFlags`. Unsupported
+// timestamps MUST be returned as "zero time".
 type FileStat struct {
 	DeviceID     uint64
 	InodeNumber  uint64
