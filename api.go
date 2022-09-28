@@ -71,7 +71,7 @@ const MountFlagsMask = MountFlagsCustomStart - 1
 // implementations.
 type FileSystemImplementer interface {
 	// Mount initializes the file system implementation. `image` is owned by the
-	// main driver.
+	// implementation and will not be (directly) modified by the driver.
 	Mount(image *blockcache.BlockCache, flags MountFlags) errors.DriverError
 
 	// Unmount writes out all pending changes to the disk image and releases any
@@ -157,37 +157,43 @@ type ObjectHandle interface {
 	// beginning at `index`. The following guarantees apply:
 	//
 	//   - `buffer` is a nonzero multiple of the size of a block.
-	//   - The read range is guaranteed to be within the current boundaries of
-	//     the object.
+	//   - The read range will always be within the current boundaries of the
+	//     object.
 	ReadBlocks(index common.LogicalBlock, buffer []byte) errors.DriverError
 
 	// WriteBlocks writes bytes from `buffer` into a sequence of logical blocks
 	// beginning at `index`. The following guarantees apply:
 	//
 	//   - `buffer` is a nonzero multiple of the size of a block.
-	//   - The write range is guaranteed to be within the current boundaries of
-	//     the object.
+	//   - The write range will always be within the current boundaries of the
+	//     object.
 	WriteBlocks(index common.LogicalBlock, data []byte) errors.DriverError
 
-	// ZeroOutBlocks tells the driver to treat `count` blocks beginning at
-	// `startIndex` as consisting entirely of null bytes (0). It does not change
-	// the size of the object.
+	// ZeroOutBlocks tells the implementation to treat `count` logical blocks
+	// beginning at `startIndex` as consisting entirely of null bytes (0). It
+	// does not change the size of the object.
 	//
 	// Functionally, it's equivalent to:
 	//
 	//		buffer := make([]byte, BlockSize * NUM_BLOCKS)
 	//		WriteBlocks(START_BLOCK, buffer)
 	//
-	// However, some file systems have optimizations for such "holes" that can
-	// save disk space. If the file system doesn't support hole optimization,
-	// the driver *must* set all bytes in these blocks to 0.
+	// The following guarantees apply:
 	//
-	// NOTE: It's the driver's responsibility to consolidate holes where possible.
+	//   - `count` is nonzero.
+	//   - `[startIndex, startIndex + count)` will always be within the current
+	//     boundaries of the object.
+	//
+	// Some file systems have optimizations for such "holes" that can save disk
+	// space. It's up to the file system implementation to handle this case, as
+	// well as consolidating holes where possible. The driver doesn't care what
+	// the implementation does as long as a subsequent call to [ReadBlocks] on
+	// this range returns all null bytes.
 	ZeroOutBlocks(startIndex common.LogicalBlock, count uint) errors.DriverError
 
 	// Unlink deletes the file system object. For directories, this is guaranteed
-	// to not be called unless [ListDir] returns an empty slice (ignoring "." and
-	// ".." if present).
+	// to not be called unless [ListDir] returns an empty slice (aside from "."
+	// and ".." if present, as the driver cannot assume these exist).
 	Unlink() errors.DriverError
 
 	// Chmod changes the permission bits of this file system object. Only the
@@ -196,10 +202,27 @@ type ObjectHandle interface {
 	// permissions) must silently ignore flags they don't recognize.
 	Chmod(mode os.FileMode) errors.DriverError
 
-	// Chown sets the ID of the owning user and group for this object. This
-	// function will never be called if user IDs are not supported. If the file
-	// system doesn't support group IDs, it must ignore `gid`.
+	// Chown sets the ID of the owning user and group for this object.
+	//
+	// The following guarantees apply:
+	//
+	//  - `uid` and `gid` will never be negative.
+	//  - This will never be called if user IDs are not supported. If, however,
+	//    the file system doesn't support group IDs, implementations must
+	//    silently ignore `gid`.
 	Chown(uid, gid int) errors.DriverError
+
+	// Chtimes changes various timestamps associated with an object. The driver
+	// will do its best to ensure that unsupported timestamps are equal to
+	// [UndefinedTimestamp], but the implementation must ignore timestamps it
+	// doesn't support.
+	//
+	// The following guarantees apply:
+	//
+	//  - Timestamps known to be unsupported (i.e. the corresponding function
+	//    from [FSFeatures] returned false) will always be [UndefinedTimestamp].
+	//  - `deletedAt` will only be set if the object has been deleted and the
+	//    flag is supported by the file system.
 	Chtimes(
 		createdAt,
 		lastAccessed,
@@ -220,7 +243,7 @@ type ObjectHandle interface {
 }
 
 // UndefinedTimestamp is a timestamp that should be used as an invalid value,
-// like `nil` for pointers.
+// equivalent to `nil` for pointers.
 var UndefinedTimestamp = time.UnixMicro(math.MaxInt64)
 
 // FSFeatures indicates the features available for the file system. If a file
@@ -242,14 +265,14 @@ type FSFeatures struct {
 	HasGroupPermissions bool
 
 	// TimestampEpoch returns the earliest representable timestamp on this file
-	// system. File systems that don't support timestamps of any kind should
-	// return [UndefinedTimestamp].
+	// system. File systems that don't support timestamps of any kind must
+	// return [UndefinedTimestamp] here.
 	TimestampEpoch time.Time
 
 	// DefaultNameEncoding gives the name of the text encoding natively used by
 	// the file system, in lowercase with no symbols (e.g. "utf8" not "UTF-8").
-	// For systems this old for the most part it will be either "ascii" or
-	// "ebcdic".
+	// For systems this old for the most part it will most likely be either
+	// "ascii" or "ebcdic".
 	DefaultNameEncoding string
 	SupportsBootCode    bool
 
@@ -259,18 +282,22 @@ type FSFeatures struct {
 	// should return [math.MaxInt].
 	MaxBootCodeSize int
 
-	// BlockSize gives the default size of a single block in the file system,
-	// in bytes. File systems that don't have fixed block sizes (such as certain
-	// types of archives) should return 0.
+	// BlockSize gives the default size of a single block in the file system, in
+	// bytes. File systems that don't have fixed block sizes (such as certain
+	// types of archives) must be 0.
 	DefaultBlockSize int
+
+	// MaxVolumeLabelSize gives the maximum size of the volume label for the
+	// file system. If not supported, this should be 0.
+	MaxVolumeLabelSize int
 }
 
 // FileStat is a platform-independent form of [syscall.Stat_t].
 //
-// If a file system doesn't support a particular feature, drivers should use a
-// reasonable default value. For most of these 0 is fine, but for compatibility
-// drivers should use 1 for `Nlinks` and 0o777 for `ModeFlags`. Unsupported
-// timestamps MUST be returned as "zero time".
+// If a file system doesn't support a particular feature, implementations should
+// use a reasonable default value. For most of these 0 is fine, but for
+// compatibility they should use 1 for `Nlinks`, 0o777 for `ModeFlags`;
+// unsupported timestamps MUST be [UndefinedTimestamp].
 type FileStat struct {
 	DeviceID     uint64
 	InodeNumber  uint64
@@ -289,14 +316,19 @@ type FileStat struct {
 	DeletedAt    time.Time
 }
 
+// IsDir returns true if and only if the file descriptor is a directory.
 func (stat *FileStat) IsDir() bool {
 	return stat.ModeFlags.IsDir()
 }
 
+// IsFile returns true if and only if the file descriptor is a normal file; hard
+// links count as normal, symbolic links do not.
 func (stat *FileStat) IsFile() bool {
 	return stat.ModeFlags.IsRegular()
 }
 
+// IsSymlink returns true if and only if the file descriptor is a symbolic link,
+// irrespective of what type of object the symbolic link points to.
 func (stat *FileStat) IsSymlink() bool {
 	return stat.ModeFlags&os.ModeType == os.ModeSymlink
 }
@@ -331,9 +363,9 @@ type FSStat struct {
 // File is the expected interface for file handles from drivers.
 //
 // This interface is intended to be more or less a drop-in replacement for
-// [os.File], *however* not all functions are implemented. In particular,
-// all deadline-related functions and `Fd` are excluded. For a full list, see
-// the documentation in the README.
+// [os.File], *however* not all functions are implemented. In particular, all
+// deadline-related functions and `Fd` are excluded. For a full list of what is
+// and isn't supported, see the documentation in the README.
 type File interface {
 	io.ReadWriteCloser
 	io.Seeker
@@ -355,8 +387,8 @@ type File interface {
 }
 
 // DirectoryEntry represents a file, directory, device, or other entity
-// encountered on the file system. It must implement the os.FileInfo interface
-// but only needs to fill values in Stat for the features it supports.
+// encountered on the file system. It must implement the [os.FileInfo] interface
+// but [Stat] only needs to fill values in [FileStat] for features it supports.
 type DirectoryEntry interface {
 	os.DirEntry
 	Stat() FileStat
