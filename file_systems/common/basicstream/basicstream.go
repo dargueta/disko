@@ -210,7 +210,7 @@ func (stream *BasicStream) Size() int64 {
 // Sync writes out all pending changes to the backing storage. After calling
 // this, all loaded blocks will be marked clean.
 func (stream *BasicStream) Sync() error {
-	return stream.data.FlushAll()
+	return stream.data.Flush()
 }
 
 // Tell returns the current stream position. It's slightly more efficient than

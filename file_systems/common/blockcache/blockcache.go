@@ -39,7 +39,8 @@ type FlushBlockCallback func(blockIndex c.LogicalBlock, buffer []byte) error
 // Standard conditions for error codes:
 //
 //   - [errors.EFBIG]: Can't increase the size of the object because it would
-//     exceed some technical limit.
+//     exceed some technical limit. For example, the Unix v6 file system has
+//     24-bit file sizes, so no file can be 16 MiB or greater.
 //   - [errors.ENOSPC]: Can't increase the size of the object because there's no
 //     space left on the volume.
 //   - [errors.ENOTSUP]: The object can't be resized as a general rule. This is
@@ -218,14 +219,12 @@ func (cache *BlockCache) checkBounds(start c.LogicalBlock, bufferSize uint) erro
 // GetSlice returns a slice pointing to the cache's storage, beginning at block
 // `start` and continuing for `count` blocks.
 //
-// The returned slice MUST NOT be modified.
+// If the returned slice is modified, the modified blocks MUST be marked as
+// dirty.
 func (cache *BlockCache) GetSlice(
 	start c.LogicalBlock,
 	count uint,
 ) ([]byte, error) {
-	// Note: That warning in the documentation about the returned slice can't be
-	// modified is a lie. You *can* modify the slice, but you need to mark the
-	// corresponding blocks as dirty.
 	err := cache.loadBlockRange(start, count)
 	if err != nil {
 		return nil, err
@@ -240,13 +239,14 @@ func (cache *BlockCache) GetSlice(
 // blocks not yet in the cache, so it may incur a one-time performance penalty
 // for large files or with inefficient driver implementations.
 //
-// The returned slice MUST NOT be modified.
+// If the returned slice is modified, the modified blocks MUST be marked as
+// dirty.
 func (cache *BlockCache) Data() ([]byte, error) {
 	err := cache.LoadAll()
 	if err != nil {
 		return nil, err
 	}
-	return cache.data, nil
+	return cache.data[:], nil
 }
 
 // loadBlockRange ensures that all blocks in the range [start, start + count) are
@@ -327,9 +327,9 @@ func (cache *BlockCache) LoadAll() error {
 	return cache.loadBlockRange(0, cache.totalBlocks)
 }
 
-// FlushAll flushes all dirty blocks from the cache into storage, and marks them
+// Flush flushes all dirty blocks from the cache into storage, and marks them
 // as clean.
-func (cache *BlockCache) FlushAll() error {
+func (cache *BlockCache) Flush() error {
 	return cache.flushBlockRange(0, cache.totalBlocks)
 }
 

@@ -226,50 +226,51 @@ var UndefinedTimestamp = time.UnixMicro(math.MaxInt64)
 // FSFeatures indicates the features available for the file system. If a file
 // system supports a feature, driver implementations MUST declare it as available
 // even if the driver hasn't implemented it yet.
-type FSFeatures interface {
-	HasDirectories() bool
-	HasSymbolicLinks() bool
-	HasHardLinks() bool
-	HasCreatedTime() bool
-	HasAccessedTime() bool
-	HasModifiedTime() bool
-	HasChangedTime() bool
-	HasDeletedTime() bool
-	HasUnixPermissions() bool
-	HasUserID() bool
-	HasGroupID() bool
-	HasUserPermissions() bool
-	HasGroupPermissions() bool
+type FSFeatures struct {
+	HasDirectories      bool
+	HasSymbolicLinks    bool
+	HasHardLinks        bool
+	HasCreatedTime      bool
+	HasAccessedTime     bool
+	HasModifiedTime     bool
+	HasChangedTime      bool
+	HasDeletedTime      bool
+	HasUnixPermissions  bool
+	HasUserID           bool
+	HasGroupID          bool
+	HasUserPermissions  bool
+	HasGroupPermissions bool
 
 	// TimestampEpoch returns the earliest representable timestamp on this file
 	// system. File systems that don't support timestamps of any kind should
 	// return [UndefinedTimestamp].
-	TimestampEpoch() time.Time
+	TimestampEpoch time.Time
 
 	// DefaultNameEncoding gives the name of the text encoding natively used by
 	// the file system, in lowercase with no symbols (e.g. "utf8" not "UTF-8").
 	// For systems this old for the most part it will be either "ascii" or
 	// "ebcdic".
-	DefaultNameEncoding() string
-	SupportsBootCode() bool
+	DefaultNameEncoding string
+	SupportsBootCode    bool
 
 	// MaxBootCodeSize returns the maximum number of bytes that can be stored as
 	// boot code in the file system. File systems that don't support boot code
 	// must return 0. File systems that don't have a theoretical upper limit
 	// should return [math.MaxInt].
-	MaxBootCodeSize() int
+	MaxBootCodeSize int
 
 	// BlockSize gives the default size of a single block in the file system,
 	// in bytes. File systems that don't have fixed block sizes (such as certain
 	// types of archives) should return 0.
-	DefaultBlockSize() int
+	DefaultBlockSize int
 }
 
 // FileStat is a platform-independent form of [syscall.Stat_t].
 //
 // If a file system doesn't support a particular feature, drivers should use a
 // reasonable default value. For most of these 0 is fine, but for compatibility
-// drivers should use 1 for `Nlinks` and 0o777 for `ModeFlags`.
+// drivers should use 1 for `Nlinks` and 0o777 for `ModeFlags`. Unsupported
+// timestamps MUST be returned as "zero time".
 type FileStat struct {
 	DeviceID     uint64
 	InodeNumber  uint64

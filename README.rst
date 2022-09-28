@@ -117,6 +117,7 @@ File System     Introduced Format New Image Read Write Existing Files Create New
 =============== ========== ================ ==== ==================== ================ ============
 Unix v1 [#]_    1971       ✔
 Unix v2         1972
+Unix v5         1973
 CP/M 1.4        1974
 Unix v6         1975
 FAT 8           1977       B [#]_
@@ -164,6 +165,7 @@ Further Reading
 * `UNIX v1 File System`_
 *  `Full UNIX v1 Manual`_, relevant parts pages 171-174.
 *  `Full UNIX v2 Manual`_, relevant parts pages 221-224.
+*  `Full UNIX v5 Manual`_, relevant parts pages 237-238.
 * `UNIX v6 File System`_
 * `Xerox BASIC-80 Manual`_, documenting FAT 8 on pages 172, 176, and 178.
 * `FAT 12/16/32 on Wikipedia`_
@@ -173,6 +175,7 @@ Further Reading
 .. _UNIX v1 File System: http://man.cat-v.org/unix-1st/5/file
 .. _Full UNIX v1 Manual: http://www.bitsavers.org/pdf/bellLabs/unix/UNIX_ProgrammersManual_Nov71.pdf
 .. _Full UNIX v2 Manual: https://web.archive.org/web/20161006034736/http://sunsite.icm.edu.pl/pub/unix/UnixArchive/PDP-11/Distributions/research/1972_stuff/unix_2nd_edition_manual.pdf
+.. _Full UNIX v5 Manual: https://www.tuhs.org/Archive/Distributions/Research/Dennis_v5/v5man.pdf
 .. _UNIX v6 File System: http://man.cat-v.org/unix-6th/5/fs
 .. _FAT 12/16/32 on Wikipedia: https://en.wikipedia.org/wiki/File_Allocation_Table
 .. _Xerox BASIC-80 Manual: http://bitsavers.trailing-edge.com/pdf/xerox/820-II/BASIC-80_5.0.pdf
@@ -199,8 +202,8 @@ Footnotes
 ---------
 
 .. [#] Timestamps are stored using the 1973 revision that uses the canonical
-       Unix epoch. The first specification can't represent timestamps past
-       1973-04-08 12:06:28.250.
+       Unix epoch. The first version of the specification can't represent
+       timestamps past 1973-04-08 12:06:28.250.
 .. [#] Works for the larger image size; smaller image size is buggy.
-.. [#] Note this version 3 of the file system, not MINIX version 3
-.. [#] Also known as "DOS Plus"
+.. [#] Note this version 3 of the file system, not MINIX version 3.
+.. [#] Also known as "DOS Plus".
