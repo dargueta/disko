@@ -164,6 +164,20 @@ Extract using shell globs
 Interactive editing
 ========================= ======
 
+Development & Usage
+-------------------
+
+I make the following guarantees:
+
+* Versioning strictly follows `the guidelines <https://go.dev/doc/modules/version-numbers>`_
+  in Go's documentation.
+* This is tested on:
+
+  * The latest three minor versions of Go, e.g. if 1.19.x is the most recent
+    release, I will test this on 1.17, 1.18, and 1.19.
+  * The latest versions of Ubuntu, Windows, and MacOS that are supported by
+    GitHub.
+
 Further Reading
 ---------------
 
