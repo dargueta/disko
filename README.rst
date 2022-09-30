@@ -1,6 +1,11 @@
 Disko: A Disk Image Editor
 ==========================
 
+|go-versions| |platforms|
+
+.. |go-versions| image:: https://img.shields.io/badge/Go-1.17,%201.18,%201.19-blue.svg
+.. |platforms| image::  https://img.shields.io/badge/platform-Linux%20%7C%20MacOS%20%7C%20Windows-lightgrey
+
 I've recently gotten into retro computing and found I need to create disk images.
 I also wanted to learn Go, so I figured I could kill two birds with one stone
 and create a tool for doing this, written in Go.
