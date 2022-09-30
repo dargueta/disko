@@ -240,6 +240,16 @@ type ObjectHandle interface {
 	// Name returns the name of the object itself without any path component.
 	// The root directory, which technically has no name, must return "/".
 	Name() string
+
+	// SameAs returns a boolean indicating if this object handle refers to the
+	// same on-disk object as the given handle. A few rules:
+	//
+	//   - Attributes such as size, timestamps, number of links, etc. should be
+	//     ignored. This is only comparing identity, not properties.
+	//   - Symbolic links should not be dereferenced, so X and Y are not the same
+	//     even if X is a symbolic link to Y.
+	//   - Hard links are considered the same as the files they refer to.
+	SameAs(other ObjectHandle) bool
 }
 
 // UndefinedTimestamp is a timestamp that should be used as an invalid value,
