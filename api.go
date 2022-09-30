@@ -2,7 +2,6 @@ package disko
 
 import (
 	"io"
-	"math"
 	"os"
 	"time"
 
@@ -254,11 +253,14 @@ type ObjectHandle interface {
 
 // UndefinedTimestamp is a timestamp that should be used as an invalid value,
 // equivalent to `nil` for pointers.
-var UndefinedTimestamp = time.UnixMicro(math.MaxInt64)
+//
+// To check to see if a timestamp is invalid, use [time.Time.IsZero]. Direct
+// comparison to this is not recommended.
+var UndefinedTimestamp = time.Time{}
 
 // FSFeatures indicates the features available for the file system. If a file
 // system supports a feature, driver implementations MUST declare it as available
-// even if the driver hasn't implemented it yet.
+// even if it hasn't implemented it yet.
 type FSFeatures struct {
 	HasDirectories      bool
 	HasSymbolicLinks    bool
@@ -280,9 +282,10 @@ type FSFeatures struct {
 	TimestampEpoch time.Time
 
 	// DefaultNameEncoding gives the name of the text encoding natively used by
-	// the file system, in lowercase with no symbols (e.g. "utf8" not "UTF-8").
-	// For systems this old for the most part it will most likely be either
-	// "ascii" or "ebcdic".
+	// the file system for directory and file names (not file contents!).
+	//
+	// This must be lowercase with no symbols (e.g. "utf8" not "UTF-8"). For
+	// systems this old it will most likely be either "ascii" or "ebcdic".
 	DefaultNameEncoding string
 	SupportsBootCode    bool
 
