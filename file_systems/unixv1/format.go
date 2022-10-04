@@ -160,7 +160,7 @@ func (driver *UnixV1Driver) Format(stat disko.FSStat) error {
 	)
 
 	driver.image.MarkBlockRangeDirty(0, firstDataBlock)
-	return driver.image.FlushAll()
+	return driver.image.Flush()
 }
 
 /*

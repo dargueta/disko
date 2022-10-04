@@ -148,7 +148,7 @@ func (driver *UnixV1Driver) Mount(
 }
 
 func (driver *UnixV1Driver) Unmount() errors.DriverError {
-	err := driver.image.FlushAll()
+	err := driver.image.Flush()
 	if err != nil {
 		return errors.NewFromError(errors.EIO, err)
 	}
