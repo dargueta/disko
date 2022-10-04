@@ -8,7 +8,6 @@ import (
 
 	"github.com/dargueta/disko"
 	"github.com/dargueta/disko/errors"
-	"golang.org/x/exp/slices"
 )
 
 // Driver is a file system driver wrapping an implementation of a specific file
@@ -434,15 +433,29 @@ func (driver *Driver) Create(path string) (File, error) {
 }
 
 func removeDotsFromSlice(arr []string) []string {
-	toRemove := []string{".", ".."}
+	numToIgnore := 0
 
-	for _, dotStr := range toRemove {
-		index := slices.Index(arr, dotStr)
-		if index >= 0 {
-			arr = slices.Delete(arr, index, 1)
+	for _, element := range arr {
+		if element == "." || element == ".." {
+			numToIgnore++
 		}
 	}
-	return slices.Clip(arr)
+
+	// If we didn't find . or .. anywhere then don't bother copying the slice,
+	// and return it unmodified.
+	if numToIgnore == 0 {
+		return arr
+	}
+
+	// We found at least one dot string. Create a copy of the slice while skipping
+	// over the things we don't want.
+	newSlice := make([]string, 0, len(arr)-numToIgnore)
+	for _, element := range arr {
+		if element != "." && element != ".." {
+			newSlice = append(newSlice, element)
+		}
+	}
+	return newSlice
 }
 
 func (driver *Driver) Remove(path string) error {
