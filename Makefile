@@ -17,7 +17,7 @@ ALL_SOURCES = $(ALL_DRIVER_SOURCES) $(CLI_SOURCES) $(BASE_SOURCES)
 
 
 $(BINDIR)/disko: $(ALL_SOURCES) | $(BINDIR)
-	go build -o $@ $^
+	go build -v -o $@ ./...
 
 
 $(BINDIR):
@@ -27,3 +27,7 @@ $(BINDIR):
 .PHONY: clean
 clean:
 	$(RM) -r $(BINDIR)
+
+.PHONY: test
+test: $(ALL_SOURCES)
+	go test -v ./...

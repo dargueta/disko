@@ -204,7 +204,12 @@ func (cache *BlockCache) LengthToNumBlocks(size uint) uint {
 func (cache *BlockCache) checkBounds(start c.LogicalBlock, bufferSize uint) error {
 	numBlocks := cache.LengthToNumBlocks(bufferSize)
 
-	if uint(start)+numBlocks >= cache.totalBlocks {
+	if uint(start) >= cache.totalBlocks {
+		return fmt.Errorf(
+			"block %d not in range [0, %d)", start, cache.totalBlocks,
+		)
+	}
+	if uint(start)+numBlocks > cache.totalBlocks {
 		return fmt.Errorf(
 			"can't access %d bytes (%d blocks) from block %d; range not in [0, %d)",
 			bufferSize,
@@ -264,10 +269,9 @@ func (cache *BlockCache) loadBlockRange(start c.LogicalBlock, count uint) error 
 			continue
 		}
 
-		buffer, err := cache.GetSlice(c.LogicalBlock(blockIndex), 1)
-		if err != nil {
-			return err
-		}
+		startByteOffset := start * c.LogicalBlock(cache.bytesPerBlock)
+		endByteOffset := startByteOffset + c.LogicalBlock(cache.bytesPerBlock*count)
+		buffer := cache.data[startByteOffset:endByteOffset]
 
 		// Load the block from backing storage directly into the cache.
 		err = cache.fetch(c.LogicalBlock(blockIndex), buffer)
