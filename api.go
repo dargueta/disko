@@ -2,7 +2,6 @@ package disko
 
 import (
 	"io"
-	"math"
 	"os"
 	"time"
 
@@ -240,15 +239,28 @@ type ObjectHandle interface {
 	// Name returns the name of the object itself without any path component.
 	// The root directory, which technically has no name, must return "/".
 	Name() string
+
+	// SameAs returns a boolean indicating if this object handle refers to the
+	// same on-disk object as the given handle. A few rules:
+	//
+	//   - Attributes such as size, timestamps, number of links, etc. should be
+	//     ignored. This is only comparing identity, not properties.
+	//   - Symbolic links should not be dereferenced, so X and Y are not the same
+	//     even if X is a symbolic link to Y.
+	//   - Hard links are considered the same as the files they refer to.
+	SameAs(other ObjectHandle) bool
 }
 
 // UndefinedTimestamp is a timestamp that should be used as an invalid value,
 // equivalent to `nil` for pointers.
-var UndefinedTimestamp = time.UnixMicro(math.MaxInt64)
+//
+// To check to see if a timestamp is invalid, use [time.Time.IsZero]. Direct
+// comparison to this is not recommended.
+var UndefinedTimestamp = time.Time{}
 
 // FSFeatures indicates the features available for the file system. If a file
 // system supports a feature, driver implementations MUST declare it as available
-// even if the driver hasn't implemented it yet.
+// even if it hasn't implemented it yet.
 type FSFeatures struct {
 	HasDirectories      bool
 	HasSymbolicLinks    bool
@@ -270,9 +282,10 @@ type FSFeatures struct {
 	TimestampEpoch time.Time
 
 	// DefaultNameEncoding gives the name of the text encoding natively used by
-	// the file system, in lowercase with no symbols (e.g. "utf8" not "UTF-8").
-	// For systems this old for the most part it will most likely be either
-	// "ascii" or "ebcdic".
+	// the file system for directory and file names (not file contents!).
+	//
+	// This must be lowercase with no symbols (e.g. "utf8" not "UTF-8"). For
+	// systems this old it will most likely be either "ascii" or "ebcdic".
 	DefaultNameEncoding string
 	SupportsBootCode    bool
 

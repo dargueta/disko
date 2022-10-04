@@ -8,7 +8,6 @@ import (
 
 	"github.com/dargueta/disko"
 	"github.com/dargueta/disko/errors"
-	"golang.org/x/exp/slices"
 )
 
 // Driver is a file system driver wrapping an implementation of a specific file
@@ -31,10 +30,10 @@ func New(
 	}
 }
 
-// normalizePath converts a path from the user's native file system syntax to
+// NormalizePath converts a path from the user's native file system syntax to
 // an absolute normalized path using forward slashes (/) as the component
 // separator. The return value is always an absolute path.
-func (driver *Driver) normalizePath(path string) string {
+func (driver *Driver) NormalizePath(path string) string {
 	path = posixpath.Clean(filepath.ToSlash(path))
 	if path == "." {
 		path = "/"
@@ -82,7 +81,7 @@ func (driver *Driver) resolveSymlink(
 
 		// Compute the next path in this chain; if it's already in the cache
 		// then we hit a cycle.
-		nextPath := driver.normalizePath(string(symlinkText))
+		nextPath := driver.NormalizePath(string(symlinkText))
 		_, exists := pathCache[nextPath]
 		if exists {
 			return nil,
@@ -146,6 +145,8 @@ func (driver *Driver) getObjectAtPathNoFollow(
 	return driver.getExtObjectInDir(baseName, parentObject)
 }
 
+// getObjectAtPathFollowingLink is like [getObjectAtPathNoFollow] except that it
+// always follows the last path component if it's a symlink.
 func (driver *Driver) getObjectAtPathFollowingLink(
 	path string,
 ) (extObjectHandle, errors.DriverError) {
@@ -228,7 +229,7 @@ func (driver *Driver) OpenFile(
 	flags disko.IOFlags,
 	perm os.FileMode,
 ) (File, error) {
-	absPath := driver.normalizePath(path)
+	absPath := driver.NormalizePath(path)
 	ioFlags := disko.IOFlags(flags)
 
 	if ioFlags.RequiresWritePerm() && !driver.mountFlags.CanWrite() {
@@ -288,7 +289,7 @@ func (driver *Driver) OpenFile(
 // ReadingDriver ---------------------------------------------------------------
 
 func (driver *Driver) Chdir(path string) error {
-	absPath := driver.normalizePath(path)
+	absPath := driver.NormalizePath(path)
 
 	object, err := driver.getObjectAtPathFollowingLink(absPath)
 	if err != nil {
@@ -316,7 +317,7 @@ func (driver *Driver) Open(path string) (File, error) {
 }
 
 func (driver *Driver) ReadFile(path string) ([]byte, error) {
-	path = driver.normalizePath(path)
+	path = driver.NormalizePath(path)
 
 	object, err := driver.getObjectAtPathFollowingLink(path)
 	if err != nil {
@@ -332,7 +333,7 @@ func (driver *Driver) SameFile(fi1, fi2 os.FileInfo) bool {
 }
 
 func (driver *Driver) Stat(path string) (disko.FileStat, error) {
-	path = driver.normalizePath(path)
+	path = driver.NormalizePath(path)
 
 	object, err := driver.getObjectAtPathFollowingLink(path)
 	if err != nil {
@@ -344,7 +345,7 @@ func (driver *Driver) Stat(path string) (disko.FileStat, error) {
 // DirReadingDriver ------------------------------------------------------------
 
 func (driver *Driver) ReadDir(path string) ([]disko.DirectoryEntry, error) {
-	absPath := driver.normalizePath(path)
+	absPath := driver.NormalizePath(path)
 
 	directory, err := driver.getObjectAtPathFollowingLink(absPath)
 	if err != nil {
@@ -384,7 +385,7 @@ func (driver *Driver) readDir(
 // ReadingLinkingDriver --------------------------------------------------------
 
 func (driver *Driver) Readlink(path string) (string, error) {
-	path = driver.normalizePath(path)
+	path = driver.NormalizePath(path)
 	object, err := driver.getObjectAtPathNoFollow(path)
 	if err != nil {
 		return "", err
@@ -406,7 +407,7 @@ func (driver *Driver) Readlink(path string) (string, error) {
 }
 
 func (driver *Driver) Lstat(path string) (disko.FileStat, error) {
-	path = driver.normalizePath(path)
+	path = driver.NormalizePath(path)
 	object, err := driver.getObjectAtPathNoFollow(path)
 	if err != nil {
 		return disko.FileStat{}, err
@@ -432,19 +433,33 @@ func (driver *Driver) Create(path string) (File, error) {
 }
 
 func removeDotsFromSlice(arr []string) []string {
-	toRemove := []string{".", ".."}
+	numToIgnore := 0
 
-	for _, dotStr := range toRemove {
-		index := slices.Index(arr, dotStr)
-		if index >= 0 {
-			arr = slices.Delete(arr, index, 1)
+	for _, element := range arr {
+		if element == "." || element == ".." {
+			numToIgnore++
 		}
 	}
-	return slices.Clip(arr)
+
+	// If we didn't find . or .. anywhere then don't bother copying the slice,
+	// and return it unmodified.
+	if numToIgnore == 0 {
+		return arr
+	}
+
+	// We found at least one dot string. Create a copy of the slice while skipping
+	// over the things we don't want.
+	newSlice := make([]string, 0, len(arr)-numToIgnore)
+	for _, element := range arr {
+		if element != "." && element != ".." {
+			newSlice = append(newSlice, element)
+		}
+	}
+	return newSlice
 }
 
 func (driver *Driver) Remove(path string) error {
-	absPath := driver.normalizePath(path)
+	absPath := driver.NormalizePath(path)
 	object, err := driver.getObjectAtPathFollowingLink(absPath)
 	if err != nil {
 		return err
@@ -481,7 +496,7 @@ func (driver *Driver) Remove(path string) error {
 }
 
 func (driver *Driver) Truncate(path string) error {
-	absPath := driver.normalizePath(path)
+	absPath := driver.NormalizePath(path)
 	object, err := driver.getObjectAtPathFollowingLink(absPath)
 	if err != nil {
 		return err
@@ -511,11 +526,12 @@ func (driver *Driver) WriteFile(
 // DirWritingDriver ------------------------------------------------------------
 
 func (driver *Driver) Mkdir(path string, perm os.FileMode) error {
-	// Force the permissions flags to indicate this is a directory
+	// Force the permissions flags to indicate this is a directory so that the
+	// caller doesn't have to remember to do it themselves.
 	perm &^= os.ModeType
 	perm |= os.ModeDir
 
-	absPath := driver.normalizePath(path)
+	absPath := driver.NormalizePath(path)
 	parentDir, baseName := posixpath.Split(absPath)
 
 	parentObject, err := driver.getObjectAtPathFollowingLink(parentDir)
@@ -528,7 +544,7 @@ func (driver *Driver) Mkdir(path string, perm os.FileMode) error {
 		return errors.NewWithMessage(
 			errors.ENOTDIR,
 			fmt.Sprintf(
-				"cannot create `%s`: `%s is not a directory",
+				"cannot create `%s`: `%s` is not a directory",
 				absPath,
 				parentDir,
 			),
@@ -540,10 +556,11 @@ func (driver *Driver) Mkdir(path string, perm os.FileMode) error {
 }
 
 func (driver *Driver) MkdirAll(path string, perm os.FileMode) error {
-	absPath := driver.normalizePath(path)
+	absPath := driver.NormalizePath(path)
 	parentDir, baseName := posixpath.Split(absPath)
 
-	// Force the permissions flags to indicate this is a directory
+	// Force the permissions flags to indicate this is a directory so that the
+	// caller doesn't have to remember to do it themselves.
 	perm &^= os.ModeType
 	perm |= os.ModeDir
 
@@ -563,7 +580,7 @@ func (driver *Driver) MkdirAll(path string, perm os.FileMode) error {
 }
 
 func (driver *Driver) RemoveAll(path string) error {
-	path = driver.normalizePath(path)
+	path = driver.NormalizePath(path)
 	directory, err := driver.getObjectAtPathFollowingLink(path)
 	if err != nil {
 		return err
@@ -574,6 +591,15 @@ func (driver *Driver) RemoveAll(path string) error {
 		return errors.NewWithMessage(
 			errors.ENOTDIR,
 			fmt.Sprintf("cannot remove `%s`: not a directory", path),
+		)
+	}
+
+	// Block an attempt at `rm -rf /`, because some clown is gonna try it.
+	root := driver.implementation.GetRootDirectory()
+	if root.SameAs(directory) {
+		return errors.NewWithMessage(
+			errors.EPERM,
+			"you can't remove the root directory",
 		)
 	}
 

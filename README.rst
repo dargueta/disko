@@ -1,6 +1,11 @@
 Disko: A Disk Image Editor
 ==========================
 
+|go-versions| |platforms|
+
+.. |go-versions| image:: https://img.shields.io/badge/Go-1.17,%201.18,%201.19-blue.svg
+.. |platforms| image::  https://img.shields.io/badge/platform-Linux%20%7C%20MacOS%20%7C%20Windows-lightgrey
+
 I've recently gotten into retro computing and found I need to create disk images.
 I also wanted to learn Go, so I figured I could kill two birds with one stone
 and create a tool for doing this, written in Go.
@@ -158,6 +163,20 @@ Extract directory trees
 Extract using shell globs
 Interactive editing
 ========================= ======
+
+Development & Usage
+-------------------
+
+I make the following guarantees:
+
+* Versioning strictly follows `the guidelines <https://go.dev/doc/modules/version-numbers>`_
+  in Go's documentation.
+* This is tested on:
+
+  * The latest three minor versions of Go, e.g. if 1.19.x is the most recent
+    release, I will test this on 1.17, 1.18, and 1.19.
+  * The latest versions of Ubuntu, Windows, and MacOS that are supported by
+    GitHub.
 
 Further Reading
 ---------------

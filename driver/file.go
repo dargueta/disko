@@ -46,7 +46,7 @@ func (info FileInfo) ModTime() time.Time {
 	return info.FileStat.LastModified
 }
 
-func (info *FileInfo) Sys() any {
+func (info *FileInfo) Sys() interface{} {
 	return info.FileStat
 }
 
