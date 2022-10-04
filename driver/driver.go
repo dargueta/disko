@@ -30,6 +30,7 @@ func New(
 	}
 }
 
+// RWX
 // NormalizePath converts a path from the user's native file system syntax to
 // an absolute normalized path using forward slashes (/) as the component
 // separator. The return value is always an absolute path.
