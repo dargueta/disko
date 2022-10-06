@@ -11,6 +11,8 @@ import (
 	"github.com/dargueta/disko/file_systems/common/blockcache"
 )
 
+// Create an image with the given number of blocks and bytes per block. It is
+// guaranteed to either return a valid slice or fail the test and abort.
 func createRandomImage(bytesPerBlock, totalBlocks uint, t *testing.T) []byte {
 	backingData := make([]byte, bytesPerBlock*totalBlocks)
 
@@ -26,6 +28,25 @@ func createRandomImage(bytesPerBlock, totalBlocks uint, t *testing.T) []byte {
 	return backingData
 }
 
+// Create a cache with default settings, fetch/flush handlers, etc. The image
+// cannot be resized.
+//
+// Arguments:
+//
+//   - bytesPerBlock: The number of bytes in a single block.
+//   - totalBlocks: The number of blocks in the cache.
+//   - writable: `true` if the image is writable, `false` otherwise. The handler
+//     will fail a test if an attempt is made to write to the image if this is
+//     false.
+//   - backingData: Optional. A byte slice of at least `bytesPerBlock * totalBlocks`
+//     that is used as the underlying storage the cache sits on top of. You can
+//     pass `nil` for this to get completely random data.
+//   - `t`: The testing fixture.
+//
+// The fetch and flush handlers generated for the cache check bounds and
+// permissions for you, and fail with an appropriate error message. This means
+// you won't be able to test negative conditions (i.e. ensure methods fail where
+// they should) so you'll have to do that yourself. See [createRandomImage].
 func createDefaultCache(
 	bytesPerBlock,
 	totalBlocks uint,
@@ -150,5 +171,15 @@ func TestBlockCache__Fetch__ReadPastEnd(t *testing.T) {
 	err = cache.Read(16, []byte{})
 	if err == nil {
 		t.Error("tried reading 0 bytes of block 16 of [0, 16) but it didn't fail")
+	}
+
+	err = cache.Read(0, make([]byte, 8192))
+	if err != nil {
+		t.Errorf("failed reading entire image into buffer: %s", err.Error())
+	}
+
+	err = cache.Read(0, make([]byte, 8193))
+	if err == nil {
+		t.Error("should've failed to read entire image + 1 byte into buffer")
 	}
 }
