@@ -117,7 +117,7 @@ func (stream *BasicStream) ReadAt(buffer []byte, offset int64) (int, error) {
 
 	sourceData, err := stream.data.GetSlice(
 		firstBlock,
-		uint(lastBlock-firstBlock)+1,
+		uint(lastBlock-firstBlock),
 	)
 	if err != nil {
 		return 0, err
