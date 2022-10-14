@@ -211,7 +211,7 @@ func (cache *BlockCache) checkBounds(start c.LogicalBlock, bufferSize uint) erro
 	}
 	if uint(start)+numBlocks > cache.totalBlocks {
 		return fmt.Errorf(
-			"can't access %d bytes (%d blocks) from block %d; range not in [0, %d)",
+			"can't access %d bytes (%d blocks) starting at block %d; range not in [0, %d)",
 			bufferSize,
 			numBlocks,
 			start,
