@@ -182,7 +182,7 @@ func (stream *BasicStream) Seek(offset int64, whence int) (int64, error) {
 	case io.SeekStart:
 		absoluteOffset = offset
 	case io.SeekCurrent:
-		absoluteOffset += offset
+		absoluteOffset = stream.position + offset
 	case io.SeekEnd:
 		absoluteOffset = stream.size + offset
 	default:
@@ -192,9 +192,10 @@ func (stream *BasicStream) Seek(offset int64, whence int) (int64, error) {
 	if absoluteOffset < 0 {
 		return stream.position,
 			fmt.Errorf(
-				"result of Seek(offset=%d, whence=%d) is negative",
+				"result of Seek(offset=%d, whence=%d) is negative: %d",
 				offset,
 				whence,
+				absoluteOffset,
 			)
 	}
 
