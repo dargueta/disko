@@ -119,7 +119,15 @@ func TestBasicStream__SeekStart(t *testing.T) {
 				Whence:                io.SeekStart,
 				ExpectedFinalPosition: offset,
 			}
-			checkStreamRead(stream, info, readSize, rawUnderlyingBytes, t)
+
+			// Run this independently, as a sub-test.
+			testName := fmt.Sprintf("Offset_%d_Size_%d", offset, readSize)
+			t.Run(
+				testName,
+				func(subT *testing.T) {
+					checkStreamRead(stream, info, readSize, rawUnderlyingBytes, subT)
+				},
+			)
 		}
 	}
 }
