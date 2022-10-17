@@ -1,4 +1,4 @@
-package utilities
+package compression
 
 import (
 	"bytes"
@@ -19,7 +19,8 @@ type RLE90Writer struct {
 	lastByteRunLength int
 }
 
-// NewReader returns an io.Reader which decompresses RLE90-encoded data from rd.
+// NewRLE90Reader returns an [io.Reader] which decompresses RLE90-encoded data
+// from rd.
 func NewRLE90Reader(rd io.ByteReader) (RLE90Reader, error) {
 	return RLE90Reader{stream: rd}, nil
 }
@@ -123,7 +124,7 @@ func (reader *RLE90Reader) Close() error {
 	return nil
 }
 
-func NewWriter(stream io.Writer) (RLE90Writer, error) {
+func NewRLE90Writer(stream io.Writer) (RLE90Writer, error) {
 	return RLE90Writer{stream: stream, lastByte: -1}, nil
 }
 
@@ -196,11 +197,11 @@ func (writer *RLE90Writer) Close() error {
 	return writer.Flush()
 }
 
-func CompressBytes(unpacked []byte) ([]byte, error) {
+func CompressBytesWithRLE90(unpacked []byte) ([]byte, error) {
 	var targetBuffer bytes.Buffer
 	_ = io.Writer(&targetBuffer)
 
-	writer, err := NewWriter(&targetBuffer)
+	writer, err := NewRLE90Writer(&targetBuffer)
 	if err != nil {
 		return nil, err
 	}
@@ -209,7 +210,7 @@ func CompressBytes(unpacked []byte) ([]byte, error) {
 	return targetBuffer.Bytes(), err
 }
 
-func DecompressBytes(packed []byte) ([]byte, error) {
+func DecompressBytesFromRLE90(packed []byte) ([]byte, error) {
 	var packedCopy []byte
 	copy(packedCopy, packed)
 	stream := bytes.NewReader(packedCopy)
