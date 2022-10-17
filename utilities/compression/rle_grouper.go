@@ -17,18 +17,21 @@ type ByteRun struct {
 	RunLength int
 }
 
-// RunLengthGrouper returns a
-type RunLengthGrouper struct {
+// RLEGrouper represents a
+type RLEGrouper struct {
 	rd *bufio.Reader
 }
 
-func NewRunLengthGrouper(rd io.Reader) RunLengthGrouper {
-	return RunLengthGrouper{rd: bufio.NewReader(rd)}
+// NewRLEGrouper constructs an [RLEGrouper] that reads bytes from `rd` and
+// returns them serially in groups.
+func NewRLEGrouper(rd io.Reader) RLEGrouper {
+	return RLEGrouper{rd: bufio.NewReader(rd)}
 }
 
 // GetNextRun returns a [ByteRun] for the next byte or run of byte values in the
-// stream.
-func (grouper RunLengthGrouper) GetNextRun() (ByteRun, error) {
+// stream. If an error occurred, the returned [ByteRun] struct is undefined and
+// should be ignored.
+func (grouper RLEGrouper) GetNextRun() (ByteRun, error) {
 	firstByte, err := grouper.rd.ReadByte()
 	// Bail if any error occurred, including EOF.
 	if err != nil {

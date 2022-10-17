@@ -11,8 +11,9 @@ import (
 // an error occurred, the value is undefined and should not be used.
 func CompressImage(input io.Reader, output io.Writer) (int64, error) {
 	// Wrap the output stream in a gzip compressor using the highest compression
-	// available. The disk images aren't that huge so we won't notice much of a
-	// speed difference between the default and highest levels.
+	// available. The disk images aren't that huge by modern standards (mostly
+	// under 32MiB), so we won't notice much of a speed difference between the
+	// default and highest levels.
 	gzWriter, err := gzip.NewWriterLevel(output, gzip.BestCompression)
 	if err != nil {
 		return 0, err
