@@ -157,6 +157,7 @@ func (file *File) Name() string {
 	return file.objectHandle.Name()
 }
 
+// ReadDir is equivalent to [os.File.ReadDir].
 func (file *File) ReadDir(n int) ([]os.DirEntry, error) {
 	stat := file.objectHandle.Stat()
 	if !stat.IsDir() {
@@ -201,6 +202,7 @@ func (file *File) ReadDir(n int) ([]os.DirEntry, error) {
 	return result, nil
 }
 
+// ReadDir is equivalent to [os.File.Readdir].
 func (file *File) Readdir(n int) ([]os.FileInfo, error) {
 	dirents, err := file.ReadDir(n)
 	if err == io.EOF {
@@ -223,6 +225,7 @@ func (file *File) Readdir(n int) ([]os.FileInfo, error) {
 	return infoList, nil
 }
 
+// Readdirnames is equivalent to [os.File.Readdirnames].
 func (file *File) Readdirnames(n int) ([]string, error) {
 	dirents, err := file.ReadDir(n)
 	if err == io.EOF {

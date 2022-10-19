@@ -225,7 +225,7 @@ func (cache *BlockCache) checkBounds(start c.LogicalBlock, bufferSize uint) erro
 // `start` and continuing for `count` blocks.
 //
 // If the returned slice is modified, the modified blocks MUST be marked as
-// dirty.
+// dirty. Use [MarkBlockRangeDirty] for this.
 func (cache *BlockCache) GetSlice(
 	start c.LogicalBlock,
 	count uint,
@@ -245,7 +245,7 @@ func (cache *BlockCache) GetSlice(
 // for large files or with inefficient driver implementations.
 //
 // If the returned slice is modified, the modified blocks MUST be marked as
-// dirty.
+// dirty. Use [MarkBlockRangeDirty] for this.
 func (cache *BlockCache) Data() ([]byte, error) {
 	err := cache.LoadAll()
 	if err != nil {

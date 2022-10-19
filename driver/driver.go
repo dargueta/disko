@@ -10,8 +10,8 @@ import (
 	"github.com/dargueta/disko/errors"
 )
 
-// Driver is a file system driver wrapping an implementation of a specific file
-// system to provide a unified interface for interacting with any file system.
+// Driver is an abstraction layer for all file system implementations, providing
+// a single interface for interacting with them.
 type Driver struct {
 	implementation disko.FileSystemImplementer
 	mountFlags     disko.MountFlags
@@ -30,7 +30,6 @@ func New(
 	}
 }
 
-// RWX
 // NormalizePath converts a path from the user's native file system syntax to
 // an absolute normalized path using forward slashes (/) as the component
 // separator. The return value is always an absolute path.
