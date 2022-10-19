@@ -125,18 +125,14 @@ type FileSystemImplementer interface {
 		image io.ReadWriteSeeker,
 		stat FSStat,
 	) errors.DriverError
+}
 
+type BootCodeImplementer interface {
 	// SetBootCode sets the machine code that is executed on startup if the disk
-	// image is used as a boot volume. This function will never be called if the
-	// [FSFeatures.SupportsBootCode] returns false.
-	//
-	// If the file system doesn't have explicit support for this defined in the
-	// standard (such as FAT8), it should do nothing and immediately return an
-	// error with [ENOSYS] as the error code.
+	// image is used as a boot volume.
 	SetBootCode(code []byte) errors.DriverError
 
-	// GetBootCode returns the machine code that is executed on startup. It will
-	// never be called if [FSFeatures.SupportsBootCode] returns false.
+	// GetBootCode returns the machine code that is executed on startup.
 	GetBootCode() ([]byte, errors.DriverError)
 }
 
@@ -218,8 +214,8 @@ type ObjectHandle interface {
 	//
 	// The following guarantees apply:
 	//
-	//  - Timestamps known to be unsupported (i.e. the corresponding function
-	//    from [FSFeatures] returned false) will always be [UndefinedTimestamp].
+	//  - Timestamps known to be unsupported (i.e. the corresponding feature in
+	//    [FSFeatures] is false) will always be [UndefinedTimestamp].
 	//  - `deletedAt` will only be set if the object has been deleted and the
 	//    flag is supported by the file system.
 	Chtimes(
