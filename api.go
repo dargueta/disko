@@ -191,22 +191,32 @@ type ObjectHandle interface {
 	// and ".." if present, as the driver cannot assume these exist).
 	Unlink() errors.DriverError
 
-	// Chmod changes the permission bits of this file system object. Only the
-	// permissions bits will be set in `mode`. File systems that support access
-	// controls but not all aspects (e.g. no executable bit, or no group
-	// permissions) must silently ignore flags they don't recognize.
-	Chmod(mode os.FileMode) errors.DriverError
+	// Name returns the name of the object itself without any path component.
+	// The root directory, which technically has no name, must return "/".
+	Name() string
 
-	// Chown sets the ID of the owning user and group for this object.
+	// SameAs returns a boolean indicating if this object handle refers to the
+	// same on-disk object as the given handle. A few rules:
 	//
-	// The following guarantees apply:
-	//
-	//  - `uid` and `gid` will never be negative.
-	//  - This will never be called if user IDs are not supported. If, however,
-	//    the file system doesn't support group IDs, implementations must
-	//    silently ignore `gid`.
-	Chown(uid, gid int) errors.DriverError
+	//   - Attributes such as size, timestamps, number of links, etc. should be
+	//     ignored. This is only comparing identity, not properties.
+	//   - Symbolic links should not be dereferenced, so X and Y are not the same
+	//     even if X is a symbolic link to Y.
+	//   - Hard links are considered the same as the files they refer to.
+	SameAs(other ObjectHandle) bool
+}
 
+// SupportsListDirHandle is an interface for an [ObjectHandle] that represents a
+// directory to implement so that its contents can be accessed.
+type SupportsListDirHandle interface {
+	// ListDir returns a list of the directory entries this object contains. "."
+	// and ".." are ignored if present.
+	ListDir() ([]string, errors.DriverError)
+}
+
+// SupportsChtimesHandle is an interface for an [ObjectHandle] that supports
+// changing its created/modified/etc. timestamps.
+type SupportsChtimesHandle interface {
 	// Chtimes changes various timestamps associated with an object. The driver
 	// will do its best to ensure that unsupported timestamps are equal to
 	// [UndefinedTimestamp], but the implementation must ignore timestamps it
@@ -225,26 +235,27 @@ type ObjectHandle interface {
 		lastChanged,
 		deletedAt time.Time,
 	) errors.DriverError
+}
 
-	// ListDir returns a list of the directory entries this object contains. "."
-	// and ".." are ignored if present.
+// SupportsChmodHandle is an interface for an [ObjectHandle] that supports
+// changing its mode flags.
+type SupportsChmodHandle interface {
+	// Chmod changes the permission bits of this file system object. Only the
+	// permissions bits will be set in `mode`.
 	//
-	// This is guaranteed to never be called unless this is a directory.
-	ListDir() ([]string, errors.DriverError)
+	// File systems that support access controls but not all aspects (e.g. no
+	// executable bit, or no group permissions) must silently ignore flags they
+	// don't recognize.
+	Chmod(mode os.FileMode) errors.DriverError
+}
 
-	// Name returns the name of the object itself without any path component.
-	// The root directory, which technically has no name, must return "/".
-	Name() string
-
-	// SameAs returns a boolean indicating if this object handle refers to the
-	// same on-disk object as the given handle. A few rules:
-	//
-	//   - Attributes such as size, timestamps, number of links, etc. should be
-	//     ignored. This is only comparing identity, not properties.
-	//   - Symbolic links should not be dereferenced, so X and Y are not the same
-	//     even if X is a symbolic link to Y.
-	//   - Hard links are considered the same as the files they refer to.
-	SameAs(other ObjectHandle) bool
+// SupportsChownHandle is an interface for an [ObjectHandle] that supports
+// changing its owning user and group IDs.
+type SupportsChownHandle interface {
+	// Chown sets the ID of the owning user and group for this object. If the
+	// file system doesn't support group IDs, implementations must silently
+	// ignore `gid`, whatever its value.
+	Chown(uid, gid int) errors.DriverError
 }
 
 // UndefinedTimestamp is a timestamp that should be used as an invalid value,
@@ -267,10 +278,10 @@ type FSFeatures struct {
 	HasChangedTime      bool
 	HasDeletedTime      bool
 	HasUnixPermissions  bool
-	HasUserID           bool
-	HasGroupID          bool
 	HasUserPermissions  bool
 	HasGroupPermissions bool
+	HasUserID           bool
+	HasGroupID          bool
 
 	// TimestampEpoch returns the earliest representable timestamp on this file
 	// system. File systems that don't support timestamps of any kind must

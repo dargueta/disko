@@ -139,7 +139,6 @@ func (driver *Driver) getObjectAtPathNoFollow(
 					parentPath,
 				),
 			)
-
 	}
 
 	return driver.getExtObjectInDir(baseName, parentObject)
@@ -222,8 +221,6 @@ func (driver *Driver) createExtObject(
 	return object, nil
 }
 
-// OpeningDriver ---------------------------------------------------------------
-
 func (driver *Driver) OpenFile(
 	path string,
 	flags disko.IOFlags,
@@ -286,8 +283,6 @@ func (driver *Driver) OpenFile(
 	return NewFileFromObjectHandle(driver, object, flags)
 }
 
-// ReadingDriver ---------------------------------------------------------------
-
 func (driver *Driver) Chdir(path string) error {
 	absPath := driver.NormalizePath(path)
 
@@ -342,8 +337,6 @@ func (driver *Driver) Stat(path string) (disko.FileStat, error) {
 	return object.Stat(), nil
 }
 
-// DirReadingDriver ------------------------------------------------------------
-
 func (driver *Driver) ReadDir(path string) ([]disko.DirectoryEntry, error) {
 	absPath := driver.NormalizePath(path)
 
@@ -358,7 +351,7 @@ func (driver *Driver) ReadDir(path string) ([]disko.DirectoryEntry, error) {
 func (driver *Driver) readDir(
 	directory extObjectHandle,
 ) ([]disko.DirectoryEntry, error) {
-	direntNames, err := directory.ListDir()
+	direntNames, err := directory.(disko.SupportsListDirHandle).ListDir()
 	if err != nil {
 		return nil, err
 	}
@@ -381,8 +374,6 @@ func (driver *Driver) readDir(
 
 	return output, nil
 }
-
-// ReadingLinkingDriver --------------------------------------------------------
 
 func (driver *Driver) Readlink(path string) (string, error) {
 	path = driver.NormalizePath(path)
@@ -421,8 +412,6 @@ func (driver *Driver) Lstat(path string) (disko.FileStat, error) {
 	}
 	return object.Stat(), nil
 }
-
-// WritingDriver ---------------------------------------------------------------
 
 func (driver *Driver) Create(path string) (File, error) {
 	return driver.OpenFile(
@@ -469,7 +458,7 @@ func (driver *Driver) Remove(path string) error {
 	if stat.IsDir() {
 		// Caller wants to remove a directory. The directory must be empty, i.e.
 		// must at most only contain the "." and ".." entries.
-		names, err := object.ListDir()
+		names, err := object.(disko.SupportsListDirHandle).ListDir()
 		if err != nil {
 			return err
 		}
@@ -522,8 +511,6 @@ func (driver *Driver) WriteFile(
 	_, err = handle.Write(data)
 	return err
 }
-
-// DirWritingDriver ------------------------------------------------------------
 
 func (driver *Driver) Mkdir(path string, perm os.FileMode) error {
 	// Force the permissions flags to indicate this is a directory so that the
@@ -613,7 +600,7 @@ func (driver *Driver) RemoveAll(path string) error {
 func (driver *Driver) removeDirectory(directory extObjectHandle) error {
 	var err error
 
-	direntNames, err := directory.ListDir()
+	direntNames, err := directory.(disko.SupportsListDirHandle).ListDir()
 	if err != nil {
 		return err
 	}

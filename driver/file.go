@@ -142,11 +142,19 @@ func (file *File) Chdir() error {
 }
 
 func (file *File) Chmod(mode os.FileMode) error {
-	return file.objectHandle.Chmod(mode)
+	chmodHandle, ok := file.objectHandle.(disko.SupportsChmodHandle)
+	if ok {
+		return chmodHandle.Chmod(mode)
+	}
+	return errors.New(errors.ENOTSUP)
 }
 
 func (file *File) Chown(uid, gid int) error {
-	return file.objectHandle.Chown(uid, gid)
+	chownHandle, ok := file.objectHandle.(disko.SupportsChownHandle)
+	if ok {
+		return chownHandle.Chown(uid, gid)
+	}
+	return errors.New(errors.ENOTSUP)
 }
 
 func (file *File) Close() error {
