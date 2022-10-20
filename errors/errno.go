@@ -13,125 +13,76 @@ type Errno int
 var errorMessagesByCode map[Errno]string
 
 const (
-	EOK Errno = iota
-	EPERM
-	ENOENT
-	EINTR
-	EIO
-	EBADF
-	EAGAIN
-	EACCES
-	EFAULT
-	ENOTBLK
-	EBUSY
-	EEXIST
-	EXDEV
-	ENODEV
-	ENOTDIR
-	EISDIR
-	EINVAL
-	ENFILE
-	EMFILE
-	EFBIG
-	ENOSPC
-	ESPIPE
-	EROFS
-	EMLINK
-	EDOM
-	ERANGE
-	EDEADLK
-	ENAMETOOLONG
-	ENOSYS
-	ENOTEMPTY
-	ELOOP
-	ENODATA
-	EOVERFLOW
-	EBADFD
-	EUSERS
-	ENOTSUP
-	ENOBUFS
-	EALREADY
-	ESTALE
-	EUCLEAN
-	EDQUOT
-	EMEDIUMTYPE
+	_ Errno = iota
+	ErrNotPermitted
+	ErrNotFound
+	ErrIOFailed
+	ErrInvalidFileDescriptor
+	ErrPermissionDenied
+	ErrBlockDeviceRequired
+	ErrBusy
+	ErrExists
+	ErrCrossDeviceLink
+	ErrNoDevice
+	ErrNotADirectory
+	ErrIsADirectory
+	ErrInvalidArgument
+	ErrTooManyOpenFiles
+	ErrFileTooLarge
+	ErrNoSpaceOnDevice
+	ErrReadOnlyFileSystem
+	ErrTooManyLinks
+	ErrArgumentOutOfRange
+	ErrResultOutOfRange
+	ErrNameTooLong
+	ErrNotImplemented
+	ErrDirectoryNotEmpty
+	ErrLinkCycleDetected
+	ErrFileDescriptorBadState
+	ErrTooManyUsers
+	ErrNotSupported
+	ErrAlreadyInProgress
+	ErrFileSystemCorrupted
+	ErrDiskQuotaExceeded
+	ErrInvalidFileSystem
+	ErrUnexpectedEOF
+	maxErrorCode
 )
 
-var ErrNotPermitted = New(EPERM)
-var ErrNotFound = New(ENOENT)
-var ErrIOFailed = New(EIO)
-var ErrInvalidFileDescriptor = New(EBADF)
-var ErrBlockDeviceRequired = New(ENOTBLK)
-var ErrBusy = New(EBUSY)
-var ErrExists = New(EEXIST)
-var ErrPermissionDenied = New(EACCES)
-var ErrCrossDeviceLink = New(EXDEV)
-var ErrNoDevice = New(ENODEV)
-var ErrNotADirectory = New(ENOTDIR)
-var ErrIsADirectory = New(EISDIR)
-var ErrInvalidArgument = New(EINVAL)
-var ErrTooManyOpenFiles = New(EMFILE)
-var ErrFileTooLarge = New(EFBIG)
-var ErrNoSpaceOnDevice = New(ENOSPC)
-var ErrReadOnlyFileSystem = New(EROFS)
-var ErrTooManyLinks = New(EMLINK)
-var ErrArgumentOutOfRange = New(EDOM)
-var ErrResultOutOfRange = New(ERANGE)
-var ErrNameTooLong = New(ENAMETOOLONG)
-var ErrNotImplemented = New(ENOSYS)
-var ErrDirectoryNotEmpty = New(ENOTEMPTY)
-var ErrLinkCycleDetected = New(ELOOP)
-var ErrBrokenSymlink = NewWithMessage(ENOENT, "symlink is broken")
-var ErrFileDescriptorBadState = New(EBADFD)
-var ErrTooManyUsers = New(EUSERS)
-var ErrNotSupported = New(ENOTSUP)
-var ErrStaleFileHandle = New(ESTALE)
-var ErrFileSystemCorrupted = New(EUCLEAN)
-var ErrDiskQuotaExceeded = New(EDQUOT)
-var ErrAlreadyInProgress = New(EALREADY)
-
 func init() {
-	errorMessagesByCode = make(map[Errno]string, 32)
-	errorMessagesByCode[EPERM] = "Operation not permitted"
-	errorMessagesByCode[ENOENT] = "No such file or directory"
-	errorMessagesByCode[EINTR] = "Interrupted system call"
-	errorMessagesByCode[EIO] = "Input/output error"
-	errorMessagesByCode[EBADF] = "Bad file descriptor"
-	errorMessagesByCode[EAGAIN] = "Resource temporarily unavailable"
-	errorMessagesByCode[EACCES] = "Permission denied"
-	errorMessagesByCode[EFAULT] = "Bad address"
-	errorMessagesByCode[ENOTBLK] = "Block device required"
-	errorMessagesByCode[EBUSY] = "Device or resource busy"
-	errorMessagesByCode[EEXIST] = "File exists"
-	errorMessagesByCode[EXDEV] = "Invalid cross-device link"
-	errorMessagesByCode[ENODEV] = "No such device"
-	errorMessagesByCode[ENOTDIR] = "Not a directory"
-	errorMessagesByCode[EISDIR] = "Is a directory"
-	errorMessagesByCode[EINVAL] = "Invalid argument"
-	errorMessagesByCode[ENFILE] = "Too many open files in system"
-	errorMessagesByCode[EMFILE] = "Too many open files"
-	errorMessagesByCode[EFBIG] = "File too large"
-	errorMessagesByCode[ENOSPC] = "No space left on device"
-	errorMessagesByCode[ESPIPE] = "Illegal seek"
-	errorMessagesByCode[EROFS] = "Read-only file system"
-	errorMessagesByCode[EMLINK] = "Too many links"
-	errorMessagesByCode[EDOM] = "Numerical argument out of domain"
-	errorMessagesByCode[ERANGE] = "Numerical result out of range"
-	errorMessagesByCode[ENAMETOOLONG] = "File name too long"
-	errorMessagesByCode[ENOSYS] = "Function not implemented"
-	errorMessagesByCode[ENOTEMPTY] = "Directory not empty"
-	errorMessagesByCode[ELOOP] = "Too many levels of symbolic links"
-	errorMessagesByCode[ENODATA] = "No data available"
-	errorMessagesByCode[EOVERFLOW] = "Value too large for defined data type"
-	errorMessagesByCode[EBADFD] = "File descriptor in bad state"
-	errorMessagesByCode[EUSERS] = "Too many users"
-	errorMessagesByCode[ENOTSUP] = "Operation not supported"
-	errorMessagesByCode[ENOBUFS] = "No buffer space available"
-	errorMessagesByCode[EALREADY] = "Operation already in progress"
-	errorMessagesByCode[ESTALE] = "Stale file handle"
-	errorMessagesByCode[EUCLEAN] = "Structure needs cleaning"
-	errorMessagesByCode[EDQUOT] = "Disk quota exceeded"
-	errorMessagesByCode[EMEDIUMTYPE] = "Wrong medium type"
+	errorMessagesByCode = make(map[Errno]string, maxErrorCode)
+	errorMessagesByCode[ErrNotPermitted] = "Operation not permitted"
+	errorMessagesByCode[ErrNotFound] = "No such file or directory"
+	errorMessagesByCode[ErrIOFailed] = "Input/output error"
+	errorMessagesByCode[ErrInvalidFileDescriptor] = "Bad file descriptor"
+	errorMessagesByCode[ErrPermissionDenied] = "Permission denied"
+	errorMessagesByCode[ErrBlockDeviceRequired] = "Block device required"
+	errorMessagesByCode[ErrBusy] = "Device or resource busy"
+	errorMessagesByCode[ErrExists] = "File exists"
+	errorMessagesByCode[ErrCrossDeviceLink] = "Invalid cross-device link"
+	errorMessagesByCode[ErrNoDevice] = "No such device"
+	errorMessagesByCode[ErrNotADirectory] = "Not a directory"
+	errorMessagesByCode[ErrIsADirectory] = "Is a directory"
+	errorMessagesByCode[ErrInvalidArgument] = "Invalid argument"
+	errorMessagesByCode[ErrTooManyOpenFiles] = "Too many open files in system"
+	errorMessagesByCode[ErrFileTooLarge] = "File too large"
+	errorMessagesByCode[ErrNoSpaceOnDevice] = "No space left on device"
+	errorMessagesByCode[ErrReadOnlyFileSystem] = "Read-only file system"
+	errorMessagesByCode[ErrTooManyLinks] = "Too many links"
+	errorMessagesByCode[ErrArgumentOutOfRange] = "Numerical argument out of domain"
+	errorMessagesByCode[ErrResultOutOfRange] = "Numerical result out of range"
+	errorMessagesByCode[ErrNameTooLong] = "File name too long"
+	errorMessagesByCode[ErrNotImplemented] = "Function not implemented"
+	errorMessagesByCode[ErrDirectoryNotEmpty] = "Directory not empty"
+	errorMessagesByCode[ErrTooManyLinks] = "Too many levels of symbolic links"
+	errorMessagesByCode[ErrFileDescriptorBadState] = "File descriptor in bad state"
+	errorMessagesByCode[ErrTooManyUsers] = "Too many users"
+	errorMessagesByCode[ErrNotSupported] = "Operation not supported"
+	errorMessagesByCode[ErrAlreadyInProgress] = "Operation already in progress"
+	errorMessagesByCode[ErrFileSystemCorrupted] = "Structure needs cleaning"
+	errorMessagesByCode[ErrDiskQuotaExceeded] = "Disk quota exceeded"
+	errorMessagesByCode[ErrInvalidFileSystem] = "Wrong medium type"
+	errorMessagesByCode[ErrUnexpectedEOF] = "Unexpected end of file or stream"
 }
 
 func StrError(code Errno) string {
@@ -140,4 +91,40 @@ func StrError(code Errno) string {
 		return message
 	}
 	return fmt.Sprintf("error %d not recognized.", int(code))
+}
+
+func (e Errno) Error() string {
+	return StrError(e)
+}
+
+func (e Errno) Errno() Errno {
+	return e
+}
+
+func (e Errno) Unwrap() error {
+	return nil
+}
+
+func (e Errno) WithMessage(message string) DriverError {
+	return driverErrorWithMessage{
+		errno:         e,
+		message:       message,
+		originalError: nil,
+	}
+}
+
+func (e Errno) WrapError(err error) DriverError {
+	return driverErrorWithMessage{
+		errno:         e,
+		message:       fmt.Sprintf("error: [%d] %s", int(e), err.Error()),
+		originalError: err,
+	}
+}
+
+func (e Errno) IsSameError(other error) bool {
+	driverError, ok := other.(DriverError)
+	if ok {
+		return e == driverError.Errno()
+	}
+	return false
 }

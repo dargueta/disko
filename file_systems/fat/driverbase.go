@@ -75,8 +75,7 @@ func (drv *FATDriver) readCluster(cluster ClusterID) ([]byte, error) {
 // is an EOF marker (e.g. 0xFFF on FAT12 systems). In this case, the list is empty.
 func (drv *FATDriver) listClusters(chainStart ClusterID) ([]ClusterID, error) {
 	if !drv.fs.IsValidCluster(chainStart) {
-		return nil, errors.NewWithMessage(
-			errors.EINVAL,
+		return nil, errors.ErrInvalidArgument.WithMessage(
 			fmt.Sprintf("invalid cluster 0x%x cannot start a cluster chain", chainStart))
 	}
 
@@ -95,8 +94,7 @@ func (drv *FATDriver) listClusters(chainStart ClusterID) ([]ClusterID, error) {
 		if !drv.fs.IsValidCluster(nextCluster) {
 			// Hit an invalid cluster. This is not the same as EOF, and usually indicates
 			// corruption of some sort.
-			return chain, errors.NewWithMessage(
-				errors.EUCLEAN,
+			return chain, errors.ErrFileSystemCorrupted.WithMessage(
 				fmt.Sprintf(
 					"cluster %d followed by invalid cluster 0x%x at index %d in chain from %d",
 					currentCluster,
@@ -127,8 +125,7 @@ func (drv *FATDriver) getClusterInChain(firstCluster ClusterID, index uint) (Clu
 
 		if drv.fs.IsEndOfChain(nextCluster) {
 			// Hit EOF
-			return 0, errors.NewWithMessage(
-				errors.EINVAL,
+			return 0, errors.ErrInvalidArgument.WithMessage(
 				fmt.Sprintf(
 					"cluster index %d out of bounds -- chain from 0x%x has %d clusters",
 					index,
@@ -137,8 +134,7 @@ func (drv *FATDriver) getClusterInChain(firstCluster ClusterID, index uint) (Clu
 		} else if !drv.fs.IsValidCluster(nextCluster) {
 			// Hit an invalid cluster. This is not the same as EOF, and usually indicates
 			// corruption of some sort.
-			return 0, errors.NewWithMessage(
-				errors.EINVAL,
+			return 0, errors.ErrFileSystemCorrupted.WithMessage(
 				fmt.Sprintf(
 					"cluster %d followed by invalid cluster 0x%x at index %d in chain from %d",
 					currentCluster,
@@ -173,8 +169,8 @@ func (drv *FATDriver) resolvePathToDirent(path string) (Dirent, error) {
 
 	if len(pathParts) == 0 {
 		// Caller gave us an empty path after components were resolved.
-		return Dirent{}, errors.NewWithMessage(
-			errors.EINVAL, fmt.Sprintf("file path \"%s\" resolves to empty path", path))
+		return Dirent{}, errors.ErrInvalidArgument.WithMessage(
+			fmt.Sprintf("file path %q resolves to empty path", path))
 	}
 
 	// Get a listing for the root directory. We need to call a separate function because

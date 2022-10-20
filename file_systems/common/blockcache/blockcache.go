@@ -76,8 +76,7 @@ func New(
 ) *BlockCache {
 	if resizeCb == nil {
 		resizeCb = func(newTotalBlocks c.LogicalBlock) error {
-			return errors.NewWithMessage(
-				errors.ENOTSUP,
+			return errors.ErrNotSupported.WithMessage(
 				fmt.Sprintf(
 					"resizing is not supported; size fixed at %d bytes",
 					bytesPerBlock*totalBlocks,
@@ -161,8 +160,7 @@ func WrapStream(
 // seekToBlock sets the stream pointer for a stream to the offset of a block.
 func seekToBlock(stream io.Seeker, block, totalBlocks c.LogicalBlock, bytesPerBlock uint) error {
 	if block >= totalBlocks {
-		return errors.NewWithMessage(
-			errors.EINVAL,
+		return errors.ErrArgumentOutOfRange.WithMessage(
 			fmt.Sprintf(
 				"invalid block number: %d not in range [0, %d)",
 				block,

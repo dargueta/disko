@@ -345,7 +345,7 @@ func (drv *FATDriver) clusterToDirentSlice(data []byte) ([]Dirent, error) {
 
 			// If the error code is ENOENT then that means this directory entry is free
 			// and we've hit the end of the directory.
-			if drverr.Errno() == errors.ENOENT {
+			if errors.ErrNotFound.IsSameError(drverr) {
 				break
 			}
 			// Else: We failed for a different reason. Pass this error up to the

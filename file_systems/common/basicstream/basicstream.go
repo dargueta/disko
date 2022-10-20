@@ -228,13 +228,11 @@ func (stream *BasicStream) Truncate(size int64) error {
 	}
 
 	if size < 0 {
-		return errors.NewWithMessage(
-			errors.EINVAL,
+		return errors.ErrInvalidArgument.WithMessage(
 			fmt.Sprintf("truncate failed: %d is not a valid file size", size),
 		)
 	} else if uint64(size) > math.MaxUint {
-		return errors.NewWithMessage(
-			errors.EINVAL,
+		return errors.ErrFileTooLarge.WithMessage(
 			fmt.Sprintf("truncate failed: new file size %d is too large", size),
 		)
 	}

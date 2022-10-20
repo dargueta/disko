@@ -95,7 +95,7 @@ func FilenameToBytes(name string) ([]byte, error) {
 	if len(parts[0]) > 6 {
 		message := fmt.Sprintf(
 			"filename stem can be at most six characters: `%s`", parts[0])
-		return nil, errors.NewWithMessage(errors.ENAMETOOLONG, message)
+		return nil, errors.ErrNameTooLong.WithMessage(message)
 	}
 
 	var paddedName string
@@ -110,7 +110,7 @@ func FilenameToBytes(name string) ([]byte, error) {
 			// Extension is longer than three characters.
 			message := fmt.Sprintf(
 				"filename extension can be at most three characters: `%s`", parts[1])
-			return nil, errors.NewWithMessage(errors.ENAMETOOLONG, message)
+			return nil, errors.ErrNameTooLong.WithMessage(message)
 		}
 
 		paddedName = fmt.Sprintf("%-6s%-3s", parts[0], parts[1])

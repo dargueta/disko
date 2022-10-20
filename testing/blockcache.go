@@ -65,7 +65,7 @@ func CreateDefaultCache(
 				totalBlocks,
 			)
 			t.Error(message)
-			return errors.NewWithMessage(errors.EIO, message)
+			return errors.ErrIOFailed.WithMessage(message)
 		}
 
 		start := blockIndex * c.LogicalBlock(bytesPerBlock)
@@ -83,7 +83,7 @@ func CreateDefaultCache(
 					totalBlocks,
 				)
 				t.Errorf(message)
-				return errors.NewWithMessage(errors.EIO, message)
+				return errors.ErrIOFailed.WithMessage(message)
 			}
 
 			start := blockIndex * c.LogicalBlock(bytesPerBlock)
@@ -98,7 +98,7 @@ func CreateDefaultCache(
 				blockIndex,
 			)
 			t.Errorf(message)
-			return errors.NewWithMessage(errors.EROFS, message)
+			return errors.ErrReadOnlyFileSystem.WithMessage(message)
 		}
 	}
 

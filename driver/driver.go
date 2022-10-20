@@ -68,8 +68,7 @@ func (driver *Driver) resolveSymlink(
 		symlinkText, err := driver.getContentsOfObject(object)
 		if err != nil {
 			return nil,
-				errors.NewWithMessage(
-					err.Errno(),
+				err.Errno().WithMessage(
 					fmt.Sprintf(
 						"can't resolve path `%s`, failed to read symlink `%s`: %s",
 						originalPath,
@@ -85,10 +84,9 @@ func (driver *Driver) resolveSymlink(
 		_, exists := pathCache[nextPath]
 		if exists {
 			return nil,
-				errors.NewWithMessage(
-					errors.ELOOP,
+				errors.ErrLinkCycleDetected.WithMessage(
 					fmt.Sprintf(
-						"found cycle resolving symlink `%s`: hit `%s` twice",
+						"found cycle resolving symlink %q: hit %q twice",
 						originalPath,
 						nextPath,
 					),
@@ -131,8 +129,7 @@ func (driver *Driver) getObjectAtPathNoFollow(
 	parentStat := parentObject.Stat()
 	if !parentStat.IsDir() {
 		return nil,
-			errors.NewWithMessage(
-				errors.ENOTDIR,
+			errors.ErrNotADirectory.WithMessage(
 				fmt.Sprintf(
 					"cannot resolve path `%s`: `%s` is not a directory",
 					path,
@@ -174,7 +171,7 @@ func (driver *Driver) getContentsOfObject(
 ) ([]byte, errors.DriverError) {
 	handle, err := NewFileFromObjectHandle(driver, object, disko.O_RDONLY)
 	if err != nil {
-		return nil, errors.NewFromError(errors.EIO, err)
+		return nil, errors.ErrIOFailed.WrapError(err)
 	}
 	defer handle.Close()
 
@@ -183,7 +180,7 @@ func (driver *Driver) getContentsOfObject(
 
 	_, readError := handle.Read(buffer)
 	if readError != nil {
-		return nil, errors.NewFromError(errors.EIO, readError)
+		return nil, errors.ErrIOFailed.WrapError(readError)
 	}
 	return buffer, nil
 }
@@ -230,10 +227,9 @@ func (driver *Driver) OpenFile(
 	ioFlags := disko.IOFlags(flags)
 
 	if ioFlags.RequiresWritePerm() && !driver.mountFlags.CanWrite() {
-		return File{}, errors.NewWithMessage(
-			errors.EROFS,
+		return File{}, errors.ErrReadOnlyFileSystem.WithMessage(
 			fmt.Sprintf(
-				"can't open `%s` for writing: image is mounted read-only",
+				"can't open %q for writing: image is mounted read-only",
 				absPath,
 			),
 		)
@@ -243,7 +239,7 @@ func (driver *Driver) OpenFile(
 	if err != nil {
 		// An error occurred. If the file is missing we may be able to create it
 		// and proceed.
-		if err.Errno() == errors.ENOENT {
+		if errors.ErrNotFound.IsSameError(err) {
 			// File does not exist, can we create it?
 			if ioFlags.Create() {
 				// To create the missing file, we need to get a handle for its
@@ -274,9 +270,8 @@ func (driver *Driver) OpenFile(
 	stat := object.Stat()
 	if !stat.IsFile() {
 		return File{},
-			errors.NewWithMessage(
-				errors.EISDIR,
-				fmt.Sprintf("`%s` isn't a regular file", absPath),
+			errors.ErrIsADirectory.WithMessage(
+				fmt.Sprintf("%q isn't a regular file", absPath),
 			)
 	}
 
@@ -297,9 +292,8 @@ func (driver *Driver) chdirToObject(object extObjectHandle) error {
 	absPath := object.AbsolutePath()
 	stat := object.Stat()
 	if !stat.IsDir() {
-		return errors.NewWithMessage(
-			errors.ENOTDIR,
-			fmt.Sprintf("not a directory: `%s`", absPath),
+		return errors.ErrNotADirectory.WithMessage(
+			fmt.Sprintf("not a directory: %q", absPath),
 		)
 	}
 
@@ -384,9 +378,8 @@ func (driver *Driver) Readlink(path string) (string, error) {
 
 	stat := object.Stat()
 	if !stat.IsSymlink() {
-		return "", errors.NewWithMessage(
-			errors.EINVAL,
-			fmt.Sprintf("`%s` is not a symlink", path),
+		return "", errors.ErrInvalidArgument.WithMessage(
+			fmt.Sprintf("%q is not a symlink", path),
 		)
 	}
 
@@ -469,15 +462,13 @@ func (driver *Driver) Remove(path string) error {
 		// If there are any other entries in here the directory isn't empty and
 		// we must fail.
 		if len(names) > 0 {
-			return errors.NewWithMessage(
-				errors.ENOTEMPTY,
-				fmt.Sprintf("can't remove `%s`: directory not empty", absPath),
+			return errors.ErrDirectoryNotEmpty.WithMessage(
+				fmt.Sprintf("can't remove %q: directory not empty", absPath),
 			)
 		}
 	} else if !stat.IsFile() {
-		return errors.NewWithMessage(
-			errors.EINVAL,
-			fmt.Sprintf("can't remove `%s`: not a file or directory", absPath),
+		return errors.ErrInvalidArgument.WithMessage(
+			fmt.Sprintf("can't remove %q: not a file or directory", absPath),
 		)
 	}
 
@@ -528,10 +519,9 @@ func (driver *Driver) Mkdir(path string, perm os.FileMode) error {
 
 	parentStat := parentObject.Stat()
 	if !parentStat.IsDir() {
-		return errors.NewWithMessage(
-			errors.ENOTDIR,
+		return errors.ErrNotADirectory.WithMessage(
 			fmt.Sprintf(
-				"cannot create `%s`: `%s` is not a directory",
+				"cannot create %q: %q is not a directory",
 				absPath,
 				parentDir,
 			),
@@ -553,7 +543,7 @@ func (driver *Driver) MkdirAll(path string, perm os.FileMode) error {
 
 	parentObject, err := driver.getObjectAtPathFollowingLink(parentDir)
 	if err != nil {
-		if err.Errno() == errors.ENOENT {
+		if errors.ErrNotFound.IsSameError(err) {
 			// Parent directory doesn't exist, create it.
 			driver.MkdirAll(parentDir, perm)
 		} else {
@@ -575,8 +565,7 @@ func (driver *Driver) RemoveAll(path string) error {
 
 	stat := directory.Stat()
 	if !stat.IsDir() {
-		return errors.NewWithMessage(
-			errors.ENOTDIR,
+		return errors.ErrNotADirectory.WithMessage(
 			fmt.Sprintf("cannot remove `%s`: not a directory", path),
 		)
 	}
@@ -584,8 +573,7 @@ func (driver *Driver) RemoveAll(path string) error {
 	// Block an attempt at `rm -rf /`, because some clown is gonna try it.
 	root := driver.implementation.GetRootDirectory()
 	if root.SameAs(directory) {
-		return errors.NewWithMessage(
-			errors.EPERM,
+		return errors.ErrPermissionDenied.WithMessage(
 			"you can't remove the root directory",
 		)
 	}

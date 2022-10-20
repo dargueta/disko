@@ -47,7 +47,7 @@ func (driver *Driver) Stat(path string) (disko.FileStat, error) {
 		size = int64(totalSectors) * 128
 	} else {
 		// TODO(dargueta): Handle text files
-		err := errors.NewWithMessage(errors.ENOSYS, "text files not supported yet")
+		err := errors.ErrNotImplemented.WithMessage("text files not supported yet")
 		return disko.FileStat{}, err
 	}
 
