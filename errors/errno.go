@@ -51,7 +51,6 @@ const (
 	ENOTSUP
 	ENOBUFS
 	EALREADY
-	EINPROGRESS
 	ESTALE
 	EUCLEAN
 	EDQUOT
@@ -65,7 +64,7 @@ var ErrInvalidFileDescriptor = New(EBADF)
 var ErrBlockDeviceRequired = New(ENOTBLK)
 var ErrBusy = New(EBUSY)
 var ErrExists = New(EEXIST)
-var ErrPermissionDenied = New(EPERM)
+var ErrPermissionDenied = New(EACCES)
 var ErrCrossDeviceLink = New(EXDEV)
 var ErrNoDevice = New(ENODEV)
 var ErrNotADirectory = New(ENOTDIR)
@@ -76,7 +75,6 @@ var ErrFileTooLarge = New(EFBIG)
 var ErrNoSpaceOnDevice = New(ENOSPC)
 var ErrReadOnlyFileSystem = New(EROFS)
 var ErrTooManyLinks = New(EMLINK)
-var ErrTooManyUsers = New(EUSERS)
 var ErrArgumentOutOfRange = New(EDOM)
 var ErrResultOutOfRange = New(ERANGE)
 var ErrNameTooLong = New(ENAMETOOLONG)
@@ -85,9 +83,12 @@ var ErrDirectoryNotEmpty = New(ENOTEMPTY)
 var ErrLinkCycleDetected = New(ELOOP)
 var ErrBrokenSymlink = NewWithMessage(ENOENT, "symlink is broken")
 var ErrFileDescriptorBadState = New(EBADFD)
+var ErrTooManyUsers = New(EUSERS)
+var ErrNotSupported = New(ENOTSUP)
 var ErrStaleFileHandle = New(ESTALE)
 var ErrFileSystemCorrupted = New(EUCLEAN)
 var ErrDiskQuotaExceeded = New(EDQUOT)
+var ErrAlreadyInProgress = New(EALREADY)
 
 func init() {
 	errorMessagesByCode = make(map[Errno]string, 32)
@@ -127,7 +128,6 @@ func init() {
 	errorMessagesByCode[ENOTSUP] = "Operation not supported"
 	errorMessagesByCode[ENOBUFS] = "No buffer space available"
 	errorMessagesByCode[EALREADY] = "Operation already in progress"
-	errorMessagesByCode[EINPROGRESS] = "Operation now in progress"
 	errorMessagesByCode[ESTALE] = "Stale file handle"
 	errorMessagesByCode[EUCLEAN] = "Structure needs cleaning"
 	errorMessagesByCode[EDQUOT] = "Disk quota exceeded"

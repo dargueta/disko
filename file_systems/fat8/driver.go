@@ -53,7 +53,7 @@ func NewDriverFromFile(stream *os.File) Driver {
 func (driver *Driver) Mount(flags disko.MountFlags) error {
 	// Ignore attempts to mount the drive multiple times.
 	if driver.isMounted {
-		return errors.New(errors.EALREADY)
+		return errors.ErrAlreadyInProgress
 	}
 
 	offset, err := driver.image.Seek(0, io.SeekEnd)

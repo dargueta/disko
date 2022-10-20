@@ -206,7 +206,7 @@ func (drv *FATDriver) resolvePathToDirent(path string) (Dirent, error) {
 // including the `.` and `..` entries.
 func (drv *FATDriver) readDirFromDirent(directoryDirent *Dirent) ([]Dirent, error) {
 	if !directoryDirent.IsDir() {
-		return nil, errors.New(errors.ENOTDIR)
+		return nil, errors.ErrNotADirectory
 	}
 
 	bootSector := drv.fs.GetBootSector()
@@ -245,7 +245,7 @@ func (drv *FATDriver) readDirFromDirent(directoryDirent *Dirent) ([]Dirent, erro
 // Readlink is unsupported on FAT file systems, so calling this function will return an
 // error.
 func (drv *FATDriver) Readlink(path string) (string, error) {
-	return "", errors.New(errors.ENOTSUP)
+	return "", errors.ErrNotSupported
 }
 
 // SameFile determines if two FileInfos reference the same file.
@@ -267,7 +267,7 @@ func (drv *FATDriver) Readdir(path string) ([]os.FileInfo, error) {
 
 	if !dirent.IsDir() {
 		// TODO: Provide the path in the error message
-		return nil, errors.New(errors.ENOTDIR)
+		return nil, errors.ErrNotADirectory
 	}
 
 	dirContents, err := drv.readDirFromDirent(&dirent)
@@ -291,7 +291,7 @@ func (drv *FATDriver) ReadFile(path string) ([]byte, error) {
 	}
 
 	if dirent.IsDir() {
-		return nil, errors.New(errors.EISDIR)
+		return nil, errors.ErrIsADirectory
 	}
 
 	allClusters, err := drv.listClusters(dirent.FirstCluster)
@@ -380,7 +380,7 @@ func (drv *FATDriver) Chmod(path string, mode os.FileMode) error {
 // Chown is unsupported on FAT file systems since they have no concept of ownership.
 // This function does nothing, only returns an error.
 func (drv *FATDriver) Chown(path string, uid, gid int) error {
-	return errors.New(errors.ENOTSUP)
+	return errors.ErrNotSupported
 }
 
 // Chtimes changes the last accessed and last modified timestamps of a directory entry.
@@ -398,12 +398,12 @@ func (drv *FATDriver) Chtimes(path string, atime, mtime time.Time) error {
 // Lchown is unsupported on FAT file systems since they have no concept of ownership.
 // This function does nothing, only returns an error.
 func (drv *FATDriver) Lchown(path string, uid, gid int) error {
-	return errors.New(errors.ENOTSUP)
+	return errors.ErrNotSupported
 }
 
 // Link does nothing and returns an error since links are unsupported on FAT file systems.
 func (drv *FATDriver) Link(oldpath, newpath string) error {
-	return errors.New(errors.ENOTSUP)
+	return errors.ErrNotSupported
 }
 
 // TODO: Mkdir
@@ -418,7 +418,7 @@ func (drv *FATDriver) Remove(path string) error {
 	}
 
 	if dirent.IsDir() {
-		return errors.New(errors.EISDIR)
+		return errors.ErrIsADirectory
 	}
 
 	parentDirent, err := drv.resolvePathToDirent(filepath.Dir(path))
@@ -460,7 +460,7 @@ func (drv *FATDriver) Remove(path string) error {
 // Symlink does nothing and returns an error since links are unsupported on FAT file
 // systems.
 func (drv *FATDriver) Symlink(oldpath, newpath string) error {
-	return errors.New(errors.ENOTSUP)
+	return errors.ErrNotSupported
 }
 
 // TODO: Truncate

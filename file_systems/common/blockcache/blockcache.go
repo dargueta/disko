@@ -151,7 +151,7 @@ func WrapStream(
 		// the functionality *is* supported by Disko, but not this specific
 		// stream.
 		resizeCb = func(newTotalBlocks c.LogicalBlock) error {
-			return errors.New(errors.ENOTSUP)
+			return errors.ErrNotSupported
 		}
 	}
 

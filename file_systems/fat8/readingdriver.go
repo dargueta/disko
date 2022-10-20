@@ -29,7 +29,7 @@ func (driver *Driver) Stat(path string) (disko.FileStat, error) {
 
 	info, found := driver.dirents[normalizedPath]
 	if !found {
-		return disko.FileStat{}, errors.New(errors.ENOENT)
+		return disko.FileStat{}, errors.ErrNotFound
 	}
 
 	// Cluster size is fixed at two clusters per track. Since we know the number

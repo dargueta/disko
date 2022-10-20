@@ -146,7 +146,7 @@ func (file *File) Chmod(mode os.FileMode) error {
 	if ok {
 		return chmodHandle.Chmod(mode)
 	}
-	return errors.New(errors.ENOTSUP)
+	return errors.ErrNotSupported
 }
 
 func (file *File) Chown(uid, gid int) error {
@@ -154,7 +154,7 @@ func (file *File) Chown(uid, gid int) error {
 	if ok {
 		return chownHandle.Chown(uid, gid)
 	}
-	return errors.New(errors.ENOTSUP)
+	return errors.ErrNotSupported
 }
 
 func (file *File) Close() error {
@@ -169,7 +169,7 @@ func (file *File) Name() string {
 func (file *File) ReadDir(n int) ([]os.DirEntry, error) {
 	stat := file.objectHandle.Stat()
 	if !stat.IsDir() {
-		return nil, errors.New(errors.ENOTDIR)
+		return nil, errors.ErrNotADirectory
 	}
 
 	if file.lastReadDirResult == nil {
