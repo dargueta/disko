@@ -451,7 +451,7 @@ func (drv *FATDriver) Remove(path string) error {
 }
 
 // TODO: RemoveAll
-// TODO: Repath
+// TODO: Rename
 
 // Symlink does nothing and returns an error since links are unsupported on FAT file
 // systems.

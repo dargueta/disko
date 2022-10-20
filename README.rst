@@ -27,7 +27,7 @@ interface. For details on the functions that need to be implemented, see
 
 * ✔: Supported
 * ⚠: Partial implementation, see notes
-* ✘: Doesn't make sense for this, so the function wasn't implemented.
+* ✘: Doesn't make sense for this, so the function deliberately wasn't implemented.
 
 **Optional Features**
 
@@ -56,7 +56,8 @@ Chown             3
 Chtimes           4
 Create    ✔
 Flush
-Lchown            2, 6
+Getwd     ✔
+Lchown            3, 6
 Link              5
 Lstat     ✔
 Mkdir     ✔
@@ -73,6 +74,7 @@ SameFile  ✔
 Stat      ✔
 Symlink           6
 Truncate  ✔
+Unmount
 WriteFile ✔
 ========= ======= ====================
 

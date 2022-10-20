@@ -380,6 +380,41 @@ type FSStat struct {
 	Label string
 }
 
+// Driver is the interface implemented by the base file system driver that wraps
+// a file system implementation.
+type Driver interface {
+	// NormalizePath converts a path from the user's native file system syntax
+	// to an absolute normalized path using forward slashes (/) as the component
+	// separator. The return value is always an absolute path.
+	NormalizePath(path string) string
+
+	Chdir(path string) error
+	Chmod(name string, mode os.FileMode) error
+	Chown(name string, uid, gid int) error
+	Chtimes(name string, atime time.Time, mtime time.Time) error
+	Create(path string) (File, error)
+	Getwd() (string, error)
+	Lchown(name string, uid, gid int) error
+	Link(oldname, newname string) error
+	Lstat(path string) (FileStat, error)
+	Mkdir(path string, perm os.FileMode) error
+	MkdirAll(path string, perm os.FileMode) error
+	Open(path string) (File, error)
+	OpenFile(path string, flags IOFlags, perm os.FileMode) (File, error)
+	ReadDir(path string) ([]DirectoryEntry, error)
+	ReadFile(path string) ([]byte, error)
+	Readlink(path string) (string, error)
+	Remove(path string) error
+	RemoveAll(path string) error
+	Rename(old string, new string) error
+	SameFile(fi1, fi2 os.FileInfo) bool
+	Stat(path string) (FileStat, error)
+	Symlink(oldname, newname string) error
+	Truncate(path string) error
+	Unmount() error
+	WriteFile(path string, data []byte, perm os.FileMode) error
+}
+
 // File is the expected interface for file handles from drivers.
 //
 // This interface is intended to be more or less a drop-in replacement for

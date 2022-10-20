@@ -13,6 +13,10 @@ import (
 // Driver is an abstraction layer for all file system implementations, providing
 // a single interface for interacting with them.
 type Driver struct {
+	// Interfaces
+	disko.Driver
+
+	// Fields
 	implementation disko.FileSystemImplementer
 	mountFlags     disko.MountFlags
 	workingDirPath string
@@ -30,9 +34,6 @@ func New(
 	}
 }
 
-// NormalizePath converts a path from the user's native file system syntax to
-// an absolute normalized path using forward slashes (/) as the component
-// separator. The return value is always an absolute path.
 func (driver *Driver) NormalizePath(path string) string {
 	path = posixpath.Clean(filepath.ToSlash(path))
 	if path == "." {
@@ -623,4 +624,8 @@ func (driver *Driver) removeDirectory(directory extObjectHandle) error {
 	}
 
 	return nil
+}
+
+func (driver *Driver) Getwd() (string, error) {
+	return driver.workingDirPath, nil
 }
