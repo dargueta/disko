@@ -91,3 +91,35 @@ func TestBlockCache__Write__Basic(t *testing.T) {
 		}
 	}
 }
+
+// Attempting to write starting past the end of the cache fails.
+func TestBlockCache__Write__WriteStartingPastEndFails(t *testing.T) {
+	cache := diskotest.CreateDefaultCache(512, 16, true, nil, t)
+	writeBuffer := make([]byte, cache.BytesPerBlock())
+
+	err := cache.Write(c.LogicalBlock(16), writeBuffer)
+	if err == nil {
+		t.Error("writing past the end of the buffer should've failed but it didn't")
+	}
+}
+
+// If we write to a block inside the cache but the buffer extends past the end
+// of the cache, it fails immediately and no data is modified.
+func TestBlockCache__Write__WriteOverlappingPastEndFails(t *testing.T) {
+	cache := diskotest.CreateDefaultCache(512, 16, true, nil, t)
+	cacheData, _ := cache.Data()
+	copyOfOriginalData := make([]byte, len(cacheData))
+	copy(copyOfOriginalData, cacheData)
+
+	writeBuffer := make([]byte, cache.BytesPerBlock()*5)
+	rand.Read(writeBuffer)
+
+	err := cache.Write(c.LogicalBlock(12), writeBuffer)
+	if err == nil {
+		t.Error("writing past the end of the buffer should've failed but it didn't")
+	}
+
+	if !bytes.Equal(cacheData, copyOfOriginalData) {
+		t.Error("cache data was modified but shouldn't've been")
+	}
+}
