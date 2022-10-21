@@ -629,3 +629,7 @@ func (driver *Driver) removeDirectory(directory extObjectHandle) error {
 func (driver *Driver) Getwd() (string, error) {
 	return driver.workingDirPath, nil
 }
+
+func (driver *Driver) GetFSFeatures() disko.FSFeatures {
+	return driver.implementation.GetFSFeatures()
+}

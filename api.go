@@ -112,8 +112,8 @@ type FileSystemImplementer interface {
 	// to the file system.
 	FSStat() FSStat
 
-	// GetFSFeatures returns an interface that gives the various features the
-	// file system supports, regardless of whether the driver implements these
+	// GetFSFeatures returns a struct that gives the various features the file
+	// system supports, regardless of whether the driver implements these
 	// features or not.
 	GetFSFeatures() FSFeatures
 
@@ -381,12 +381,24 @@ type FSStat struct {
 }
 
 // Driver is the interface implemented by the base file system driver that wraps
-// a file system implementation.
+// a file system implementation. For most functions, the functionality is the
+// same as the equivalent function in the [os] package.
+//
+// The presence of a function doesn't imply that the file system it's wrapping
+// supports or implements that feature, so be sure to check the returned errors
+// if you need something to happen.
 type Driver interface {
 	// NormalizePath converts a path from the user's native file system syntax
 	// to an absolute normalized path using forward slashes (/) as the component
 	// separator. The return value is always an absolute path.
 	NormalizePath(path string) string
+	// GetFSFeatures returns a struct that gives the various features the file
+	// system supports, regardless of whether the driver implements these
+	// features or not.
+	GetFSFeatures() FSFeatures
+
+	// -------------------------------------------------------------------------
+	// Functions from [os]
 
 	Chdir(path string) error
 	Chmod(name string, mode os.FileMode) error
