@@ -371,6 +371,10 @@ func (driver *Driver) readDir(
 }
 
 func (driver *Driver) Readlink(path string) (string, error) {
+	if !driver.implementation.GetFSFeatures().HasSymbolicLinks {
+		return "", errors.ErrNotSupported
+	}
+
 	path = driver.NormalizePath(path)
 	object, err := driver.getObjectAtPathNoFollow(path)
 	if err != nil {
