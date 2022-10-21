@@ -75,6 +75,7 @@ func New(
 	resizeCb ResizeCallback,
 ) *BlockCache {
 	if resizeCb == nil {
+		// The caller wants this cache to not be resizable.
 		resizeCb = func(newTotalBlocks c.LogicalBlock) error {
 			return errors.ErrNotSupported.WithMessage(
 				fmt.Sprintf(
@@ -144,13 +145,15 @@ func WrapStream(
 			truncator := stream.(c.Truncator)
 			return truncator.Truncate(int64(newTotalBlocks) * int64(bytesPerBlock))
 		}
-	} else {
-		// Resizing is not allowed, either because the caller forbade it or the
-		// stream doesn't support it. Note we don't return ENOSYS here because
-		// the functionality *is* supported by Disko, but not this specific
-		// stream.
+	} else if allowResize {
+		// The caller allows resizing but the stream doesn't support Truncate().
 		resizeCb = func(newTotalBlocks c.LogicalBlock) error {
 			return errors.ErrNotSupported
+		}
+	} else {
+		// The caller forbade resizing.
+		resizeCb = func(newTotalBlocks c.LogicalBlock) error {
+			return errors.ErrNotPermitted
 		}
 	}
 
@@ -203,17 +206,20 @@ func (cache *BlockCache) checkBounds(start c.LogicalBlock, bufferSize uint) erro
 	numBlocks := cache.LengthToNumBlocks(bufferSize)
 
 	if uint(start) >= cache.totalBlocks {
-		return fmt.Errorf(
-			"block %d not in range [0, %d)", start, cache.totalBlocks,
+		return errors.ErrArgumentOutOfRange.WithMessage(
+			fmt.Sprintf("block %d not in range [0, %d)", start, cache.totalBlocks),
 		)
 	}
 	if uint(start)+numBlocks > cache.totalBlocks {
-		return fmt.Errorf(
-			"can't access %d bytes (%d blocks) starting at block %d; range not in [0, %d)",
-			bufferSize,
-			numBlocks,
-			start,
-			cache.totalBlocks,
+		return errors.ErrArgumentOutOfRange.WithMessage(
+			fmt.Sprintf(
+				"can't access %d bytes (%d blocks) starting at block %d; range"+
+					" not in [0, %d)",
+				bufferSize,
+				numBlocks,
+				start,
+				cache.totalBlocks,
+			),
 		)
 	}
 	return nil
