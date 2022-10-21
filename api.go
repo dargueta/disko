@@ -74,7 +74,8 @@ type FileSystemImplementer interface {
 	Mount(image *blockcache.BlockCache, flags MountFlags) errors.DriverError
 
 	// Unmount writes out all pending changes to the disk image and releases any
-	// resources the implementation may be holding.
+	// resources the implementation may be holding. The driver guarantees that
+	// no files will be open when this is called.
 	Unmount() errors.DriverError
 
 	// CreateObject creates an object on the file system, such as a file or
@@ -108,7 +109,7 @@ type FileSystemImplementer interface {
 	GetRootDirectory() ObjectHandle
 
 	// FSStat returns information about the file system. Multiple calls to this
-	// function should return identical data if no modifications have been made
+	// function must return identical data if no modifications have been made
 	// to the file system.
 	FSStat() FSStat
 

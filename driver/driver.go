@@ -71,7 +71,7 @@ func (driver *Driver) resolveSymlink(
 			return nil,
 				err.Errno().WithMessage(
 					fmt.Sprintf(
-						"can't resolve path `%s`, failed to read symlink `%s`: %s",
+						"can't resolve path %q, failed to read symlink %q: %s",
 						originalPath,
 						currentPath,
 						err.Error(),
@@ -132,7 +132,7 @@ func (driver *Driver) getObjectAtPathNoFollow(
 		return nil,
 			errors.ErrNotADirectory.WithMessage(
 				fmt.Sprintf(
-					"cannot resolve path `%s`: `%s` is not a directory",
+					"cannot resolve path %q: %q is not a directory",
 					path,
 					parentPath,
 				),
@@ -571,7 +571,7 @@ func (driver *Driver) RemoveAll(path string) error {
 	stat := directory.Stat()
 	if !stat.IsDir() {
 		return errors.ErrNotADirectory.WithMessage(
-			fmt.Sprintf("cannot remove `%s`: not a directory", path),
+			fmt.Sprintf("cannot remove %q: not a directory", path),
 		)
 	}
 

@@ -126,7 +126,7 @@ func (d *Dirent) SetLastModifiedAt(t time.Time) error {
 // It is an error to get this timestamp for a dirent that has been deleted.
 func (d *Dirent) GetCreatedAt() (time.Time, error) {
 	if d.isDeleted {
-		return time.Unix(0, 0), errors.ErrNotFound
+		return disko.UndefinedTimestamp, errors.ErrNotFound
 	}
 	return d.stat.CreatedAt, nil
 }

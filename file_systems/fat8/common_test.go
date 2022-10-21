@@ -61,10 +61,10 @@ func TestSerializeFilenames(t *testing.T) {
 	for _, test := range filenameTests {
 		serialized, err := FilenameToBytes(test.Filename)
 		if err != nil {
-			t.Errorf("Error serializing `%s`: %s", test.Filename, err.Error())
+			t.Errorf("Error serializing %q: %s", test.Filename, err.Error())
 		} else if !bytes.Equal(serialized, test.BinaryForm) {
 			t.Errorf(
-				"Serialized filename is wrong; expected `%s`, got `%s`",
+				"Serialized filename is wrong; expected %q, got %q",
 				test.BinaryForm,
 				serialized,
 			)
@@ -76,10 +76,10 @@ func TestDeserializeFilenames(t *testing.T) {
 	for _, test := range filenameTests {
 		deserialized, err := BytesToFilename(test.BinaryForm)
 		if err != nil {
-			t.Errorf("Error deserializing `%s`: %s", test.Filename, err.Error())
+			t.Errorf("Error deserializing %q: %s", test.Filename, err.Error())
 		} else if !strings.EqualFold(deserialized, test.Filename) {
 			t.Errorf(
-				"Serialized filename is wrong; expected `%s`, got `%s`",
+				"Serialized filename is wrong; expected %q, got %q",
 				strings.ToUpper(test.Filename),
 				deserialized,
 			)
