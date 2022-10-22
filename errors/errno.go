@@ -10,152 +10,121 @@ import (
 
 type Errno int
 
+var errorMessagesByCode map[Errno]string
+
 const (
-	EOK Errno = iota
-	EPERM
-	ENOENT
-	ESRCH
-	EINTR
-	EIO
-	ENXIO
-	E2BIG
-	ENOEXEC
-	EBADF
-	ECHILD
-	EAGAIN
-	EACCES
-	ENOMEM
-	EFAULT
-	ENOTBLK
-	EBUSY
-	EEXIST
-	EXDEV
-	ENODEV
-	ENOTDIR
-	EISDIR
-	EINVAL
-	ENFILE
-	EMFILE
-	ENOTTY
-	ETXTBSY
-	EFBIG
-	ENOSPC
-	ESPIPE
-	EROFS
-	EMLINK
-	EPIPE
-	EDOM
-	ERANGE
-	EDEADLK
-	ENAMETOOLONG
-	ENOLCK
-	ENOSYS
-	ENOTEMPTY
-	ELOOP
-	_ // 0x29 not assigned
-	ENOMSG
-	EIDRM
-	ECHRNG
-	EL2NSYNC
-	EL3HLT
-	EL3RST
-	ELNRNG
-	EUNATCH
-	ENOCSI
-	EL2HLT
-	EBADE
-	EBADR
-	EXFULL
-	ENOANO
-	EBADRQC
-	EBADSLT
-	_ // 0x3a not assigned
-	EBFONT
-	ENOSTR
-	ENODATA
-	ETIME
-	ENOSR
-	ENONET
-	ENOPKG
-	EREMOTE
-	ENOLINK
-	EADV
-	ESRMNT
-	ECOMM
-	EPROTO
-	EMULTIHOP
-	EDOTDOT
-	EBADMSG
-	EOVERFLOW
-	ENOTUNIQ
-	EBADFD
-	EREMCHG
-	ELIBACC
-	ELIBBAD
-	ELIBSCN
-	ELIBMAX
-	ELIBEXEC
-	EILSEQ
-	ERESTART
-	ESTRPIPE
-	EUSERS
-	ENOTSOCK
-	EDESTADDRREQ
-	EMSGSIZE
-	EPROTOTYPE
-	ENOPROTOOPT
-	EPROTONOSUPPORT
-	ESOCKTNOSUPPORT
-	ENOTSUP
-	EPFNOSUPPORT
-	EAFNOSUPPORT
-	EADDRINUSE
-	EADDRNOTAVAIL
-	ENETDOWN
-	ENETUNREACH
-	ENETRESET
-	ECONNABORTED
-	ECONNRESET
-	ENOBUFS
-	EISCONN
-	ENOTCONN
-	ESHUTDOWN
-	ETOOMANYREFS
-	ETIMEDOUT
-	ECONNREFUSED
-	EHOSTDOWN
-	EHOSTUNREACH
-	EALREADY
-	EINPROGRESS
-	ESTALE
-	EUCLEAN
-	ENOTNAM
-	ENAVAIL
-	EISNAM
-	EREMOTEIO
-	EDQUOT
-	ENOMEDIUM
-	EMEDIUMTYPE
-	ECANCELED
-	ENOKEY
-	EKEYEXPIRED
-	EKEYREVOKED
-	EKEYREJECTED
-	EOWNERDEAD
-	ENOTRECOVERABLE
-	ERFKILL
+	_ Errno = iota
+	ErrNotPermitted
+	ErrNotFound
+	ErrIOFailed
+	ErrInvalidFileDescriptor
+	ErrPermissionDenied
+	ErrBlockDeviceRequired
+	ErrBusy
+	ErrExists
+	ErrCrossDeviceLink
+	ErrNoDevice
+	ErrNotADirectory
+	ErrIsADirectory
+	ErrInvalidArgument
+	ErrTooManyOpenFiles
+	ErrFileTooLarge
+	ErrNoSpaceOnDevice
+	ErrReadOnlyFileSystem
+	ErrTooManyLinks
+	ErrArgumentOutOfRange
+	ErrResultOutOfRange
+	ErrNameTooLong
+	ErrNotImplemented
+	ErrDirectoryNotEmpty
+	ErrLinkCycleDetected
+	ErrFileDescriptorBadState
+	ErrTooManyUsers
+	ErrNotSupported
+	ErrAlreadyInProgress
+	ErrFileSystemCorrupted
+	ErrDiskQuotaExceeded
+	ErrInvalidFileSystem
+	ErrUnexpectedEOF
+	maxErrorCode
 )
 
-// EWOULDBLOCK is a synonym for EAGAIN.
-const EWOULDBLOCK = EAGAIN
+func init() {
+	errorMessagesByCode = make(map[Errno]string, maxErrorCode)
+	errorMessagesByCode[ErrNotPermitted] = "Operation not permitted"
+	errorMessagesByCode[ErrNotFound] = "No such file or directory"
+	errorMessagesByCode[ErrIOFailed] = "Input/output error"
+	errorMessagesByCode[ErrInvalidFileDescriptor] = "Bad file descriptor"
+	errorMessagesByCode[ErrPermissionDenied] = "Permission denied"
+	errorMessagesByCode[ErrBlockDeviceRequired] = "Block device required"
+	errorMessagesByCode[ErrBusy] = "Device or resource busy"
+	errorMessagesByCode[ErrExists] = "File exists"
+	errorMessagesByCode[ErrCrossDeviceLink] = "Invalid cross-device link"
+	errorMessagesByCode[ErrNoDevice] = "No such device"
+	errorMessagesByCode[ErrNotADirectory] = "Not a directory"
+	errorMessagesByCode[ErrIsADirectory] = "Is a directory"
+	errorMessagesByCode[ErrInvalidArgument] = "Invalid argument"
+	errorMessagesByCode[ErrTooManyOpenFiles] = "Too many open files in system"
+	errorMessagesByCode[ErrFileTooLarge] = "File too large"
+	errorMessagesByCode[ErrNoSpaceOnDevice] = "No space left on device"
+	errorMessagesByCode[ErrReadOnlyFileSystem] = "Read-only file system"
+	errorMessagesByCode[ErrTooManyLinks] = "Too many links"
+	errorMessagesByCode[ErrArgumentOutOfRange] = "Numerical argument out of domain"
+	errorMessagesByCode[ErrResultOutOfRange] = "Numerical result out of range"
+	errorMessagesByCode[ErrNameTooLong] = "File name too long"
+	errorMessagesByCode[ErrNotImplemented] = "Function not implemented"
+	errorMessagesByCode[ErrDirectoryNotEmpty] = "Directory not empty"
+	errorMessagesByCode[ErrTooManyLinks] = "Too many levels of symbolic links"
+	errorMessagesByCode[ErrFileDescriptorBadState] = "File descriptor in bad state"
+	errorMessagesByCode[ErrTooManyUsers] = "Too many users"
+	errorMessagesByCode[ErrNotSupported] = "Operation not supported"
+	errorMessagesByCode[ErrAlreadyInProgress] = "Operation already in progress"
+	errorMessagesByCode[ErrFileSystemCorrupted] = "Structure needs cleaning"
+	errorMessagesByCode[ErrDiskQuotaExceeded] = "Disk quota exceeded"
+	errorMessagesByCode[ErrInvalidFileSystem] = "Wrong medium type"
+	errorMessagesByCode[ErrUnexpectedEOF] = "Unexpected end of file or stream"
+}
 
-// EDEADLOCK is a synonym for EDEADLK.
-const EDEADLOCK = EDEADLK
-
-// EOPNOTSUPP is a synonym for ENOTSUP
-const EOPNOTSUPP = ENOTSUP
-
-// TODO (dargueta): Actually implement this
 func StrError(code Errno) string {
+	message, ok := errorMessagesByCode[code]
+	if ok {
+		return message
+	}
 	return fmt.Sprintf("error %d not recognized.", int(code))
+}
+
+func (e Errno) Error() string {
+	return StrError(e)
+}
+
+func (e Errno) Errno() Errno {
+	return e
+}
+
+func (e Errno) Unwrap() error {
+	return nil
+}
+
+func (e Errno) WithMessage(message string) DriverError {
+	return driverErrorWithMessage{
+		errno:         e,
+		message:       message,
+		originalError: nil,
+	}
+}
+
+func (e Errno) WrapError(err error) DriverError {
+	return driverErrorWithMessage{
+		errno:         e,
+		message:       fmt.Sprintf("error: [%d] %s", int(e), err.Error()),
+		originalError: err,
+	}
+}
+
+func (e Errno) IsSameError(other error) bool {
+	driverError, ok := other.(DriverError)
+	if ok {
+		return e == driverError.Errno()
+	}
+	return false
 }

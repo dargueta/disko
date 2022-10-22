@@ -96,7 +96,7 @@ func (stream *BasicStream) Read(buffer []byte) (int, error) {
 
 func (stream *BasicStream) ReadAt(buffer []byte, offset int64) (int, error) {
 	if !stream.ioFlags.Read() {
-		return 0, errors.New(errors.EPERM)
+		return 0, errors.ErrNotPermitted
 	}
 
 	bufLen := int64(len(buffer))
@@ -117,7 +117,7 @@ func (stream *BasicStream) ReadAt(buffer []byte, offset int64) (int, error) {
 
 	sourceData, err := stream.data.GetSlice(
 		firstBlock,
-		uint(lastBlock-firstBlock)+1,
+		uint(lastBlock-firstBlock),
 	)
 	if err != nil {
 		return 0, err
@@ -133,7 +133,7 @@ func (stream *BasicStream) ReadAt(buffer []byte, offset int64) (int, error) {
 
 func (stream *BasicStream) ReadFrom(r io.Reader) (n int64, err error) {
 	if !stream.ioFlags.Write() {
-		return 0, errors.New(errors.EACCES)
+		return 0, errors.ErrNotPermitted
 	}
 
 	// If the argument is another BasicStream, make the read buffer be exactly
@@ -182,7 +182,7 @@ func (stream *BasicStream) Seek(offset int64, whence int) (int64, error) {
 	case io.SeekStart:
 		absoluteOffset = offset
 	case io.SeekCurrent:
-		absoluteOffset += offset
+		absoluteOffset = stream.position + offset
 	case io.SeekEnd:
 		absoluteOffset = stream.size + offset
 	default:
@@ -192,9 +192,10 @@ func (stream *BasicStream) Seek(offset int64, whence int) (int64, error) {
 	if absoluteOffset < 0 {
 		return stream.position,
 			fmt.Errorf(
-				"result of Seek(offset=%d, whence=%d) is negative",
+				"result of Seek(offset=%d, whence=%d) is negative: %d",
 				offset,
 				whence,
+				absoluteOffset,
 			)
 	}
 
@@ -223,17 +224,15 @@ func (stream *BasicStream) Tell() int64 {
 // stream pointer.
 func (stream *BasicStream) Truncate(size int64) error {
 	if !stream.ioFlags.Write() {
-		return errors.New(errors.EPERM)
+		return errors.ErrNotPermitted
 	}
 
 	if size < 0 {
-		return errors.NewWithMessage(
-			errors.EINVAL,
+		return errors.ErrInvalidArgument.WithMessage(
 			fmt.Sprintf("truncate failed: %d is not a valid file size", size),
 		)
 	} else if uint64(size) > math.MaxUint {
-		return errors.NewWithMessage(
-			errors.EINVAL,
+		return errors.ErrFileTooLarge.WithMessage(
 			fmt.Sprintf("truncate failed: new file size %d is too large", size),
 		)
 	}
@@ -259,7 +258,7 @@ func (stream *BasicStream) Write(buffer []byte) (int, error) {
 	var err error
 
 	if !stream.ioFlags.Write() {
-		return 0, errors.New(errors.EACCES)
+		return 0, errors.ErrNotPermitted
 	}
 
 	// Force the stream pointer to the end of the file if O_APPEND was set.
@@ -281,7 +280,7 @@ func (stream *BasicStream) Write(buffer []byte) (int, error) {
 // check for the O_APPEND flag.
 func (stream *BasicStream) implWriteAt(buffer []byte, offset int64) (int, error) {
 	if !stream.ioFlags.Write() {
-		return 0, errors.New(errors.EPERM)
+		return 0, errors.ErrNotPermitted
 	}
 
 	bufLen := int64(len(buffer))
@@ -314,7 +313,7 @@ func (stream *BasicStream) implWriteAt(buffer []byte, offset int64) (int, error)
 // use this function if the stream was created with the [disko.O_APPEND] flag.
 func (stream *BasicStream) WriteAt(buffer []byte, offset int64) (int, error) {
 	if stream.ioFlags.Append() {
-		return 0, errors.New(errors.EACCES)
+		return 0, errors.ErrNotPermitted
 	}
 	return stream.implWriteAt(buffer, offset)
 }

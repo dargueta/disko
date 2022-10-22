@@ -1,6 +1,7 @@
 package fat8
 
 import (
+	"bytes"
 	_ "embed"
 	"io"
 	"os"
@@ -44,6 +45,7 @@ func ValidateImage(t *testing.T, totalBlocks, sectorsPerTrack uint, expectedImag
 	if err != nil {
 		t.Fatalf("Failed to create temporary file: %v", err)
 	}
+	defer tmpFile.Close()
 
 	driver := NewDriverFromFile(tmpFile)
 	err = driver.Format(disko.FSStat{TotalBlocks: uint64(totalBlocks)})
@@ -60,24 +62,41 @@ func ValidateImage(t *testing.T, totalBlocks, sectorsPerTrack uint, expectedImag
 		t.Fatalf("Image size is wrong; expected %d, got %d", totalBytes, bytesRead)
 	}
 
+	// Iterate sector by sector and show an error message for each sector that
+	// differs from expected.
 	for i := uint(0); i < totalBytes; i += 128 {
-		expectedSector := emptyFloppyImage[i : i+128]
-		imageSector := imageContents[i : i+128]
-		diffAt := FirstDifference(imageSector, expectedSector)
-		if diffAt >= 0 {
-			track := (i / 128) / sectorsPerTrack
-			trackSector := (i / 128) % sectorsPerTrack
-			t.Errorf(
-				"Images not equal in absolute sector %d (track: %d, sector: %d);"+
-					" first differing byte at index %d; expected %#02x, got %#02x",
-				i/128,
-				track+1,
-				trackSector+1,
-				diffAt,
-				expectedSector[diffAt],
-				imageSector[diffAt],
-			)
+		currentSector := imageContents[i : i+128]
+		expectedSector := imageContents[i : i+128]
+
+		// Do a quick check to see if the sectors are equal. Don't bother with
+		// the rest if they are.
+		if bytes.Equal(currentSector, expectedSector) {
+			continue
 		}
+
+		// The sectors differ, find the first differing byte within this sector.
+		diffAt := uint(0)
+		for ; diffAt < 128; diffAt++ {
+			if currentSector[diffAt] != expectedSector[diffAt] {
+				break
+			}
+		}
+
+		absoluteSector := i / 128
+		track := absoluteSector / sectorsPerTrack
+		sectorInTrack := absoluteSector % sectorsPerTrack
+
+		t.Errorf(
+			"Images not equal in track %d, sector %d (absolute sector %d);"+
+				" first differing byte at index %d (base 0); expected %#02x,"+
+				" got %#02x",
+			track+1,
+			sectorInTrack+1,
+			absoluteSector,
+			diffAt,
+			expectedSector[diffAt],
+			currentSector[diffAt],
+		)
 	}
 }
 
