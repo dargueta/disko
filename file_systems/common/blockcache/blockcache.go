@@ -75,9 +75,9 @@ func New(
 	resizeCb ResizeCallback,
 ) *BlockCache {
 	if resizeCb == nil {
+		// The caller wants this cache to not be resizable.
 		resizeCb = func(newTotalBlocks c.LogicalBlock) error {
-			return errors.NewWithMessage(
-				errors.ENOTSUP,
+			return errors.ErrNotSupported.WithMessage(
 				fmt.Sprintf(
 					"resizing is not supported; size fixed at %d bytes",
 					bytesPerBlock*totalBlocks,
@@ -145,13 +145,15 @@ func WrapStream(
 			truncator := stream.(c.Truncator)
 			return truncator.Truncate(int64(newTotalBlocks) * int64(bytesPerBlock))
 		}
-	} else {
-		// Resizing is not allowed, either because the caller forbade it or the
-		// stream doesn't support it. Note we don't return ENOSYS here because
-		// the functionality *is* supported by Disko, but not this specific
-		// stream.
+	} else if allowResize {
+		// The caller allows resizing but the stream doesn't support Truncate().
 		resizeCb = func(newTotalBlocks c.LogicalBlock) error {
-			return errors.New(errors.ENOTSUP)
+			return errors.ErrNotSupported
+		}
+	} else {
+		// The caller forbade resizing.
+		resizeCb = func(newTotalBlocks c.LogicalBlock) error {
+			return errors.ErrNotPermitted
 		}
 	}
 
@@ -161,8 +163,7 @@ func WrapStream(
 // seekToBlock sets the stream pointer for a stream to the offset of a block.
 func seekToBlock(stream io.Seeker, block, totalBlocks c.LogicalBlock, bytesPerBlock uint) error {
 	if block >= totalBlocks {
-		return errors.NewWithMessage(
-			errors.EINVAL,
+		return errors.ErrArgumentOutOfRange.WithMessage(
 			fmt.Sprintf(
 				"invalid block number: %d not in range [0, %d)",
 				block,
@@ -204,13 +205,21 @@ func (cache *BlockCache) LengthToNumBlocks(size uint) uint {
 func (cache *BlockCache) checkBounds(start c.LogicalBlock, bufferSize uint) error {
 	numBlocks := cache.LengthToNumBlocks(bufferSize)
 
-	if uint(start)+numBlocks >= cache.totalBlocks {
-		return fmt.Errorf(
-			"can't access %d bytes (%d blocks) from block %d; range not in [0, %d)",
-			bufferSize,
-			numBlocks,
-			start,
-			cache.totalBlocks,
+	if uint(start) >= cache.totalBlocks {
+		return errors.ErrArgumentOutOfRange.WithMessage(
+			fmt.Sprintf("block %d not in range [0, %d)", start, cache.totalBlocks),
+		)
+	}
+	if uint(start)+numBlocks > cache.totalBlocks {
+		return errors.ErrArgumentOutOfRange.WithMessage(
+			fmt.Sprintf(
+				"can't access %d bytes (%d blocks) starting at block %d; range"+
+					" not in [0, %d)",
+				bufferSize,
+				numBlocks,
+				start,
+				cache.totalBlocks,
+			),
 		)
 	}
 	return nil
@@ -220,7 +229,7 @@ func (cache *BlockCache) checkBounds(start c.LogicalBlock, bufferSize uint) erro
 // `start` and continuing for `count` blocks.
 //
 // If the returned slice is modified, the modified blocks MUST be marked as
-// dirty.
+// dirty. Use [MarkBlockRangeDirty] for this.
 func (cache *BlockCache) GetSlice(
 	start c.LogicalBlock,
 	count uint,
@@ -240,7 +249,7 @@ func (cache *BlockCache) GetSlice(
 // for large files or with inefficient driver implementations.
 //
 // If the returned slice is modified, the modified blocks MUST be marked as
-// dirty.
+// dirty. Use [MarkBlockRangeDirty] for this.
 func (cache *BlockCache) Data() ([]byte, error) {
 	err := cache.LoadAll()
 	if err != nil {
@@ -264,10 +273,9 @@ func (cache *BlockCache) loadBlockRange(start c.LogicalBlock, count uint) error 
 			continue
 		}
 
-		buffer, err := cache.GetSlice(c.LogicalBlock(blockIndex), 1)
-		if err != nil {
-			return err
-		}
+		startByteOffset := start * c.LogicalBlock(cache.bytesPerBlock)
+		endByteOffset := startByteOffset + c.LogicalBlock(cache.bytesPerBlock*count)
+		buffer := cache.data[startByteOffset:endByteOffset]
 
 		// Load the block from backing storage directly into the cache.
 		err = cache.fetch(c.LogicalBlock(blockIndex), buffer)

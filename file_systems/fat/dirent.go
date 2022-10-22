@@ -102,7 +102,7 @@ func (d *Dirent) GetLastAccessedAt() time.Time {
 // It is an error to try to set this time before 1980-01-01 00:00:00 local time.
 func (d *Dirent) SetLastAccessedAt(t time.Time) error {
 	if t.Before(fatEpoch) {
-		return errors.New(errors.ERANGE)
+		return errors.ErrArgumentOutOfRange
 	}
 	d.stat.LastAccessed = t
 	return nil
@@ -116,7 +116,7 @@ func (d *Dirent) GetLastModifiedAt() time.Time {
 // It is an error to try to set this time before 1980-01-01 00:00:00 local time.
 func (d *Dirent) SetLastModifiedAt(t time.Time) error {
 	if t.Before(fatEpoch) {
-		return errors.New(errors.ERANGE)
+		return errors.ErrArgumentOutOfRange
 	}
 	d.stat.LastModified = t
 	return nil
@@ -126,7 +126,7 @@ func (d *Dirent) SetLastModifiedAt(t time.Time) error {
 // It is an error to get this timestamp for a dirent that has been deleted.
 func (d *Dirent) GetCreatedAt() (time.Time, error) {
 	if d.isDeleted {
-		return time.Unix(0, 0), errors.New(errors.ENOENT)
+		return disko.UndefinedTimestamp, errors.ErrNotFound
 	}
 	return d.stat.CreatedAt, nil
 }
@@ -136,9 +136,9 @@ func (d *Dirent) GetCreatedAt() (time.Time, error) {
 // this timestamp for a dirent that has been deleted.
 func (d *Dirent) SetCreatedAt(t time.Time) error {
 	if t.Before(fatEpoch) {
-		return errors.New(errors.ERANGE)
+		return errors.ErrArgumentOutOfRange
 	} else if d.isDeleted {
-		return errors.New(errors.ENOENT)
+		return errors.ErrNotFound
 	}
 
 	d.stat.CreatedAt = t
@@ -151,7 +151,7 @@ func (d *Dirent) SetCreatedAt(t time.Time) error {
 // FAT timestamp, 1980-01-01 00:00:00 local time.
 func (d *Dirent) GetDeletedAt() (time.Time, error) {
 	if !d.isDeleted {
-		return time.Unix(0, 0), errors.New(errors.EINVAL)
+		return disko.UndefinedTimestamp, errors.ErrInvalidArgument
 	}
 	return d.stat.DeletedAt, nil
 }
@@ -161,7 +161,7 @@ func (d *Dirent) GetDeletedAt() (time.Time, error) {
 // It is an error to try to set this time before 1980-01-01 00:00:00 local time.
 func (d *Dirent) SetDeletedAt(t time.Time) error {
 	if t.Before(fatEpoch) {
-		return errors.New(errors.ERANGE)
+		return errors.ErrArgumentOutOfRange
 	}
 	d.isDeleted = true
 	return d.SetCreatedAt(t)
@@ -312,7 +312,7 @@ func NewDirentFromRaw(bootSector *FATBootSector, rawDirent *RawDirent) (Dirent, 
 		trimmedName = "\xe5" + trimmedName[1:]
 	} else if trimmedName[0] == 0 {
 		// This directory entry is free and thus invalid.
-		return Dirent{}, errors.New(errors.ENOENT)
+		return Dirent{}, errors.ErrNotFound
 	}
 
 	if trimmedExt == "" {
@@ -345,7 +345,7 @@ func (drv *FATDriver) clusterToDirentSlice(data []byte) ([]Dirent, error) {
 
 			// If the error code is ENOENT then that means this directory entry is free
 			// and we've hit the end of the directory.
-			if drverr.Errno() == errors.ENOENT {
+			if errors.ErrNotFound.IsSameError(drverr) {
 				break
 			}
 			// Else: We failed for a different reason. Pass this error up to the

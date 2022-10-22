@@ -74,7 +74,8 @@ type FileSystemImplementer interface {
 	Mount(image *blockcache.BlockCache, flags MountFlags) errors.DriverError
 
 	// Unmount writes out all pending changes to the disk image and releases any
-	// resources the implementation may be holding.
+	// resources the implementation may be holding. The driver guarantees that
+	// no files will be open when this is called.
 	Unmount() errors.DriverError
 
 	// CreateObject creates an object on the file system, such as a file or
@@ -108,12 +109,12 @@ type FileSystemImplementer interface {
 	GetRootDirectory() ObjectHandle
 
 	// FSStat returns information about the file system. Multiple calls to this
-	// function should return identical data if no modifications have been made
+	// function must return identical data if no modifications have been made
 	// to the file system.
 	FSStat() FSStat
 
-	// GetFSFeatures returns an interface that gives the various features the
-	// file system supports, regardless of whether the driver implements these
+	// GetFSFeatures returns a struct that gives the various features the file
+	// system supports, regardless of whether the driver implements these
 	// features or not.
 	GetFSFeatures() FSFeatures
 
@@ -125,18 +126,14 @@ type FileSystemImplementer interface {
 		image io.ReadWriteSeeker,
 		stat FSStat,
 	) errors.DriverError
+}
 
+type BootCodeImplementer interface {
 	// SetBootCode sets the machine code that is executed on startup if the disk
-	// image is used as a boot volume. This function will never be called if the
-	// [FSFeatures.SupportsBootCode] returns false.
-	//
-	// If the file system doesn't have explicit support for this defined in the
-	// standard (such as FAT8), it should do nothing and immediately return an
-	// error with [ENOSYS] as the error code.
+	// image is used as a boot volume.
 	SetBootCode(code []byte) errors.DriverError
 
-	// GetBootCode returns the machine code that is executed on startup. It will
-	// never be called if [FSFeatures.SupportsBootCode] returns false.
+	// GetBootCode returns the machine code that is executed on startup.
 	GetBootCode() ([]byte, errors.DriverError)
 }
 
@@ -195,47 +192,6 @@ type ObjectHandle interface {
 	// and ".." if present, as the driver cannot assume these exist).
 	Unlink() errors.DriverError
 
-	// Chmod changes the permission bits of this file system object. Only the
-	// permissions bits will be set in `mode`. File systems that support access
-	// controls but not all aspects (e.g. no executable bit, or no group
-	// permissions) must silently ignore flags they don't recognize.
-	Chmod(mode os.FileMode) errors.DriverError
-
-	// Chown sets the ID of the owning user and group for this object.
-	//
-	// The following guarantees apply:
-	//
-	//  - `uid` and `gid` will never be negative.
-	//  - This will never be called if user IDs are not supported. If, however,
-	//    the file system doesn't support group IDs, implementations must
-	//    silently ignore `gid`.
-	Chown(uid, gid int) errors.DriverError
-
-	// Chtimes changes various timestamps associated with an object. The driver
-	// will do its best to ensure that unsupported timestamps are equal to
-	// [UndefinedTimestamp], but the implementation must ignore timestamps it
-	// doesn't support.
-	//
-	// The following guarantees apply:
-	//
-	//  - Timestamps known to be unsupported (i.e. the corresponding function
-	//    from [FSFeatures] returned false) will always be [UndefinedTimestamp].
-	//  - `deletedAt` will only be set if the object has been deleted and the
-	//    flag is supported by the file system.
-	Chtimes(
-		createdAt,
-		lastAccessed,
-		lastModified,
-		lastChanged,
-		deletedAt time.Time,
-	) errors.DriverError
-
-	// ListDir returns a list of the directory entries this object contains. "."
-	// and ".." are ignored if present.
-	//
-	// This is guaranteed to never be called unless this is a directory.
-	ListDir() ([]string, errors.DriverError)
-
 	// Name returns the name of the object itself without any path component.
 	// The root directory, which technically has no name, must return "/".
 	Name() string
@@ -249,6 +205,58 @@ type ObjectHandle interface {
 	//     even if X is a symbolic link to Y.
 	//   - Hard links are considered the same as the files they refer to.
 	SameAs(other ObjectHandle) bool
+}
+
+// SupportsListDirHandle is an interface for an [ObjectHandle] that represents a
+// directory to implement so that its contents can be accessed.
+type SupportsListDirHandle interface {
+	// ListDir returns a list of the directory entries this object contains. "."
+	// and ".." are ignored if present.
+	ListDir() ([]string, errors.DriverError)
+}
+
+// SupportsChtimesHandle is an interface for an [ObjectHandle] that supports
+// changing its created/modified/etc. timestamps.
+type SupportsChtimesHandle interface {
+	// Chtimes changes various timestamps associated with an object. The driver
+	// will do its best to ensure that unsupported timestamps are equal to
+	// [UndefinedTimestamp], but the implementation must ignore timestamps it
+	// doesn't support.
+	//
+	// The following guarantees apply:
+	//
+	//  - Timestamps known to be unsupported (i.e. the corresponding feature in
+	//    [FSFeatures] is false) will always be [UndefinedTimestamp].
+	//  - `deletedAt` will only be set if the object has been deleted and the
+	//    flag is supported by the file system.
+	Chtimes(
+		createdAt,
+		lastAccessed,
+		lastModified,
+		lastChanged,
+		deletedAt time.Time,
+	) errors.DriverError
+}
+
+// SupportsChmodHandle is an interface for an [ObjectHandle] that supports
+// changing its mode flags.
+type SupportsChmodHandle interface {
+	// Chmod changes the permission bits of this file system object. Only the
+	// permissions bits will be set in `mode`.
+	//
+	// File systems that support access controls but not all aspects (e.g. no
+	// executable bit, or no group permissions) must silently ignore flags they
+	// don't recognize.
+	Chmod(mode os.FileMode) errors.DriverError
+}
+
+// SupportsChownHandle is an interface for an [ObjectHandle] that supports
+// changing its owning user and group IDs.
+type SupportsChownHandle interface {
+	// Chown sets the ID of the owning user and group for this object. If the
+	// file system doesn't support group IDs, implementations must silently
+	// ignore `gid`, whatever its value.
+	Chown(uid, gid int) errors.DriverError
 }
 
 // UndefinedTimestamp is a timestamp that should be used as an invalid value,
@@ -271,10 +279,10 @@ type FSFeatures struct {
 	HasChangedTime      bool
 	HasDeletedTime      bool
 	HasUnixPermissions  bool
-	HasUserID           bool
-	HasGroupID          bool
 	HasUserPermissions  bool
 	HasGroupPermissions bool
+	HasUserID           bool
+	HasGroupID          bool
 
 	// TimestampEpoch returns the earliest representable timestamp on this file
 	// system. File systems that don't support timestamps of any kind must
@@ -371,6 +379,53 @@ type FSStat struct {
 	MaxNameLength uint
 	// Label is the volume label, if available.
 	Label string
+}
+
+// Driver is the interface implemented by the base file system driver that wraps
+// a file system implementation. For most functions, the functionality is the
+// same as the equivalent function in the [os] package.
+//
+// The presence of a function doesn't imply that the file system it's wrapping
+// supports or implements that feature, so be sure to check the returned errors
+// if you need something to happen.
+type Driver interface {
+	// NormalizePath converts a path from the user's native file system syntax
+	// to an absolute normalized path using forward slashes (/) as the component
+	// separator. The return value is always an absolute path.
+	NormalizePath(path string) string
+	// GetFSFeatures returns a struct that gives the various features the file
+	// system supports, regardless of whether the driver implements these
+	// features or not.
+	GetFSFeatures() FSFeatures
+
+	// -------------------------------------------------------------------------
+	// Functions from [os]
+
+	Chdir(path string) error
+	Chmod(name string, mode os.FileMode) error
+	Chown(name string, uid, gid int) error
+	Chtimes(name string, atime time.Time, mtime time.Time) error
+	Create(path string) (File, error)
+	Getwd() (string, error)
+	Lchown(name string, uid, gid int) error
+	Link(oldname, newname string) error
+	Lstat(path string) (FileStat, error)
+	Mkdir(path string, perm os.FileMode) error
+	MkdirAll(path string, perm os.FileMode) error
+	Open(path string) (File, error)
+	OpenFile(path string, flags IOFlags, perm os.FileMode) (File, error)
+	ReadDir(path string) ([]DirectoryEntry, error)
+	ReadFile(path string) ([]byte, error)
+	Readlink(path string) (string, error)
+	Remove(path string) error
+	RemoveAll(path string) error
+	Rename(old string, new string) error
+	SameFile(fi1, fi2 os.FileInfo) bool
+	Stat(path string) (FileStat, error)
+	Symlink(oldname, newname string) error
+	Truncate(path string) error
+	Unmount() error
+	WriteFile(path string, data []byte, perm os.FileMode) error
 }
 
 // File is the expected interface for file handles from drivers.

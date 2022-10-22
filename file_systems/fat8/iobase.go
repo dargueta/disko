@@ -29,16 +29,14 @@ func (driver *Driver) ReadDiskBlocks(start PhysicalBlock, count uint) ([]byte, e
 
 func (driver *Driver) WriteDiskBlocks(start PhysicalBlock, data []byte) error {
 	if len(data)%128 != 0 {
-		return errors.NewWithMessage(
-			errors.EIO,
+		return errors.ErrIOFailed.WithMessage(
 			fmt.Sprintf("data buffer must be a multiple of 128 bytes, got %d", len(data)),
 		)
 	}
 
 	numBlocksToWrite := uint64(len(data) / 128)
 	if uint64(start)+numBlocksToWrite > driver.stat.TotalBlocks {
-		return errors.NewWithMessage(
-			errors.EIO,
+		return errors.ErrIOFailed.WithMessage(
 			fmt.Sprintf(
 				"refusing to write past end of image: %d blocks at %d exceeds limit of %d",
 				numBlocksToWrite,
@@ -119,12 +117,10 @@ func (driver *Driver) GetFAT() ([]byte, error) {
 	}
 
 	if !bytes.Equal(firstFAT, secondFAT) {
-		return nil, errors.NewWithMessage(
-			errors.EUCLEAN,
+		return nil, errors.ErrFileSystemCorrupted.WithMessage(
 			"disk corruption detected: FAT copy 1 differs from FAT copy 2")
 	} else if !bytes.Equal(firstFAT, thirdFAT) {
-		return nil, errors.NewWithMessage(
-			errors.EUCLEAN,
+		return nil, errors.ErrFileSystemCorrupted.WithMessage(
 			"disk corruption detected: FAT copy 1 differs from FAT copy 3")
 	}
 

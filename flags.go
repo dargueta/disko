@@ -103,12 +103,12 @@ func (flags IOFlags) Append() bool {
 
 func (flags IOFlags) Read() bool {
 	masked := flags & O_ACCMODE
-	return masked == O_RDWR || masked == O_WRONLY
+	return masked == O_RDWR || masked == O_RDONLY
 }
 
 func (flags IOFlags) Write() bool {
 	masked := flags & O_ACCMODE
-	return masked == O_RDWR || masked == O_RDONLY
+	return masked == O_RDWR || masked == O_WRONLY
 }
 
 func (flags IOFlags) Create() bool {
