@@ -17,6 +17,10 @@ type ByteRun struct {
 	RunLength int
 }
 
+// InvalidRLERun is a sentinel value returned by [RLEGrouper.GetNextRun] when an
+// error occurred.
+var InvalidRLERun = ByteRun{0, 0}
+
 // RLEGrouper represents a
 type RLEGrouper struct {
 	rd *bufio.Reader
@@ -29,13 +33,13 @@ func NewRLEGrouper(rd io.Reader) RLEGrouper {
 }
 
 // GetNextRun returns a [ByteRun] for the next byte or run of byte values in the
-// stream. If an error occurred, the returned [ByteRun] struct is undefined and
-// should be ignored.
+// stream. If an error occurred, the returned [ByteRun] struct will be equal to
+// [InvalidRLERun].
 func (grouper RLEGrouper) GetNextRun() (ByteRun, error) {
 	firstByte, err := grouper.rd.ReadByte()
 	// Bail if any error occurred, including EOF.
 	if err != nil {
-		return ByteRun{Byte: 0, RunLength: 0}, err
+		return InvalidRLERun, err
 	}
 
 	var runLength int
@@ -45,7 +49,7 @@ func (grouper RLEGrouper) GetNextRun() (ByteRun, error) {
 			if err == io.EOF {
 				break
 			}
-			return ByteRun{Byte: 0, RunLength: 0}, err
+			return InvalidRLERun, err
 		}
 		if currentByte != firstByte {
 			// Hit a different byte, back up and return.
