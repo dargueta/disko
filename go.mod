@@ -4,7 +4,8 @@ go 1.17
 
 require (
 	github.com/boljen/go-bitmap v0.0.0-20151001105940-23cd2fb0ce7d
-	github.com/urfave/cli/v2 v2.16.3
+	github.com/noxer/bytewriter v1.0.0
+	github.com/urfave/cli/v2 v2.20.3
 )
 
 require (
