@@ -26,18 +26,16 @@ func CompressRLE8(input io.Reader, output io.Writer) (int64, error) {
 			var repeatCount int
 			if run.RunLength > 257 {
 				repeatCount = 255
-				run.RunLength -= 255
 			} else {
 				repeatCount = run.RunLength - 2
-				run.RunLength = 0
 			}
 
 			n, err := output.Write([]byte{run.Byte, run.Byte, byte(repeatCount)})
-			totalBytesWritten += int64(n)
-			run.RunLength -= repeatCount + 2
 			if err != nil {
 				return totalBytesWritten, err
 			}
+			totalBytesWritten += int64(n)
+			run.RunLength -= repeatCount + 2
 		}
 
 		if run.RunLength == 1 {
@@ -74,16 +72,24 @@ func DecompressRLE8(input io.Reader, output io.Writer) (int64, error) {
 				return totalBytesWritten, err
 			}
 
+			// Note we're writing out repeatCount + 1 instead of +2. We do this
+			// because on the previous iteration of the loop we already wrote it
+			// out once.
 			currentOutput = bytes.Repeat([]byte{currentByte}, int(repeatCountByte)+1)
+
+			// Reset the last byte read since we're done with this group. If we
+			// didn't do this, runs of 258+ bytes would be decompressed
+			// incorrectly, adding in extra bytes.
+			lastByteRead = -1
 		} else {
 			lastByteRead = int(currentByte)
 			currentOutput = []byte{currentByte}
 		}
 
 		n, err := output.Write(currentOutput)
-		totalBytesWritten += int64(n)
 		if err != nil {
 			return totalBytesWritten, err
 		}
+		totalBytesWritten += int64(n)
 	}
 }
