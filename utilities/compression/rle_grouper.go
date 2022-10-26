@@ -2,6 +2,7 @@ package compression
 
 import (
 	"bufio"
+	"errors"
 	"io"
 )
 
@@ -46,7 +47,7 @@ func (grouper RLEGrouper) GetNextRun() (ByteRun, error) {
 	for runLength = 1; ; runLength++ {
 		currentByte, err := grouper.rd.ReadByte()
 		if err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				break
 			}
 			return InvalidRLERun, err

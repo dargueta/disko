@@ -3,6 +3,7 @@ package compression
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 )
@@ -16,7 +17,7 @@ func CompressRLE8(input io.Reader, output io.Writer) (int64, error) {
 	totalBytesWritten := int64(0)
 	for {
 		run, err := grouper.GetNextRun()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			return totalBytesWritten, nil
 		} else if err != nil {
 			return totalBytesWritten, err
@@ -39,8 +40,11 @@ func CompressRLE8(input io.Reader, output io.Writer) (int64, error) {
 		}
 
 		if run.RunLength == 1 {
-			output.Write([]byte{run.Byte})
-			totalBytesWritten++
+			n, err := output.Write([]byte{run.Byte})
+			if err != nil {
+				return totalBytesWritten, err
+			}
+			totalBytesWritten += int64(n)
 		}
 	}
 }
@@ -53,7 +57,7 @@ func DecompressRLE8(input io.Reader, output io.Writer) (int64, error) {
 	for {
 		currentByte, err := source.ReadByte()
 		if err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				return totalBytesWritten, nil
 			}
 			return totalBytesWritten, err
@@ -65,9 +69,12 @@ func DecompressRLE8(input io.Reader, output io.Writer) (int64, error) {
 			// count.
 			repeatCountByte, err := source.ReadByte()
 			if err != nil {
-				if err == io.EOF {
-					return totalBytesWritten,
-						fmt.Errorf("hit unexpected EOF: byte run missing repeat count")
+				if errors.Is(err, io.EOF) {
+					err = fmt.Errorf(
+						"%w: missing repeat count after two %02x bytes",
+						io.ErrUnexpectedEOF,
+						uint(lastByteRead),
+					)
 				}
 				return totalBytesWritten, err
 			}
