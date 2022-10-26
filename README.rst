@@ -188,6 +188,7 @@ Further Reading
 *  `Full UNIX v2 Manual`_, relevant parts pages 221-224.
 *  `Full UNIX v5 Manual`_, relevant parts pages 237-238.
 * `UNIX v6 File System`_
+* `UNIX v10 File System`_
 * `FAT 8`_, documenting FAT 8 on pages 172, 176, and 178.
 * `FAT 12/16/32 on Wikipedia`_
 * `CP/M file systems`_, including extensions.
@@ -198,6 +199,7 @@ Further Reading
 .. _Full UNIX v2 Manual: https://web.archive.org/web/20161006034736/http://sunsite.icm.edu.pl/pub/unix/UnixArchive/PDP-11/Distributions/research/1972_stuff/unix_2nd_edition_manual.pdf
 .. _Full UNIX v5 Manual: https://www.tuhs.org/Archive/Distributions/Research/Dennis_v5/v5man.pdf
 .. _UNIX v6 File System: http://man.cat-v.org/unix-6th/5/fs
+.. _UNIX v10 File System: http://man.cat-v.org/unix_10th/5/filsys
 .. _FAT 12/16/32 on Wikipedia: https://en.wikipedia.org/wiki/File_Allocation_Table
 .. _FAT 8: http://bitsavers.trailing-edge.com/pdf/xerox/820-II/BASIC-80_5.0.pdf
 .. _CP/M file systems: https://www.seasip.info/Cpm/formats.html
