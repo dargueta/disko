@@ -27,5 +27,13 @@
 // as its own escape sequence means that occurrences of the same byte exactly
 // twice are stored as three bytes: the two bytes followed by a null byte
 // indicating no further repetition.
+//
+// For truly "large" images -- e.g. an early 90s hard drive around 320MiB -- we
+// could have a run of a megabyte of empty space. Simple RLE8 will compress this
+// to 12,243 bytes. If instead of limiting ourselves to one byte for the run
+// length we encode the length with ULEB128, we can get this down to just 5 bytes.
+// That advantage is nearly eliminated though once we gzip the result; the RLE8
+// shrinks to 50 bytes, ULEB128 expands to 25 bytes. In order to reduce the
+// complexity of the code, we will (for now) stick to RLE8.
 
 package compression
