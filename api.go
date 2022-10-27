@@ -5,9 +5,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/dargueta/disko/errors"
 	"github.com/dargueta/disko/file_systems/common"
-	"github.com/dargueta/disko/file_systems/common/blockcache"
 )
 
 type MountFlags int
@@ -71,12 +69,12 @@ const MountFlagsMask = MountFlagsCustomStart - 1
 type FileSystemImplementer interface {
 	// Mount initializes the file system implementation. `image` is owned by the
 	// implementation and will not be (directly) modified by the driver.
-	Mount(image *blockcache.BlockCache, flags MountFlags) errors.DriverError
+	Mount(image common.DiskImage, flags MountFlags) DriverError
 
 	// Unmount writes out all pending changes to the disk image and releases any
 	// resources the implementation may be holding. The driver guarantees that
 	// no files will be open when this is called.
-	Unmount() errors.DriverError
+	Unmount() DriverError
 
 	// CreateObject creates an object on the file system, such as a file or
 	// directory. You can tell the what it is based on the flags.
@@ -89,7 +87,7 @@ type FileSystemImplementer interface {
 		name string,
 		parent ObjectHandle,
 		perm os.FileMode,
-	) (ObjectHandle, errors.DriverError)
+	) (ObjectHandle, DriverError)
 
 	// GetObject returns a handle to an object with the given name in a directory
 	// specified by `parent`.
@@ -101,7 +99,7 @@ type FileSystemImplementer interface {
 	GetObject(
 		name string,
 		parent ObjectHandle,
-	) (ObjectHandle, errors.DriverError)
+	) (ObjectHandle, DriverError)
 
 	// GetRootDirectory returns a handle to the root directory of the disk image.
 	// This must always be a valid object handle, even if directories are not
@@ -125,7 +123,7 @@ type FileSystemImplementer interface {
 	FormatImage(
 		image io.ReadWriteSeeker,
 		stat FSStat,
-	) errors.DriverError
+	) DriverError
 }
 
 type BootCodeImplementer interface {
@@ -133,13 +131,13 @@ type BootCodeImplementer interface {
 	// image is used as a boot volume. If the code provided is too short then
 	// the implementation should pad it with bytes to fit. If the code provided
 	// is too long, return [errors.ErrFileTooLarge].
-	SetBootCode(code []byte) errors.DriverError
+	SetBootCode(code []byte) DriverError
 
 	// GetBootCode returns the machine code that is executed on startup.
-	GetBootCode() ([]byte, errors.DriverError)
+	GetBootCode() ([]byte, DriverError)
 }
 
-type ImplementerConstructor func(stream io.ReadWriteSeeker) (FileSystemImplementer, errors.DriverError)
+type ImplementerConstructor func(stream io.ReadWriteSeeker) (FileSystemImplementer, DriverError)
 
 // ObjectHandle is an interface for a way to interact with on-disk file system
 // objects.
@@ -149,7 +147,7 @@ type ObjectHandle interface {
 
 	// Resize changes the size of the object, in bytes. Drivers are responsible
 	// for ensuring the needed number of blocks are allocated or freed.
-	Resize(newSize uint64) errors.DriverError
+	Resize(newSize uint64) DriverError
 
 	// ReadBlocks fills `buffer` with data from a sequence of logical blocks
 	// beginning at `index`. The following guarantees apply:
@@ -157,7 +155,7 @@ type ObjectHandle interface {
 	//   - `buffer` is a nonzero multiple of the size of a block.
 	//   - The read range will always be within the current boundaries of the
 	//     object.
-	ReadBlocks(index common.LogicalBlock, buffer []byte) errors.DriverError
+	ReadBlocks(index common.LogicalBlock, buffer []byte) DriverError
 
 	// WriteBlocks writes bytes from `buffer` into a sequence of logical blocks
 	// beginning at `index`. The following guarantees apply:
@@ -165,7 +163,7 @@ type ObjectHandle interface {
 	//   - `buffer` is a nonzero multiple of the size of a block.
 	//   - The write range will always be within the current boundaries of the
 	//     object.
-	WriteBlocks(index common.LogicalBlock, data []byte) errors.DriverError
+	WriteBlocks(index common.LogicalBlock, data []byte) DriverError
 
 	// ZeroOutBlocks tells the implementation to treat `count` logical blocks
 	// beginning at `startIndex` as consisting entirely of null bytes (0). It
@@ -187,12 +185,12 @@ type ObjectHandle interface {
 	// well as consolidating holes where possible. The driver doesn't care what
 	// the implementation does as long as a subsequent call to [ReadBlocks] on
 	// this range returns all null bytes.
-	ZeroOutBlocks(startIndex common.LogicalBlock, count uint) errors.DriverError
+	ZeroOutBlocks(startIndex common.LogicalBlock, count uint) DriverError
 
 	// Unlink deletes the file system object. For directories, this is guaranteed
 	// to not be called unless [ListDir] returns an empty slice (aside from "."
 	// and ".." if present, as the driver cannot assume these exist).
-	Unlink() errors.DriverError
+	Unlink() DriverError
 
 	// Name returns the name of the object itself without any path component.
 	// The root directory, which technically has no name, must return "/".
@@ -214,7 +212,7 @@ type ObjectHandle interface {
 type SupportsListDirHandle interface {
 	// ListDir returns a list of the directory entries this object contains. "."
 	// and ".." are ignored if present.
-	ListDir() ([]string, errors.DriverError)
+	ListDir() ([]string, DriverError)
 }
 
 // SupportsChtimesHandle is an interface for an [ObjectHandle] that supports
@@ -237,7 +235,7 @@ type SupportsChtimesHandle interface {
 		lastModified,
 		lastChanged,
 		deletedAt time.Time,
-	) errors.DriverError
+	) DriverError
 }
 
 // SupportsChmodHandle is an interface for an [ObjectHandle] that supports
@@ -249,7 +247,7 @@ type SupportsChmodHandle interface {
 	// File systems that support access controls but not all aspects (e.g. no
 	// executable bit, or no group permissions) must silently ignore flags they
 	// don't recognize.
-	Chmod(mode os.FileMode) errors.DriverError
+	Chmod(mode os.FileMode) DriverError
 }
 
 // SupportsChownHandle is an interface for an [ObjectHandle] that supports
@@ -258,7 +256,7 @@ type SupportsChownHandle interface {
 	// Chown sets the ID of the owning user and group for this object. If the
 	// file system doesn't support group IDs, implementations must silently
 	// ignore `gid`, whatever its value.
-	Chown(uid, gid int) errors.DriverError
+	Chown(uid, gid int) DriverError
 }
 
 // UndefinedTimestamp is a timestamp that should be used as an invalid value,

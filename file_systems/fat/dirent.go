@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/dargueta/disko"
-	diskoerr "github.com/dargueta/disko/errors"
 )
 
 // fatEpoch is 1980-01-01 00:00:00 at local time.
@@ -103,7 +102,7 @@ func (d *Dirent) GetLastAccessedAt() time.Time {
 // It is an error to try to set this time before 1980-01-01 00:00:00 local time.
 func (d *Dirent) SetLastAccessedAt(t time.Time) error {
 	if t.Before(fatEpoch) {
-		return diskoerr.ErrArgumentOutOfRange
+		return disko.ErrArgumentOutOfRange
 	}
 	d.stat.LastAccessed = t
 	return nil
@@ -117,7 +116,7 @@ func (d *Dirent) GetLastModifiedAt() time.Time {
 // It is an error to try to set this time before 1980-01-01 00:00:00 local time.
 func (d *Dirent) SetLastModifiedAt(t time.Time) error {
 	if t.Before(fatEpoch) {
-		return diskoerr.ErrArgumentOutOfRange
+		return disko.ErrArgumentOutOfRange
 	}
 	d.stat.LastModified = t
 	return nil
@@ -127,7 +126,7 @@ func (d *Dirent) SetLastModifiedAt(t time.Time) error {
 // It is an error to get this timestamp for a dirent that has been deleted.
 func (d *Dirent) GetCreatedAt() (time.Time, error) {
 	if d.isDeleted {
-		return disko.UndefinedTimestamp, diskoerr.ErrNotFound
+		return disko.UndefinedTimestamp, disko.ErrNotFound
 	}
 	return d.stat.CreatedAt, nil
 }
@@ -137,9 +136,9 @@ func (d *Dirent) GetCreatedAt() (time.Time, error) {
 // this timestamp for a dirent that has been deleted.
 func (d *Dirent) SetCreatedAt(t time.Time) error {
 	if t.Before(fatEpoch) {
-		return diskoerr.ErrArgumentOutOfRange
+		return disko.ErrArgumentOutOfRange
 	} else if d.isDeleted {
-		return diskoerr.ErrNotFound
+		return disko.ErrNotFound
 	}
 
 	d.stat.CreatedAt = t
@@ -152,7 +151,7 @@ func (d *Dirent) SetCreatedAt(t time.Time) error {
 // FAT timestamp, 1980-01-01 00:00:00 local time.
 func (d *Dirent) GetDeletedAt() (time.Time, error) {
 	if !d.isDeleted {
-		return disko.UndefinedTimestamp, diskoerr.ErrInvalidArgument
+		return disko.UndefinedTimestamp, disko.ErrInvalidArgument
 	}
 	return d.stat.DeletedAt, nil
 }
@@ -162,7 +161,7 @@ func (d *Dirent) GetDeletedAt() (time.Time, error) {
 // It is an error to try to set this time before 1980-01-01 00:00:00 local time.
 func (d *Dirent) SetDeletedAt(t time.Time) error {
 	if t.Before(fatEpoch) {
-		return diskoerr.ErrArgumentOutOfRange
+		return disko.ErrArgumentOutOfRange
 	}
 	d.isDeleted = true
 	return d.SetCreatedAt(t)
@@ -313,7 +312,7 @@ func NewDirentFromRaw(bootSector *FATBootSector, rawDirent *RawDirent) (Dirent, 
 		trimmedName = "\xe5" + trimmedName[1:]
 	} else if trimmedName[0] == 0 {
 		// This directory entry is free and thus invalid.
-		return Dirent{}, diskoerr.ErrNotFound
+		return Dirent{}, disko.ErrNotFound
 	}
 
 	if trimmedExt == "" {
@@ -338,7 +337,7 @@ func (drv *FATDriver) clusterToDirentSlice(data []byte) ([]Dirent, error) {
 		dirent, err := NewDirentFromRaw(bootSector, &rawDirent)
 		if err != nil {
 			// If this is a DriverError there may be further action we can take.
-			drverr, ok := err.(diskoerr.DriverError)
+			drverr, ok := err.(disko.DriverError)
 			if !ok {
 				// Not a DriverError, nothing else we can do.
 				return nil, err
@@ -346,7 +345,7 @@ func (drv *FATDriver) clusterToDirentSlice(data []byte) ([]Dirent, error) {
 
 			// If the error code is ENOENT then that means this directory entry is free
 			// and we've hit the end of the directory.
-			if errors.Is(drverr, diskoerr.ErrNotFound) {
+			if errors.Is(drverr, disko.ErrNotFound) {
 				break
 			}
 			// Else: We failed for a different reason. Pass this error up to the

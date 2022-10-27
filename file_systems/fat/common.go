@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/dargueta/disko/errors"
+	"github.com/dargueta/disko"
 )
 
 type SectorID uint32
@@ -73,13 +73,13 @@ func NewFATBootSectorFromStream(reader io.Reader) (*FATBootSector, error) {
 
 	err := binary.Read(reader, binary.LittleEndian, &rawHeader)
 	if err != nil {
-		return nil, errors.ErrIOFailed.WrapError(err)
+		return nil, disko.ErrIOFailed.WrapError(err)
 	}
 
 	var sectorsPerFAT32 uint32
 	err = binary.Read(reader, binary.LittleEndian, &sectorsPerFAT32)
 	if err != nil {
-		return nil, errors.ErrIOFailed.WrapError(err)
+		return nil, disko.ErrIOFailed.WrapError(err)
 	}
 
 	var sectorsPerFAT uint
@@ -115,7 +115,7 @@ func NewFATBootSectorFromStream(reader io.Reader) (*FATBootSector, error) {
 		message := fmt.Sprintf(
 			"corruption detected: BytesPerSector must be 512, 1024, 2048, or 4096, got %d",
 			rawHeader.BytesPerSector)
-		return nil, errors.ErrFileSystemCorrupted.WithMessage(message)
+		return nil, disko.ErrFileSystemCorrupted.WithMessage(message)
 	}
 
 	// SectorsPerCluster must be 2^x with x in [0, 8)
@@ -132,7 +132,7 @@ func NewFATBootSectorFromStream(reader io.Reader) (*FATBootSector, error) {
 		message := fmt.Sprintf(
 			"corruption detected: SectorsPerCluster must be a power of 2 in 1-128, got %d",
 			rawHeader.SectorsPerCluster)
-		return nil, errors.ErrFileSystemCorrupted.WithMessage(message)
+		return nil, disko.ErrFileSystemCorrupted.WithMessage(message)
 	}
 
 	fatVersion := DetermineFATVersion(totalClusters)
@@ -141,7 +141,7 @@ func NewFATBootSectorFromStream(reader io.Reader) (*FATBootSector, error) {
 			"corruption detected: RootDirectorySectors is nonzero for a FAT32 disk: %d",
 			rootDirSectors)
 
-		return nil, errors.ErrFileSystemCorrupted.WithMessage(message)
+		return nil, disko.ErrFileSystemCorrupted.WithMessage(message)
 
 	}
 
@@ -151,7 +151,7 @@ func NewFATBootSectorFromStream(reader io.Reader) (*FATBootSector, error) {
 			"corruption detected: BytesPerCluster cannot exceed 32,768 but got %d",
 			bytesPerCluster)
 
-		return nil, errors.ErrFileSystemCorrupted.WithMessage(message)
+		return nil, disko.ErrFileSystemCorrupted.WithMessage(message)
 	}
 
 	processedHeader := FATBootSector{

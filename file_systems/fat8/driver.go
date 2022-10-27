@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"github.com/dargueta/disko"
-	"github.com/dargueta/disko/errors"
 )
 
 type LogicalBlock uint
@@ -53,7 +52,7 @@ func NewDriverFromFile(stream *os.File) Driver {
 func (driver *Driver) Mount(flags disko.MountFlags) error {
 	// Ignore attempts to mount the drive multiple times.
 	if driver.isMounted {
-		return errors.ErrAlreadyInProgress
+		return disko.ErrAlreadyInProgress
 	}
 
 	offset, err := driver.image.Seek(0, io.SeekEnd)
@@ -63,7 +62,7 @@ func (driver *Driver) Mount(flags disko.MountFlags) error {
 
 	geo, err := GetGeometry(uint(offset) / 128)
 	if err != nil {
-		return errors.ErrFileSystemCorrupted.WrapError(err)
+		return disko.ErrFileSystemCorrupted.WrapError(err)
 	}
 	driver.geometry = geo
 

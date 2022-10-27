@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/dargueta/disko/errors"
+	"github.com/dargueta/disko"
 	c "github.com/dargueta/disko/file_systems/common"
 	"github.com/dargueta/disko/file_systems/common/blockcache"
 )
@@ -65,7 +65,7 @@ func CreateDefaultCache(
 				totalBlocks,
 			)
 			t.Error(message)
-			return errors.ErrIOFailed.WithMessage(message)
+			return disko.ErrIOFailed.WithMessage(message)
 		}
 
 		start := blockIndex * c.LogicalBlock(bytesPerBlock)
@@ -83,7 +83,7 @@ func CreateDefaultCache(
 					totalBlocks,
 				)
 				t.Errorf(message)
-				return errors.ErrIOFailed.WithMessage(message)
+				return disko.ErrIOFailed.WithMessage(message)
 			}
 
 			start := blockIndex * c.LogicalBlock(bytesPerBlock)
@@ -98,7 +98,7 @@ func CreateDefaultCache(
 				blockIndex,
 			)
 			t.Errorf(message)
-			return errors.ErrReadOnlyFileSystem.WithMessage(message)
+			return disko.ErrReadOnlyFileSystem.WithMessage(message)
 		}
 	}
 
