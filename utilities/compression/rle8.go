@@ -60,7 +60,7 @@ func DecompressRLE8(input io.Reader, output io.Writer) (int64, error) {
 			if errors.Is(err, io.EOF) {
 				return totalBytesWritten, nil
 			}
-			return totalBytesWritten, err
+			return totalBytesWritten, fmt.Errorf("error reading input: %w", err)
 		}
 
 		var currentOutput []byte
@@ -76,7 +76,7 @@ func DecompressRLE8(input io.Reader, output io.Writer) (int64, error) {
 						uint(lastByteRead),
 					)
 				}
-				return totalBytesWritten, err
+				return totalBytesWritten, fmt.Errorf("failed to write to output: %w", err)
 			}
 
 			// Note we're writing out repeatCount + 1 instead of +2. We do this
@@ -95,7 +95,7 @@ func DecompressRLE8(input io.Reader, output io.Writer) (int64, error) {
 
 		n, err := output.Write(currentOutput)
 		if err != nil {
-			return totalBytesWritten, err
+			return totalBytesWritten, fmt.Errorf("failed to write to output: %w", err)
 		}
 		totalBytesWritten += int64(n)
 	}

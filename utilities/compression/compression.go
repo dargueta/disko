@@ -1,7 +1,10 @@
 package compression
 
 import (
+	"bufio"
+	"bytes"
 	"compress/gzip"
+	"fmt"
 	"io"
 )
 
@@ -21,18 +24,36 @@ func CompressImage(input io.Reader, output io.Writer) (int64, error) {
 	// default and highest levels.
 	gzWriter, err := gzip.NewWriterLevel(writer, gzip.BestCompression)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to create gzip writer: %w", err)
 	}
 
 	_, err = CompressRLE8(input, gzWriter)
 	closeErr := gzWriter.Close()
 	if err != nil {
-		return bytesWritten, err
+		return bytesWritten, fmt.Errorf("RLE8 compression error: %w", err)
 	}
 	if closeErr != nil {
-		return bytesWritten, closeErr
+		return bytesWritten, fmt.Errorf("gzip compression error: %w", closeErr)
 	}
 	return bytesWritten, nil
+}
+
+// CompressImageToBytes is a convenience function wrapping [CompressImage]. It
+// functions identically, except it returns the compressed data in a new byte
+// slice instead of writing to an [io.Writer].
+func CompressImageToBytes(input io.Reader) ([]byte, error) {
+	buffer := bytes.Buffer{}
+	writer := bufio.NewWriter(&buffer)
+	_, err := CompressImage(input, writer)
+	if err != nil {
+		return nil, err
+	}
+
+	writer.Flush()
+
+	outputSlice := make([]byte, buffer.Len())
+	copy(outputSlice, buffer.Bytes())
+	return outputSlice, nil
 }
 
 // DecompressImage takes a gzipped, RLE8-encoded disk image and decompresses it
@@ -44,10 +65,29 @@ func CompressImage(input io.Reader, output io.Writer) (int64, error) {
 func DecompressImage(input io.Reader, output io.Writer) (int64, error) {
 	gzReader, err := gzip.NewReader(input)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to create gzip reader: %w", err)
 	}
 	defer gzReader.Close()
 	return DecompressRLE8(gzReader, output)
+}
+
+// DecompressImageToBytes is a convenience function wrapping [DecompressImage].
+// It functions identically, except it returns the decompressed data in a new
+// byte slice instead of writing to an [io.Writer]. It's most useful for reading
+// embedded test data.
+func DecompressImageToBytes(input io.Reader) ([]byte, error) {
+	buffer := bytes.Buffer{}
+	writer := bufio.NewWriter(&buffer)
+	_, err := DecompressImage(input, writer)
+	if err != nil {
+		return nil, err
+	}
+
+	writer.Flush()
+
+	outputSlice := make([]byte, buffer.Len())
+	copy(outputSlice, buffer.Bytes())
+	return outputSlice, nil
 }
 
 // countingWriter is a wrapper around [io.Writer] streams that keeps track of
