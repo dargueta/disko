@@ -27,7 +27,7 @@ interface. For details on the functions that need to be implemented, see
 
 * ✔: Supported
 * ⚠: Partial implementation, see notes
-* ✘: Doesn't make sense for this, so the function wasn't implemented.
+* ✘: Doesn't make sense for this, so the function deliberately wasn't implemented.
 
 **Optional Features**
 
@@ -56,7 +56,8 @@ Chown             3
 Chtimes           4
 Create    ✔
 Flush
-Lchown            2, 6
+Getwd     ✔
+Lchown            3, 6
 Link              5
 Lstat     ✔
 Mkdir     ✔
@@ -73,6 +74,7 @@ SameFile  ✔
 Stat      ✔
 Symlink           6
 Truncate  ✔
+Unmount
 WriteFile ✔
 ========= ======= ====================
 
@@ -125,7 +127,7 @@ Unix v2         1972
 Unix v5         1973
 CP/M 1.4        1974
 Unix v6         1975
-FAT 8           1977       B [#]_
+FAT 8           1977       ✔
 CP/M 2.2        1979
 Unix v7         1979
 FAT 12          1980
@@ -186,7 +188,8 @@ Further Reading
 *  `Full UNIX v2 Manual`_, relevant parts pages 221-224.
 *  `Full UNIX v5 Manual`_, relevant parts pages 237-238.
 * `UNIX v6 File System`_
-* `Xerox BASIC-80 Manual`_, documenting FAT 8 on pages 172, 176, and 178.
+* `UNIX v10 File System`_
+* `FAT 8`_, documenting FAT 8 on pages 172, 176, and 178.
 * `FAT 12/16/32 on Wikipedia`_
 * `CP/M file systems`_, including extensions.
 * `MINIX 3 <https://flylib.com/books/en/3.275.1.54/1/>`_, shorter explanation `here <http://ohm.hgesser.de/sp-ss2012/Intro-MinixFS.pdf>`_.
@@ -196,8 +199,9 @@ Further Reading
 .. _Full UNIX v2 Manual: https://web.archive.org/web/20161006034736/http://sunsite.icm.edu.pl/pub/unix/UnixArchive/PDP-11/Distributions/research/1972_stuff/unix_2nd_edition_manual.pdf
 .. _Full UNIX v5 Manual: https://www.tuhs.org/Archive/Distributions/Research/Dennis_v5/v5man.pdf
 .. _UNIX v6 File System: http://man.cat-v.org/unix-6th/5/fs
+.. _UNIX v10 File System: http://man.cat-v.org/unix_10th/5/filsys
 .. _FAT 12/16/32 on Wikipedia: https://en.wikipedia.org/wiki/File_Allocation_Table
-.. _Xerox BASIC-80 Manual: http://bitsavers.trailing-edge.com/pdf/xerox/820-II/BASIC-80_5.0.pdf
+.. _FAT 8: http://bitsavers.trailing-edge.com/pdf/xerox/820-II/BASIC-80_5.0.pdf
 .. _CP/M file systems: https://www.seasip.info/Cpm/formats.html
 
 License
@@ -223,6 +227,5 @@ Footnotes
 .. [#] Timestamps are stored using the 1973 revision that uses the canonical
        Unix epoch. The first version of the specification can't represent
        timestamps past 1973-04-08 12:06:28.250.
-.. [#] Works for the larger image size; smaller image size is buggy.
-.. [#] Note this version 3 of the file system, not MINIX version 3.
 .. [#] Also known as "DOS Plus".
+.. [#] Note this version 3 of the file system, not MINIX version 3.

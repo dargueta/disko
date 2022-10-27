@@ -142,11 +142,19 @@ func (file *File) Chdir() error {
 }
 
 func (file *File) Chmod(mode os.FileMode) error {
-	return file.objectHandle.Chmod(mode)
+	chmodHandle, ok := file.objectHandle.(disko.SupportsChmodHandle)
+	if ok {
+		return chmodHandle.Chmod(mode)
+	}
+	return errors.ErrNotSupported
 }
 
 func (file *File) Chown(uid, gid int) error {
-	return file.objectHandle.Chown(uid, gid)
+	chownHandle, ok := file.objectHandle.(disko.SupportsChownHandle)
+	if ok {
+		return chownHandle.Chown(uid, gid)
+	}
+	return errors.ErrNotSupported
 }
 
 func (file *File) Close() error {
@@ -157,10 +165,11 @@ func (file *File) Name() string {
 	return file.objectHandle.Name()
 }
 
+// ReadDir is equivalent to [os.File.ReadDir].
 func (file *File) ReadDir(n int) ([]os.DirEntry, error) {
 	stat := file.objectHandle.Stat()
 	if !stat.IsDir() {
-		return nil, errors.New(errors.ENOTDIR)
+		return nil, errors.ErrNotADirectory
 	}
 
 	if file.lastReadDirResult == nil {
@@ -201,6 +210,7 @@ func (file *File) ReadDir(n int) ([]os.DirEntry, error) {
 	return result, nil
 }
 
+// ReadDir is equivalent to [os.File.Readdir].
 func (file *File) Readdir(n int) ([]os.FileInfo, error) {
 	dirents, err := file.ReadDir(n)
 	if err == io.EOF {
@@ -223,6 +233,7 @@ func (file *File) Readdir(n int) ([]os.FileInfo, error) {
 	return infoList, nil
 }
 
+// Readdirnames is equivalent to [os.File.Readdirnames].
 func (file *File) Readdirnames(n int) ([]string, error) {
 	dirents, err := file.ReadDir(n)
 	if err == io.EOF {
