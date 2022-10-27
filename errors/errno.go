@@ -8,123 +8,55 @@ import (
 	"fmt"
 )
 
-type Errno int
+type DiskoError string
 
-var errorMessagesByCode map[Errno]string
+const ErrAlreadyInProgress = DiskoError("Operation already in progress")
+const ErrArgumentOutOfRange = DiskoError("Numerical argument out of domain")
+const ErrBlockDeviceRequired = DiskoError("Block device required")
+const ErrBusy = DiskoError("Device or resource busy")
+const ErrCrossDeviceLink = DiskoError("Invalid cross-device link")
+const ErrDirectoryNotEmpty = DiskoError("Directory not empty")
+const ErrDiskQuotaExceeded = DiskoError("Disk quota exceeded")
+const ErrExists = DiskoError("File exists")
+const ErrFileDescriptorBadState = DiskoError("File descriptor in bad state")
+const ErrFileSystemCorrupted = DiskoError("Structure needs cleaning")
+const ErrFileTooLarge = DiskoError("File too large")
+const ErrInvalidArgument = DiskoError("Invalid argument")
+const ErrInvalidFileDescriptor = DiskoError("Bad file descriptor")
+const ErrInvalidFileSystem = DiskoError("Wrong medium type")
+const ErrIOFailed = DiskoError("Input/output error")
+const ErrIsADirectory = DiskoError("Is a directory")
+const ErrLinkCycleDetected = DiskoError("Symlink cycle detected")
+const ErrNameTooLong = DiskoError("File name too long")
+const ErrNoDevice = DiskoError("No such device")
+const ErrNoSpaceOnDevice = DiskoError("No space left on device")
+const ErrNotADirectory = DiskoError("Not a directory")
+const ErrNotFound = DiskoError("No such file or directory")
+const ErrNotImplemented = DiskoError("Function not implemented")
+const ErrNotPermitted = DiskoError("Operation not permitted")
+const ErrNotSupported = DiskoError("Operation not supported")
+const ErrPermissionDenied = DiskoError("Permission denied")
+const ErrReadOnlyFileSystem = DiskoError("Read-only file system")
+const ErrResultOutOfRange = DiskoError("Numerical result out of range")
+const ErrTooManyLinks = DiskoError("Too many links")
+const ErrTooManyOpenFiles = DiskoError("Too many open files in system")
+const ErrTooManyUsers = DiskoError("Too many users")
+const ErrUnexpectedEOF = DiskoError("Unexpected end of file or stream")
 
-const (
-	_ Errno = iota
-	ErrNotPermitted
-	ErrNotFound
-	ErrIOFailed
-	ErrInvalidFileDescriptor
-	ErrPermissionDenied
-	ErrBlockDeviceRequired
-	ErrBusy
-	ErrExists
-	ErrCrossDeviceLink
-	ErrNoDevice
-	ErrNotADirectory
-	ErrIsADirectory
-	ErrInvalidArgument
-	ErrTooManyOpenFiles
-	ErrFileTooLarge
-	ErrNoSpaceOnDevice
-	ErrReadOnlyFileSystem
-	ErrTooManyLinks
-	ErrArgumentOutOfRange
-	ErrResultOutOfRange
-	ErrNameTooLong
-	ErrNotImplemented
-	ErrDirectoryNotEmpty
-	ErrLinkCycleDetected
-	ErrFileDescriptorBadState
-	ErrTooManyUsers
-	ErrNotSupported
-	ErrAlreadyInProgress
-	ErrFileSystemCorrupted
-	ErrDiskQuotaExceeded
-	ErrInvalidFileSystem
-	ErrUnexpectedEOF
-	maxErrorCode
-)
-
-func init() {
-	errorMessagesByCode = make(map[Errno]string, maxErrorCode)
-	errorMessagesByCode[ErrNotPermitted] = "Operation not permitted"
-	errorMessagesByCode[ErrNotFound] = "No such file or directory"
-	errorMessagesByCode[ErrIOFailed] = "Input/output error"
-	errorMessagesByCode[ErrInvalidFileDescriptor] = "Bad file descriptor"
-	errorMessagesByCode[ErrPermissionDenied] = "Permission denied"
-	errorMessagesByCode[ErrBlockDeviceRequired] = "Block device required"
-	errorMessagesByCode[ErrBusy] = "Device or resource busy"
-	errorMessagesByCode[ErrExists] = "File exists"
-	errorMessagesByCode[ErrCrossDeviceLink] = "Invalid cross-device link"
-	errorMessagesByCode[ErrNoDevice] = "No such device"
-	errorMessagesByCode[ErrNotADirectory] = "Not a directory"
-	errorMessagesByCode[ErrIsADirectory] = "Is a directory"
-	errorMessagesByCode[ErrInvalidArgument] = "Invalid argument"
-	errorMessagesByCode[ErrTooManyOpenFiles] = "Too many open files in system"
-	errorMessagesByCode[ErrFileTooLarge] = "File too large"
-	errorMessagesByCode[ErrNoSpaceOnDevice] = "No space left on device"
-	errorMessagesByCode[ErrReadOnlyFileSystem] = "Read-only file system"
-	errorMessagesByCode[ErrTooManyLinks] = "Too many links"
-	errorMessagesByCode[ErrArgumentOutOfRange] = "Numerical argument out of domain"
-	errorMessagesByCode[ErrResultOutOfRange] = "Numerical result out of range"
-	errorMessagesByCode[ErrNameTooLong] = "File name too long"
-	errorMessagesByCode[ErrNotImplemented] = "Function not implemented"
-	errorMessagesByCode[ErrDirectoryNotEmpty] = "Directory not empty"
-	errorMessagesByCode[ErrTooManyLinks] = "Too many levels of symbolic links"
-	errorMessagesByCode[ErrFileDescriptorBadState] = "File descriptor in bad state"
-	errorMessagesByCode[ErrTooManyUsers] = "Too many users"
-	errorMessagesByCode[ErrNotSupported] = "Operation not supported"
-	errorMessagesByCode[ErrAlreadyInProgress] = "Operation already in progress"
-	errorMessagesByCode[ErrFileSystemCorrupted] = "Structure needs cleaning"
-	errorMessagesByCode[ErrDiskQuotaExceeded] = "Disk quota exceeded"
-	errorMessagesByCode[ErrInvalidFileSystem] = "Wrong medium type"
-	errorMessagesByCode[ErrUnexpectedEOF] = "Unexpected end of file or stream"
+func (e DiskoError) Error() string {
+	return string(e)
 }
 
-func StrError(code Errno) string {
-	message, ok := errorMessagesByCode[code]
-	if ok {
-		return message
-	}
-	return fmt.Sprintf("error %d not recognized.", int(code))
-}
-
-func (e Errno) Error() string {
-	return StrError(e)
-}
-
-func (e Errno) Errno() Errno {
-	return e
-}
-
-func (e Errno) Unwrap() error {
-	return nil
-}
-
-func (e Errno) WithMessage(message string) DriverError {
-	return driverErrorWithMessage{
-		errno:         e,
+func (e DiskoError) WithMessage(message string) DriverError {
+	return customDriverError{
 		message:       message,
-		originalError: nil,
+		originalError: e,
 	}
 }
 
-func (e Errno) WrapError(err error) DriverError {
-	return driverErrorWithMessage{
-		errno:         e,
-		message:       fmt.Sprintf("error: [%d] %s", int(e), err.Error()),
+func (e DiskoError) WrapError(err error) DriverError {
+	return customDriverError{
+		message:       fmt.Sprintf("%s %s", e.Error(), err.Error()),
 		originalError: err,
 	}
-}
-
-func (e Errno) IsSameError(other error) bool {
-	driverError, ok := other.(DriverError)
-	if ok {
-		return e == driverError.Errno()
-	}
-	return false
 }

@@ -1,41 +1,40 @@
 package errors
 
+import "fmt"
+
 type DriverError interface {
 	error
-	Errno() Errno
-	Unwrap() error
-	IsSameError(other error) bool
+	WithMessage(message string) DriverError
+	WrapError(err error) DriverError
 }
 
 // -----------------------------------------------------------------------------
 
-type driverErrorWithMessage struct {
-	errno         Errno
+type customDriverError struct {
 	message       string
 	originalError error
 }
 
 // Error implements the `error` object interface. When called, it returns a string
 // describing the error.
-func (e driverErrorWithMessage) Error() string {
-	if e.message != "" {
-		return e.message
+func (e customDriverError) Error() string {
+	return e.message
+}
+
+func (e customDriverError) WithMessage(message string) DriverError {
+	return customDriverError{
+		message:       fmt.Sprintf("%s: %s", e.message, message),
+		originalError: e,
 	}
-	return StrError(e.errno)
 }
 
-func (e driverErrorWithMessage) Errno() Errno {
-	return e.errno
+func (e customDriverError) WrapError(err error) DriverError {
+	return customDriverError{
+		message:       fmt.Sprintf("%s: %s", e.Error(), err.Error()),
+		originalError: err,
+	}
 }
 
-func (e driverErrorWithMessage) Unwrap() error {
+func (e customDriverError) Unwrap() error {
 	return e.originalError
-}
-
-func (e driverErrorWithMessage) IsSameError(other error) bool {
-	driverError, ok := other.(DriverError)
-	if ok {
-		return e.errno == driverError.Errno()
-	}
-	return false
 }

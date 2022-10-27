@@ -130,7 +130,9 @@ type FileSystemImplementer interface {
 
 type BootCodeImplementer interface {
 	// SetBootCode sets the machine code that is executed on startup if the disk
-	// image is used as a boot volume.
+	// image is used as a boot volume. If the code provided is too short then
+	// the implementation should pad it with bytes to fit. If the code provided
+	// is too long, return [errors.ErrFileTooLarge].
 	SetBootCode(code []byte) errors.DriverError
 
 	// GetBootCode returns the machine code that is executed on startup.
