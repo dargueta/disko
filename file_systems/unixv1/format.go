@@ -39,7 +39,7 @@ func isValidBlockAndInodeCount(numBlocks, numInodes uint) bool {
 
 func (driver *UnixV1Driver) Format(stat disko.FSStat) error {
 	if driver.isMounted {
-		return errors.New(errors.EBUSY)
+		return errors.ErrBusy
 	}
 
 	// stat.Files tells us the number of inodes on the disk.
@@ -49,7 +49,7 @@ func (driver *UnixV1Driver) Format(stat disko.FSStat) error {
 			NumInodesPerBlock,
 			stat.Files,
 		)
-		return errors.NewWithMessage(errors.EINVAL, msg)
+		return errors.ErrInvalidArgument.WithMessage(msg)
 	}
 
 	blockBitmapSize := getBitmapSizeInBytes(uint(stat.TotalBlocks))
@@ -64,7 +64,7 @@ func (driver *UnixV1Driver) Format(stat disko.FSStat) error {
 			blockBitmapSize,
 			inodeBitmapSize,
 		)
-		return errors.NewWithMessage(errors.E2BIG, msg)
+		return errors.ErrFileTooLarge.WithMessage(msg)
 	}
 
 	// The upper 32KiB is reserved for the system (boot image and all that), and
@@ -81,7 +81,7 @@ func (driver *UnixV1Driver) Format(stat disko.FSStat) error {
 			stat.TotalBlocks,
 			float64(stat.TotalBlocks)/2.0,
 		)
-		return errors.NewWithMessage(errors.EINVAL, msg)
+		return errors.ErrInvalidArgument.WithMessage(msg)
 	}
 
 	err := driver.image.Resize(uint(stat.TotalBlocks))

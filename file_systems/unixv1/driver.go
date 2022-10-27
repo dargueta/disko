@@ -78,7 +78,7 @@ func (driver *UnixV1Driver) Mount(
 		if driver.currentMountFlags == flags {
 			return nil
 		}
-		return errors.New(errors.EALREADY)
+		return errors.ErrAlreadyInProgress
 	}
 
 	driver.currentMountFlags = flags
@@ -87,7 +87,7 @@ func (driver *UnixV1Driver) Mount(
 	// For our current purposes we only need the boot block.
 	bootSectorSlice, err := image.GetSlice(0, 1)
 	if err != nil {
-		return errors.NewFromError(errors.EIO, err)
+		return errors.ErrIOFailed.WrapError(err)
 	}
 	rawStream := bytes.NewReader(bootSectorSlice)
 
@@ -96,14 +96,14 @@ func (driver *UnixV1Driver) Mount(
 	var blockBitmapSize uint16
 	err = binary.Read(rawStream, binary.LittleEndian, &blockBitmapSize)
 	if err != nil {
-		return errors.NewFromError(errors.EIO, err)
+		return errors.ErrIOFailed.WrapError(err)
 	}
 
 	// blockBitmap is the actual bitmap.
 	blockBitmap := make([]byte, blockBitmapSize)
 	_, err = rawStream.Read(blockBitmap)
 	if err != nil {
-		return errors.NewFromError(errors.EIO, err)
+		return errors.ErrIOFailed.WrapError(err)
 	}
 
 	// inodeBitmapSize is the size of the bitmap for which bitmaps are currently
@@ -111,7 +111,7 @@ func (driver *UnixV1Driver) Mount(
 	var inodeBitmapSize uint16
 	err = binary.Read(rawStream, binary.LittleEndian, &inodeBitmapSize)
 	if err != nil {
-		return errors.NewFromError(errors.EIO, err)
+		return errors.ErrIOFailed.WrapError(err)
 	}
 
 	// Together, the bitmaps can't exceed 1000 bytes because there are 24 other
@@ -123,19 +123,19 @@ func (driver *UnixV1Driver) Mount(
 				" bytes together, got %d",
 			blockBitmapSize+inodeBitmapSize,
 		)
-		return errors.NewWithMessage(errors.EUCLEAN, message)
+		return errors.ErrFileSystemCorrupted.WithMessage(message)
 	}
 
 	inodeBitmap := make([]byte, inodeBitmapSize)
 	_, err = rawStream.Read(inodeBitmap)
 	if err != nil {
-		return errors.NewFromError(errors.EIO, err)
+		return errors.ErrIOFailed.WrapError(err)
 	}
 
 	rawInodes := make([]RawInode, inodeBitmapSize*8)
 	err = binary.Read(rawStream, binary.LittleEndian, rawInodes[:])
 	if err != nil {
-		return errors.NewFromError(errors.EIO, err)
+		return errors.ErrIOFailed.WrapError(err)
 	}
 
 	driver.inodes = make([]Inode, inodeBitmapSize*8)
@@ -150,7 +150,7 @@ func (driver *UnixV1Driver) Mount(
 func (driver *UnixV1Driver) Unmount() errors.DriverError {
 	err := driver.image.Flush()
 	if err != nil {
-		return errors.NewFromError(errors.EIO, err)
+		return errors.ErrIOFailed.WrapError(err)
 	}
 	driver.currentMountFlags = 0
 	driver.isMounted = false
