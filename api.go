@@ -67,13 +67,17 @@ const MountFlagsMask = MountFlagsCustomStart - 1
 // FileSystemImplementer is the interface required for all file system
 // implementations.
 type FileSystemImplementer interface {
-	// Mount initializes the file system implementation. `image` is owned by the
-	// implementation and will not be (directly) modified by the driver.
-	Mount(image common.DiskImage, flags MountFlags) DriverError
+	// Mount initializes the file system implementation with access settings.
+	Mount(flags MountFlags) DriverError
 
 	// Unmount writes out all pending changes to the disk image and releases any
-	// resources the implementation may be holding. The driver guarantees that
-	// no files will be open when this is called.
+	// resources the implementation may be holding.
+	//
+	// The following guarantees apply:
+	//
+	// 	- This will only be called if [Mount] returned successfully.
+	//	- There will be no open files or other handles (directory traversers, etc.)
+	//	  and all changes will have been flushed.
 	Unmount() DriverError
 
 	// CreateObject creates an object on the file system, such as a file or
@@ -81,7 +85,7 @@ type FileSystemImplementer interface {
 	//
 	// The following guarantees apply:
 	//
-	// 	- This will never be called for an object that already exists;
+	// 	- This will never be called for an object that already exists.
 	//  - `parent` will always be a valid object handle.
 	CreateObject(
 		name string,
@@ -94,7 +98,7 @@ type FileSystemImplementer interface {
 	//
 	// The following guarantees apply:
 	//
-	// 	- This will never be called for a nonexistent object;
+	// 	- This will never be called for a nonexistent object.
 	//	- `parent` will always be a valid object handle.
 	GetObject(
 		name string,
@@ -114,27 +118,60 @@ type FileSystemImplementer interface {
 	// GetFSFeatures returns a struct that gives the various features the file
 	// system supports, regardless of whether the driver implements these
 	// features or not.
+	//
+	// This function should be callable regardless of whether the file system
+	// has been mounted or not.
 	GetFSFeatures() FSFeatures
 
-	// FormatImage creates a new blank file system on the given image, using
-	// characteristics defined in `stat`. `image` will be the correct size and
-	// filled with null bytes before this function is called, and the stream
-	// pointer will be set to 0.
-	FormatImage(
-		image io.ReadWriteSeeker,
-		stat FSStat,
-	) DriverError
+	// FormatImage creates a new blank file system on the image this was created
+	// with, using characteristics defined in `stat`.
+	//
+	// The following guarantees apply:
+	//
+	//	- The image will be correctly sized according to `stat`.
+	//	- It will consist entirely of null bytes.
+	FormatImage(stat FSStat) DriverError
 }
 
+// A BootCodeImplementer implements access to the boot code stored on a file
+// system.
+//
+// This specifically refers to boot code defined in the file system specification,
+// not a ramdisk image or something stored as a file on the file system that is
+// used by the operating system for booting.
 type BootCodeImplementer interface {
 	// SetBootCode sets the machine code that is executed on startup if the disk
 	// image is used as a boot volume. If the code provided is too short then
-	// the implementation should pad it with bytes to fit. If the code provided
-	// is too long, return [errors.ErrFileTooLarge].
+	// the implementation should pad it with bytes to fit. This is guaranteed to
+	// be at most [FSFeatures.MaxBootCodeSize] bytes.
 	SetBootCode(code []byte) DriverError
 
 	// GetBootCode returns the machine code that is executed on startup.
-	GetBootCode() ([]byte, DriverError)
+	GetBootCode(buffer []byte) (int, DriverError)
+}
+
+// A VolumeLabelImplementer allows getting and setting the volume label on the
+// file system for those file systems that support it.
+type VolumeLabelImplementer interface {
+	// SetVolumeLabel sets the volume label on the file system.
+	//
+	// `label` is guaranteed to be UTF-8 encoded. Implementations should convert
+	// the string to the native character set if needed.
+	//
+	// To avoid nasty surprises, callers should try to stick to printable ASCII
+	// characters and avoid non-punctuation symbols. This is because pre-1977
+	// versions of the ASCII standard allowed some variance in how the same
+	// character code could be depicted, e.g. `!` could also render as `|`.
+	// (This is why on old keyboards the pipe character looks like `╎` to avoid
+	// confusion.)
+	// Thus, if you set the volume label to "(^_^)" you may get "(¬_¬)" when you
+	// read it back -- a very different sentiment.
+	SetVolumeLabel(label string) DriverError
+	// GetVolumeLabel gets the volume label from the file system.
+	//
+	// The return value is guaranteed to be UTF-8 encoded. Implementations must
+	// remove any padding from the return value, if applicable (and possible).
+	GetVolumeLabel() (string, DriverError)
 }
 
 type ImplementerConstructor func(stream io.ReadWriteSeeker) (FileSystemImplementer, DriverError)
@@ -262,8 +299,8 @@ type SupportsChownHandle interface {
 // UndefinedTimestamp is a timestamp that should be used as an invalid value,
 // equivalent to `nil` for pointers.
 //
-// To check to see if a timestamp is invalid, use [time.Time.IsZero]. Direct
-// comparison to this is not recommended.
+// To check if a timestamp is invalid, use [time.Time.IsZero]. Direct comparison
+// to this is not recommended.
 var UndefinedTimestamp = time.Time{}
 
 // FSFeatures indicates the features available for the file system. If a file
@@ -303,13 +340,19 @@ type FSFeatures struct {
 	// should return [math.MaxInt].
 	MaxBootCodeSize int
 
-	// BlockSize gives the default size of a single block in the file system, in
-	// bytes. File systems that don't have fixed block sizes (such as certain
-	// types of archives) must be 0.
+	// DefaultBlockSize gives the default size of a single block in the file
+	// system, in bytes. File systems that don't have fixed block sizes (such as
+	// certain types of archives) must be 0.
 	DefaultBlockSize int
 
+	// MinTotalBlocks is the smallest valid size of the file system, in blocks.
+	MinTotalBlocks int64
+
+	// MaxTotalBlocks is the largest possible size of the file system, in blocks.
+	MaxTotalBlocks int64
+
 	// MaxVolumeLabelSize gives the maximum size of the volume label for the
-	// file system. If not supported, this should be 0.
+	// file system, in bytes. If not supported, this should be 0.
 	MaxVolumeLabelSize int
 }
 
