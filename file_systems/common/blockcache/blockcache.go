@@ -11,7 +11,7 @@ import (
 	"io"
 
 	"github.com/boljen/go-bitmap"
-	"github.com/dargueta/disko/errors"
+	"github.com/dargueta/disko"
 	c "github.com/dargueta/disko/file_systems/common"
 )
 
@@ -38,13 +38,14 @@ type FlushBlockCallback func(blockIndex c.LogicalBlock, buffer []byte) error
 //
 // Standard conditions for error codes:
 //
-//   - [errors.EFBIG]: Can't increase the size of the object because it would
-//     exceed some technical limit. For example, the Unix v6 file system has
-//     24-bit file sizes, so no file can be 16 MiB or greater.
-//   - [errors.ENOSPC]: Can't increase the size of the object because there's no
-//     space left on the volume.
-//   - [errors.ENOTSUP]: The object can't be resized as a general rule. This is
-//     mostly only seen in systems with fixed-size directories, like FAT8/12/16.
+//   - [disko.ErrFileTooLarge]: Can't increase the size of the object because it
+//     would exceed some technical limit. For example, the Unix v6 file system
+//     has 24-bit file sizes, so no file can be 16 MiB or greater.
+//   - [disko.ErrNoSpaceOnDevice]: Can't increase the size of the object because
+//     there's no space left on the volume.
+//   - [disko.ErrNotSupported]: The object can't be resized as a general rule.
+//     This is mostly only seen in systems with fixed-size directories, like
+//     FAT 8/12/16.
 type ResizeCallback func(newTotalBlocks c.LogicalBlock) error
 
 type BlockCache struct {
@@ -77,7 +78,7 @@ func New(
 	if resizeCb == nil {
 		// The caller wants this cache to not be resizable.
 		resizeCb = func(newTotalBlocks c.LogicalBlock) error {
-			return errors.ErrNotSupported.WithMessage(
+			return disko.ErrNotSupported.WithMessage(
 				fmt.Sprintf(
 					"resizing is not supported; size fixed at %d bytes",
 					bytesPerBlock*totalBlocks,
@@ -148,12 +149,12 @@ func WrapStream(
 	} else if allowResize {
 		// The caller allows resizing but the stream doesn't support Truncate().
 		resizeCb = func(newTotalBlocks c.LogicalBlock) error {
-			return errors.ErrNotSupported
+			return disko.ErrNotSupported
 		}
 	} else {
 		// The caller forbade resizing.
 		resizeCb = func(newTotalBlocks c.LogicalBlock) error {
-			return errors.ErrNotPermitted
+			return disko.ErrNotPermitted
 		}
 	}
 
@@ -163,7 +164,7 @@ func WrapStream(
 // seekToBlock sets the stream pointer for a stream to the offset of a block.
 func seekToBlock(stream io.Seeker, block, totalBlocks c.LogicalBlock, bytesPerBlock uint) error {
 	if block >= totalBlocks {
-		return errors.ErrArgumentOutOfRange.WithMessage(
+		return disko.ErrArgumentOutOfRange.WithMessage(
 			fmt.Sprintf(
 				"invalid block number: %d not in range [0, %d)",
 				block,
@@ -206,12 +207,12 @@ func (cache *BlockCache) checkBounds(start c.LogicalBlock, bufferSize uint) erro
 	numBlocks := cache.LengthToNumBlocks(bufferSize)
 
 	if uint(start) >= cache.totalBlocks {
-		return errors.ErrArgumentOutOfRange.WithMessage(
+		return disko.ErrArgumentOutOfRange.WithMessage(
 			fmt.Sprintf("block %d not in range [0, %d)", start, cache.totalBlocks),
 		)
 	}
 	if uint(start)+numBlocks > cache.totalBlocks {
-		return errors.ErrArgumentOutOfRange.WithMessage(
+		return disko.ErrArgumentOutOfRange.WithMessage(
 			fmt.Sprintf(
 				"can't access %d bytes (%d blocks) starting at block %d; range"+
 					" not in [0, %d)",

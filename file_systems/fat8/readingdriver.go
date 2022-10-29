@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/dargueta/disko"
-	"github.com/dargueta/disko/errors"
 )
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -29,7 +28,7 @@ func (driver *Driver) Stat(path string) (disko.FileStat, error) {
 
 	info, found := driver.dirents[normalizedPath]
 	if !found {
-		return disko.FileStat{}, errors.ErrNotFound
+		return disko.FileStat{}, disko.ErrNotFound
 	}
 
 	// Cluster size is fixed at two clusters per track. Since we know the number
@@ -47,7 +46,7 @@ func (driver *Driver) Stat(path string) (disko.FileStat, error) {
 		size = int64(totalSectors) * 128
 	} else {
 		// TODO(dargueta): Handle text files
-		err := errors.ErrNotImplemented.WithMessage("text files not supported yet")
+		err := disko.ErrNotImplemented.WithMessage("text files not supported yet")
 		return disko.FileStat{}, err
 	}
 
