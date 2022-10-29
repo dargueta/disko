@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"fmt"
 
-	"github.com/dargueta/disko/errors"
+	"github.com/dargueta/disko"
 )
 
 // BLOCK-LEVEL ACCESS ==========================================================
@@ -29,14 +29,14 @@ func (driver *Driver) ReadDiskBlocks(start PhysicalBlock, count uint) ([]byte, e
 
 func (driver *Driver) WriteDiskBlocks(start PhysicalBlock, data []byte) error {
 	if len(data)%128 != 0 {
-		return errors.ErrIOFailed.WithMessage(
+		return disko.ErrIOFailed.WithMessage(
 			fmt.Sprintf("data buffer must be a multiple of 128 bytes, got %d", len(data)),
 		)
 	}
 
 	numBlocksToWrite := uint64(len(data) / 128)
 	if uint64(start)+numBlocksToWrite > driver.stat.TotalBlocks {
-		return errors.ErrIOFailed.WithMessage(
+		return disko.ErrIOFailed.WithMessage(
 			fmt.Sprintf(
 				"refusing to write past end of image: %d blocks at %d exceeds limit of %d",
 				numBlocksToWrite,
@@ -117,10 +117,10 @@ func (driver *Driver) GetFAT() ([]byte, error) {
 	}
 
 	if !bytes.Equal(firstFAT, secondFAT) {
-		return nil, errors.ErrFileSystemCorrupted.WithMessage(
+		return nil, disko.ErrFileSystemCorrupted.WithMessage(
 			"disk corruption detected: FAT copy 1 differs from FAT copy 2")
 	} else if !bytes.Equal(firstFAT, thirdFAT) {
-		return nil, errors.ErrFileSystemCorrupted.WithMessage(
+		return nil, disko.ErrFileSystemCorrupted.WithMessage(
 			"disk corruption detected: FAT copy 1 differs from FAT copy 3")
 	}
 

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dargueta/disko/errors"
+	"github.com/dargueta/disko"
 )
 
 type Geometry struct {
@@ -95,7 +95,7 @@ func FilenameToBytes(name string) ([]byte, error) {
 	if len(parts[0]) > 6 {
 		message := fmt.Sprintf(
 			"filename stem can be at most six characters: %q", parts[0])
-		return nil, errors.ErrNameTooLong.WithMessage(message)
+		return nil, disko.ErrNameTooLong.WithMessage(message)
 	}
 
 	var paddedName string
@@ -110,7 +110,7 @@ func FilenameToBytes(name string) ([]byte, error) {
 			// Extension is longer than three characters.
 			message := fmt.Sprintf(
 				"filename extension can be at most three characters: %q", parts[1])
-			return nil, errors.ErrNameTooLong.WithMessage(message)
+			return nil, disko.ErrNameTooLong.WithMessage(message)
 		}
 
 		paddedName = fmt.Sprintf("%-6s%-3s", parts[0], parts[1])

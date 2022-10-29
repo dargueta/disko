@@ -9,7 +9,6 @@ import (
 	"math"
 
 	"github.com/dargueta/disko"
-	"github.com/dargueta/disko/errors"
 	c "github.com/dargueta/disko/file_systems/common"
 	"github.com/dargueta/disko/file_systems/common/blockcache"
 )
@@ -41,7 +40,7 @@ type BasicStream struct {
 // All relevant behaviors of [disko.IOFlags] are implemented. In particular:
 //
 //   - Read/write permissions are enforced, e.g. attempting to write a file
-//     created with [disko.O_RDONLY] will fail with [errors.EACCES].
+//     created with [disko.O_RDONLY] will fail with [disko.ErrNotPermitted].
 //   - [disko.O_APPEND], [disko.O_SYNC], and [disko.O_TRUNC] are obeyed.
 func New(
 	size int64,
@@ -96,7 +95,7 @@ func (stream *BasicStream) Read(buffer []byte) (int, error) {
 
 func (stream *BasicStream) ReadAt(buffer []byte, offset int64) (int, error) {
 	if !stream.ioFlags.Read() {
-		return 0, errors.ErrNotPermitted
+		return 0, disko.ErrNotPermitted
 	}
 
 	bufLen := int64(len(buffer))
@@ -133,7 +132,7 @@ func (stream *BasicStream) ReadAt(buffer []byte, offset int64) (int, error) {
 
 func (stream *BasicStream) ReadFrom(r io.Reader) (n int64, err error) {
 	if !stream.ioFlags.Write() {
-		return 0, errors.ErrNotPermitted
+		return 0, disko.ErrNotPermitted
 	}
 
 	// If the argument is another BasicStream, make the read buffer be exactly
@@ -224,15 +223,15 @@ func (stream *BasicStream) Tell() int64 {
 // stream pointer.
 func (stream *BasicStream) Truncate(size int64) error {
 	if !stream.ioFlags.Write() {
-		return errors.ErrNotPermitted
+		return disko.ErrNotPermitted
 	}
 
 	if size < 0 {
-		return errors.ErrInvalidArgument.WithMessage(
+		return disko.ErrInvalidArgument.WithMessage(
 			fmt.Sprintf("truncate failed: %d is not a valid file size", size),
 		)
 	} else if uint64(size) > math.MaxUint {
-		return errors.ErrFileTooLarge.WithMessage(
+		return disko.ErrFileTooLarge.WithMessage(
 			fmt.Sprintf("truncate failed: new file size %d is too large", size),
 		)
 	}
@@ -258,7 +257,7 @@ func (stream *BasicStream) Write(buffer []byte) (int, error) {
 	var err error
 
 	if !stream.ioFlags.Write() {
-		return 0, errors.ErrNotPermitted
+		return 0, disko.ErrNotPermitted
 	}
 
 	// Force the stream pointer to the end of the file if O_APPEND was set.
@@ -280,7 +279,7 @@ func (stream *BasicStream) Write(buffer []byte) (int, error) {
 // check for the O_APPEND flag.
 func (stream *BasicStream) implWriteAt(buffer []byte, offset int64) (int, error) {
 	if !stream.ioFlags.Write() {
-		return 0, errors.ErrNotPermitted
+		return 0, disko.ErrNotPermitted
 	}
 
 	bufLen := int64(len(buffer))
@@ -313,7 +312,7 @@ func (stream *BasicStream) implWriteAt(buffer []byte, offset int64) (int, error)
 // use this function if the stream was created with the [disko.O_APPEND] flag.
 func (stream *BasicStream) WriteAt(buffer []byte, offset int64) (int, error) {
 	if stream.ioFlags.Append() {
-		return 0, errors.ErrNotPermitted
+		return 0, disko.ErrNotPermitted
 	}
 	return stream.implWriteAt(buffer, offset)
 }

@@ -75,6 +75,7 @@ Stat      ✔
 Symlink           6
 Truncate  ✔
 Unmount
+Walk
 WriteFile ✔
 ========= ======= ====================
 

@@ -5,9 +5,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/dargueta/disko/errors"
 	"github.com/dargueta/disko/file_systems/common"
-	"github.com/dargueta/disko/file_systems/common/blockcache"
 )
 
 type MountFlags int
@@ -69,39 +67,43 @@ const MountFlagsMask = MountFlagsCustomStart - 1
 // FileSystemImplementer is the interface required for all file system
 // implementations.
 type FileSystemImplementer interface {
-	// Mount initializes the file system implementation. `image` is owned by the
-	// implementation and will not be (directly) modified by the driver.
-	Mount(image *blockcache.BlockCache, flags MountFlags) errors.DriverError
+	// Mount initializes the file system implementation with access settings.
+	Mount(flags MountFlags) DriverError
 
 	// Unmount writes out all pending changes to the disk image and releases any
-	// resources the implementation may be holding. The driver guarantees that
-	// no files will be open when this is called.
-	Unmount() errors.DriverError
+	// resources the implementation may be holding.
+	//
+	// The following guarantees apply:
+	//
+	// 	- This will only be called if [Mount] returned successfully.
+	//	- There will be no open files or other handles (directory traversers, etc.)
+	//	  and all changes will have been flushed.
+	Unmount() DriverError
 
 	// CreateObject creates an object on the file system, such as a file or
 	// directory. You can tell the what it is based on the flags.
 	//
 	// The following guarantees apply:
 	//
-	// 	- This will never be called for an object that already exists;
+	// 	- This will never be called for an object that already exists.
 	//  - `parent` will always be a valid object handle.
 	CreateObject(
 		name string,
 		parent ObjectHandle,
 		perm os.FileMode,
-	) (ObjectHandle, errors.DriverError)
+	) (ObjectHandle, DriverError)
 
 	// GetObject returns a handle to an object with the given name in a directory
 	// specified by `parent`.
 	//
 	// The following guarantees apply:
 	//
-	// 	- This will never be called for a nonexistent object;
+	// 	- This will never be called for a nonexistent object.
 	//	- `parent` will always be a valid object handle.
 	GetObject(
 		name string,
 		parent ObjectHandle,
-	) (ObjectHandle, errors.DriverError)
+	) (ObjectHandle, DriverError)
 
 	// GetRootDirectory returns a handle to the root directory of the disk image.
 	// This must always be a valid object handle, even if directories are not
@@ -116,28 +118,63 @@ type FileSystemImplementer interface {
 	// GetFSFeatures returns a struct that gives the various features the file
 	// system supports, regardless of whether the driver implements these
 	// features or not.
+	//
+	// This function should be callable regardless of whether the file system
+	// has been mounted or not.
 	GetFSFeatures() FSFeatures
 
-	// FormatImage creates a new blank file system on the given image, using
-	// characteristics defined in `stat`. `image` will be the correct size and
-	// filled with null bytes before this function is called, and the stream
-	// pointer will be set to 0.
-	FormatImage(
-		image io.ReadWriteSeeker,
-		stat FSStat,
-	) errors.DriverError
+	// FormatImage creates a new blank file system on the image this was created
+	// with, using characteristics defined in `stat`.
+	//
+	// The following guarantees apply:
+	//
+	//	- The image will be correctly sized according to `stat`.
+	//	- It will consist entirely of null bytes.
+	FormatImage(stat FSStat) DriverError
 }
 
+// A BootCodeImplementer implements access to the boot code stored on a file
+// system.
+//
+// This specifically refers to boot code defined in the file system specification,
+// not a ramdisk image or something stored as a file on the file system that is
+// used by the operating system for booting.
 type BootCodeImplementer interface {
 	// SetBootCode sets the machine code that is executed on startup if the disk
-	// image is used as a boot volume.
-	SetBootCode(code []byte) errors.DriverError
+	// image is used as a boot volume. If the code provided is too short then
+	// the implementation should pad it with bytes to fit. This is guaranteed to
+	// be at most [FSFeatures.MaxBootCodeSize] bytes.
+	SetBootCode(code []byte) DriverError
 
 	// GetBootCode returns the machine code that is executed on startup.
-	GetBootCode() ([]byte, errors.DriverError)
+	GetBootCode(buffer []byte) (int, DriverError)
 }
 
-type ImplementerConstructor func(stream io.ReadWriteSeeker) (FileSystemImplementer, errors.DriverError)
+// A VolumeLabelImplementer allows getting and setting the volume label on the
+// file system for those file systems that support it.
+type VolumeLabelImplementer interface {
+	// SetVolumeLabel sets the volume label on the file system.
+	//
+	// `label` is guaranteed to be UTF-8 encoded. Implementations should convert
+	// the string to the native character set if needed.
+	//
+	// To avoid nasty surprises, callers should try to stick to printable ASCII
+	// characters and avoid non-punctuation symbols. This is because pre-1977
+	// versions of the ASCII standard allowed some variance in how the same
+	// character code could be depicted, e.g. `!` could also render as `|`.
+	// (This is why on old keyboards the pipe character looks like `╎` to avoid
+	// confusion.)
+	// Thus, if you set the volume label to "(^_^)" you may get "(¬_¬)" when you
+	// read it back -- a very different sentiment.
+	SetVolumeLabel(label string) DriverError
+	// GetVolumeLabel gets the volume label from the file system.
+	//
+	// The return value is guaranteed to be UTF-8 encoded. Implementations must
+	// remove any padding from the return value, if applicable (and possible).
+	GetVolumeLabel() (string, DriverError)
+}
+
+type ImplementerConstructor func(stream io.ReadWriteSeeker) (FileSystemImplementer, DriverError)
 
 // ObjectHandle is an interface for a way to interact with on-disk file system
 // objects.
@@ -147,7 +184,7 @@ type ObjectHandle interface {
 
 	// Resize changes the size of the object, in bytes. Drivers are responsible
 	// for ensuring the needed number of blocks are allocated or freed.
-	Resize(newSize uint64) errors.DriverError
+	Resize(newSize uint64) DriverError
 
 	// ReadBlocks fills `buffer` with data from a sequence of logical blocks
 	// beginning at `index`. The following guarantees apply:
@@ -155,7 +192,7 @@ type ObjectHandle interface {
 	//   - `buffer` is a nonzero multiple of the size of a block.
 	//   - The read range will always be within the current boundaries of the
 	//     object.
-	ReadBlocks(index common.LogicalBlock, buffer []byte) errors.DriverError
+	ReadBlocks(index common.LogicalBlock, buffer []byte) DriverError
 
 	// WriteBlocks writes bytes from `buffer` into a sequence of logical blocks
 	// beginning at `index`. The following guarantees apply:
@@ -163,7 +200,7 @@ type ObjectHandle interface {
 	//   - `buffer` is a nonzero multiple of the size of a block.
 	//   - The write range will always be within the current boundaries of the
 	//     object.
-	WriteBlocks(index common.LogicalBlock, data []byte) errors.DriverError
+	WriteBlocks(index common.LogicalBlock, data []byte) DriverError
 
 	// ZeroOutBlocks tells the implementation to treat `count` logical blocks
 	// beginning at `startIndex` as consisting entirely of null bytes (0). It
@@ -185,12 +222,12 @@ type ObjectHandle interface {
 	// well as consolidating holes where possible. The driver doesn't care what
 	// the implementation does as long as a subsequent call to [ReadBlocks] on
 	// this range returns all null bytes.
-	ZeroOutBlocks(startIndex common.LogicalBlock, count uint) errors.DriverError
+	ZeroOutBlocks(startIndex common.LogicalBlock, count uint) DriverError
 
 	// Unlink deletes the file system object. For directories, this is guaranteed
 	// to not be called unless [ListDir] returns an empty slice (aside from "."
 	// and ".." if present, as the driver cannot assume these exist).
-	Unlink() errors.DriverError
+	Unlink() DriverError
 
 	// Name returns the name of the object itself without any path component.
 	// The root directory, which technically has no name, must return "/".
@@ -212,7 +249,7 @@ type ObjectHandle interface {
 type SupportsListDirHandle interface {
 	// ListDir returns a list of the directory entries this object contains. "."
 	// and ".." are ignored if present.
-	ListDir() ([]string, errors.DriverError)
+	ListDir() ([]string, DriverError)
 }
 
 // SupportsChtimesHandle is an interface for an [ObjectHandle] that supports
@@ -235,7 +272,7 @@ type SupportsChtimesHandle interface {
 		lastModified,
 		lastChanged,
 		deletedAt time.Time,
-	) errors.DriverError
+	) DriverError
 }
 
 // SupportsChmodHandle is an interface for an [ObjectHandle] that supports
@@ -247,7 +284,7 @@ type SupportsChmodHandle interface {
 	// File systems that support access controls but not all aspects (e.g. no
 	// executable bit, or no group permissions) must silently ignore flags they
 	// don't recognize.
-	Chmod(mode os.FileMode) errors.DriverError
+	Chmod(mode os.FileMode) DriverError
 }
 
 // SupportsChownHandle is an interface for an [ObjectHandle] that supports
@@ -256,14 +293,14 @@ type SupportsChownHandle interface {
 	// Chown sets the ID of the owning user and group for this object. If the
 	// file system doesn't support group IDs, implementations must silently
 	// ignore `gid`, whatever its value.
-	Chown(uid, gid int) errors.DriverError
+	Chown(uid, gid int) DriverError
 }
 
 // UndefinedTimestamp is a timestamp that should be used as an invalid value,
 // equivalent to `nil` for pointers.
 //
-// To check to see if a timestamp is invalid, use [time.Time.IsZero]. Direct
-// comparison to this is not recommended.
+// To check if a timestamp is invalid, use [time.Time.IsZero]. Direct comparison
+// to this is not recommended.
 var UndefinedTimestamp = time.Time{}
 
 // FSFeatures indicates the features available for the file system. If a file
@@ -303,13 +340,19 @@ type FSFeatures struct {
 	// should return [math.MaxInt].
 	MaxBootCodeSize int
 
-	// BlockSize gives the default size of a single block in the file system, in
-	// bytes. File systems that don't have fixed block sizes (such as certain
-	// types of archives) must be 0.
+	// DefaultBlockSize gives the default size of a single block in the file
+	// system, in bytes. File systems that don't have fixed block sizes (such as
+	// certain types of archives) must be 0.
 	DefaultBlockSize int
 
+	// MinTotalBlocks is the smallest valid size of the file system, in blocks.
+	MinTotalBlocks int64
+
+	// MaxTotalBlocks is the largest possible size of the file system, in blocks.
+	MaxTotalBlocks int64
+
 	// MaxVolumeLabelSize gives the maximum size of the volume label for the
-	// file system. If not supported, this should be 0.
+	// file system, in bytes. If not supported, this should be 0.
 	MaxVolumeLabelSize int
 }
 

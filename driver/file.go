@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/dargueta/disko"
-	"github.com/dargueta/disko/errors"
 	"github.com/dargueta/disko/file_systems/common"
 	"github.com/dargueta/disko/file_systems/common/basicstream"
 	"github.com/dargueta/disko/file_systems/common/blockcache"
@@ -146,7 +145,7 @@ func (file *File) Chmod(mode os.FileMode) error {
 	if ok {
 		return chmodHandle.Chmod(mode)
 	}
-	return errors.ErrNotSupported
+	return disko.ErrNotSupported
 }
 
 func (file *File) Chown(uid, gid int) error {
@@ -154,7 +153,7 @@ func (file *File) Chown(uid, gid int) error {
 	if ok {
 		return chownHandle.Chown(uid, gid)
 	}
-	return errors.ErrNotSupported
+	return disko.ErrNotSupported
 }
 
 func (file *File) Close() error {
@@ -169,7 +168,7 @@ func (file *File) Name() string {
 func (file *File) ReadDir(n int) ([]os.DirEntry, error) {
 	stat := file.objectHandle.Stat()
 	if !stat.IsDir() {
-		return nil, errors.ErrNotADirectory
+		return nil, disko.ErrNotADirectory
 	}
 
 	if file.lastReadDirResult == nil {
