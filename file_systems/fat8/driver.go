@@ -62,7 +62,7 @@ func (driver *Driver) Mount(flags disko.MountFlags) error {
 
 	geo, err := GetGeometry(uint(offset) / 128)
 	if err != nil {
-		return disko.ErrFileSystemCorrupted.WrapError(err)
+		return disko.ErrFileSystemCorrupted.Wrap(err)
 	}
 	driver.geometry = geo
 

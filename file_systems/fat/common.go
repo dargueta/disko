@@ -73,13 +73,13 @@ func NewFATBootSectorFromStream(reader io.Reader) (*FATBootSector, error) {
 
 	err := binary.Read(reader, binary.LittleEndian, &rawHeader)
 	if err != nil {
-		return nil, disko.ErrIOFailed.WrapError(err)
+		return nil, disko.ErrIOFailed.Wrap(err)
 	}
 
 	var sectorsPerFAT32 uint32
 	err = binary.Read(reader, binary.LittleEndian, &sectorsPerFAT32)
 	if err != nil {
-		return nil, disko.ErrIOFailed.WrapError(err)
+		return nil, disko.ErrIOFailed.Wrap(err)
 	}
 
 	var sectorsPerFAT uint

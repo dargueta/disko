@@ -172,7 +172,7 @@ func (driver *Driver) getContentsOfObject(
 ) ([]byte, disko.DriverError) {
 	handle, err := NewFileFromObjectHandle(driver, object, disko.O_RDONLY)
 	if err != nil {
-		return nil, disko.ErrIOFailed.WrapError(err)
+		return nil, disko.ErrIOFailed.Wrap(err)
 	}
 	defer handle.Close()
 
@@ -181,7 +181,7 @@ func (driver *Driver) getContentsOfObject(
 
 	_, readError := handle.Read(buffer)
 	if readError != nil {
-		return nil, disko.ErrIOFailed.WrapError(readError)
+		return nil, disko.ErrIOFailed.Wrap(readError)
 	}
 	return buffer, nil
 }

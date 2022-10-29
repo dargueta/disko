@@ -26,7 +26,7 @@ func TestDiskoErrorWithMessage(t *testing.T) {
 
 func TestDiskoErrorWrap(t *testing.T) {
 	originalErr := errors.New("original error")
-	newErr := disko.ErrExists.WrapError(originalErr)
+	newErr := disko.ErrExists.Wrap(originalErr)
 	expectedMessage := "File exists: original error"
 
 	if newErr.Error() != expectedMessage {

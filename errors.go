@@ -9,7 +9,7 @@ import (
 type DriverError interface {
 	error
 	WithMessage(message string) DriverError
-	WrapError(err error) DriverError
+	Wrap(err error) DriverError
 }
 
 type baseDiskoError string
@@ -63,7 +63,7 @@ func (e baseDiskoError) WithMessage(message string) DriverError {
 	}
 }
 
-func (e baseDiskoError) WrapError(err error) DriverError {
+func (e baseDiskoError) Wrap(err error) DriverError {
 	return customDriverError{
 		message:       fmt.Sprintf("%s: %s", e.Error(), err.Error()),
 		originalError: multierror.Append(e, err),
@@ -90,7 +90,7 @@ func (e customDriverError) WithMessage(message string) DriverError {
 	}
 }
 
-func (e customDriverError) WrapError(err error) DriverError {
+func (e customDriverError) Wrap(err error) DriverError {
 	return customDriverError{
 		message:       fmt.Sprintf("%s: %s", e.Error(), err.Error()),
 		originalError: multierror.Append(e, err),
