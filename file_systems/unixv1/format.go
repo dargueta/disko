@@ -8,7 +8,6 @@ import (
 
 	bitmap "github.com/boljen/go-bitmap"
 	"github.com/dargueta/disko"
-	"github.com/dargueta/disko/errors"
 	"github.com/noxer/bytewriter"
 )
 
@@ -37,11 +36,7 @@ func isValidBlockAndInodeCount(numBlocks, numInodes uint) bool {
 	return (blockBitmapSize + inodeBitmapSize) <= 1000
 }
 
-func (driver *UnixV1Driver) Format(stat disko.FSStat) error {
-	if driver.isMounted {
-		return errors.ErrBusy
-	}
-
+func (driver *UnixV1Driver) Format(stat disko.FSStat) disko.DriverError {
 	// stat.Files tells us the number of inodes on the disk.
 	if (stat.Files == 0) || (stat.Files%NumInodesPerBlock != 0) {
 		msg := fmt.Sprintf(
@@ -49,7 +44,7 @@ func (driver *UnixV1Driver) Format(stat disko.FSStat) error {
 			NumInodesPerBlock,
 			stat.Files,
 		)
-		return errors.ErrInvalidArgument.WithMessage(msg)
+		return disko.ErrInvalidArgument.WithMessage(msg)
 	}
 
 	blockBitmapSize := getBitmapSizeInBytes(uint(stat.TotalBlocks))
@@ -64,7 +59,7 @@ func (driver *UnixV1Driver) Format(stat disko.FSStat) error {
 			blockBitmapSize,
 			inodeBitmapSize,
 		)
-		return errors.ErrFileTooLarge.WithMessage(msg)
+		return disko.ErrFileTooLarge.WithMessage(msg)
 	}
 
 	// The upper 32KiB is reserved for the system (boot image and all that), and
@@ -81,7 +76,7 @@ func (driver *UnixV1Driver) Format(stat disko.FSStat) error {
 			stat.TotalBlocks,
 			float64(stat.TotalBlocks)/2.0,
 		)
-		return errors.ErrInvalidArgument.WithMessage(msg)
+		return disko.ErrInvalidArgument.WithMessage(msg)
 	}
 
 	err := driver.image.Resize(uint(stat.TotalBlocks))

@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/boljen/go-bitmap"
 	"github.com/dargueta/disko"
-	"github.com/dargueta/disko/errors"
+	c "github.com/dargueta/disko/file_systems/common"
 	"github.com/dargueta/disko/file_systems/common/blockcache"
 )
 
@@ -45,7 +46,8 @@ type UnixV1Driver struct {
 	blockFreeMap      bitmap.Bitmap
 	inodes            []Inode
 	isMounted         bool
-	image             *blockcache.BlockCache
+	rawStream         io.ReadWriteSeeker
+	image             c.DiskImage
 	currentMountFlags disko.MountFlags
 }
 
@@ -73,12 +75,12 @@ func DeserializeTimestamp(tstamp uint32) time.Time {
 func (driver *UnixV1Driver) Mount(
 	image *blockcache.BlockCache,
 	flags disko.MountFlags,
-) errors.DriverError {
+) disko.DriverError {
 	if driver.isMounted {
 		if driver.currentMountFlags == flags {
 			return nil
 		}
-		return errors.ErrAlreadyInProgress
+		return disko.ErrAlreadyInProgress
 	}
 
 	driver.currentMountFlags = flags
@@ -87,7 +89,7 @@ func (driver *UnixV1Driver) Mount(
 	// For our current purposes we only need the boot block.
 	bootSectorSlice, err := image.GetSlice(0, 1)
 	if err != nil {
-		return errors.ErrIOFailed.WrapError(err)
+		return disko.ErrIOFailed.Wrap(err)
 	}
 	rawStream := bytes.NewReader(bootSectorSlice)
 
@@ -96,14 +98,14 @@ func (driver *UnixV1Driver) Mount(
 	var blockBitmapSize uint16
 	err = binary.Read(rawStream, binary.LittleEndian, &blockBitmapSize)
 	if err != nil {
-		return errors.ErrIOFailed.WrapError(err)
+		return disko.ErrIOFailed.Wrap(err)
 	}
 
 	// blockBitmap is the actual bitmap.
 	blockBitmap := make([]byte, blockBitmapSize)
 	_, err = rawStream.Read(blockBitmap)
 	if err != nil {
-		return errors.ErrIOFailed.WrapError(err)
+		return disko.ErrIOFailed.Wrap(err)
 	}
 
 	// inodeBitmapSize is the size of the bitmap for which bitmaps are currently
@@ -111,7 +113,7 @@ func (driver *UnixV1Driver) Mount(
 	var inodeBitmapSize uint16
 	err = binary.Read(rawStream, binary.LittleEndian, &inodeBitmapSize)
 	if err != nil {
-		return errors.ErrIOFailed.WrapError(err)
+		return disko.ErrIOFailed.Wrap(err)
 	}
 
 	// Together, the bitmaps can't exceed 1000 bytes because there are 24 other
@@ -123,19 +125,19 @@ func (driver *UnixV1Driver) Mount(
 				" bytes together, got %d",
 			blockBitmapSize+inodeBitmapSize,
 		)
-		return errors.ErrFileSystemCorrupted.WithMessage(message)
+		return disko.ErrFileSystemCorrupted.WithMessage(message)
 	}
 
 	inodeBitmap := make([]byte, inodeBitmapSize)
 	_, err = rawStream.Read(inodeBitmap)
 	if err != nil {
-		return errors.ErrIOFailed.WrapError(err)
+		return disko.ErrIOFailed.Wrap(err)
 	}
 
 	rawInodes := make([]RawInode, inodeBitmapSize*8)
 	err = binary.Read(rawStream, binary.LittleEndian, rawInodes[:])
 	if err != nil {
-		return errors.ErrIOFailed.WrapError(err)
+		return disko.ErrIOFailed.Wrap(err)
 	}
 
 	driver.inodes = make([]Inode, inodeBitmapSize*8)
@@ -147,10 +149,16 @@ func (driver *UnixV1Driver) Mount(
 	return nil
 }
 
-func (driver *UnixV1Driver) Unmount() errors.DriverError {
-	err := driver.image.Flush()
+func (driver *UnixV1Driver) Unmount() disko.DriverError {
+	writer, ok := driver.image.(c.WritableDiskImage)
+	if !ok {
+		// This is not a writable disk image so we have no changes to write out.
+		return nil
+	}
+
+	err := writer.Flush()
 	if err != nil {
-		return errors.ErrIOFailed.WrapError(err)
+		return disko.ErrIOFailed.Wrap(err)
 	}
 	driver.currentMountFlags = 0
 	driver.isMounted = false

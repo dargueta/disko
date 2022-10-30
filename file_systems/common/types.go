@@ -40,6 +40,7 @@ type BlockDeviceReader interface {
 
 type BlockDeviceWriter interface {
 	Write(start LogicalBlock, buffer []byte) error
+	Flush() error
 }
 
 type BlockDeviceReaderWriter interface {
