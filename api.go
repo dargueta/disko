@@ -316,19 +316,20 @@ var UndefinedTimestamp = time.Time{}
 // system supports a feature, driver implementations MUST declare it as available
 // even if it hasn't implemented it yet.
 type FSFeatures struct {
-	HasDirectories      bool
-	HasSymbolicLinks    bool
-	HasHardLinks        bool
-	HasCreatedTime      bool
-	HasAccessedTime     bool
-	HasModifiedTime     bool
-	HasChangedTime      bool
-	HasDeletedTime      bool
-	HasUnixPermissions  bool
-	HasUserPermissions  bool
-	HasGroupPermissions bool
-	HasUserID           bool
-	HasGroupID          bool
+	DoesNotRequireFormatting bool
+	HasDirectories           bool
+	HasSymbolicLinks         bool
+	HasHardLinks             bool
+	HasCreatedTime           bool
+	HasAccessedTime          bool
+	HasModifiedTime          bool
+	HasChangedTime           bool
+	HasDeletedTime           bool
+	HasUnixPermissions       bool
+	HasUserPermissions       bool
+	HasGroupPermissions      bool
+	HasUserID                bool
+	HasGroupID               bool
 
 	// TimestampEpoch returns the earliest representable timestamp on this file
 	// system. File systems that don't support timestamps of any kind must
