@@ -5,8 +5,13 @@ import (
 	"os"
 	"time"
 
+	"github.com/dargueta/disko/disks"
 	"github.com/dargueta/disko/file_systems/common"
 )
+
+const KB = 1024
+const MB = KB * 1024
+const GB = MB * 1024
 
 type MountFlags int
 
@@ -81,7 +86,7 @@ type FileSystemImplementer interface {
 	Unmount() DriverError
 
 	// CreateObject creates an object on the file system, such as a file or
-	// directory. You can tell the what it is based on the flags.
+	// directory. You can tell the what it is based on the [os.FileMode] flags.
 	//
 	// The following guarantees apply:
 	//
@@ -124,7 +129,9 @@ type FileSystemImplementer interface {
 	GetFSFeatures() FSFeatures
 
 	// FormatImage creates a new blank file system on the image this was created
-	// with, using characteristics defined in `stat`.
+	// with, using characteristics defined in `options`. Implementations must
+	// not return an error just because the file system they implement doesn't
+	// need formatting (such as tar or JSON).
 	//
 	// The following guarantees apply:
 	//
