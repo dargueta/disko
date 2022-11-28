@@ -135,9 +135,11 @@ type FileSystemImplementer interface {
 	//
 	// The following guarantees apply:
 	//
-	//	- The image will be correctly sized according to `stat`.
-	//	- It will consist entirely of null bytes.
-	FormatImage(stat FSStat) DriverError
+	//  - This will never be called if `FSFeatures.DoesNotRequireFormatting` is
+	//    true.
+	//  - The image will already be correctly sized according to `options`.
+	//  - It will consist entirely of null bytes.
+	FormatImage(options disks.FormatterOptions, metadata map[string]string) DriverError
 }
 
 // A BootCodeImplementer implements access to the boot code stored on a file
