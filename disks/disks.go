@@ -11,12 +11,14 @@ type DiskGeometry struct {
 	Name                  string `csv:"name"`
 	slug                  string `csv:"slug"`
 	FirstYearAvailable    uint   `csv:"first_year_available"`
+	FormFactor            string `csv:"form_factor"`
 	IsRemovable           uint   `csv:"is_removable"`
 	BitsPerAddressUnit    uint   `csv:"bits_per_address_unit"`
 	AddressUnitsPerSector uint   `csv:"address_units_per_sector"`
 	SectorsPerTrack       uint   `csv:"sectors_per_track"`
 	TotalDataTracks       uint   `csv:"total_data_tracks"`
-	TotalTracks           uint   `csv:"total_tracks"`
+	HiddenTracks          uint   `csv:"hidden_tracks"`
+	Heads                 uint   `csv:"heads"`
 	notes                 string `csv:"notes"`
 }
 
@@ -25,6 +27,7 @@ type FormatterOptions struct {
 	Geometry   DiskGeometry
 }
 
+// https://en.wikipedia.org/wiki/List_of_floppy_disk_formats
 // go:embed disk-geometries.csv
 var diskGeometriesRawCSV string
 var diskGeometries map[string]DiskGeometry

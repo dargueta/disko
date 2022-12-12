@@ -1,1 +1,32 @@
-name,slug,first_year_available,is_removable,bits_per_address_unit,address_units_per_sector,sectors_per_track,total_data_tracks,total_tracks,notes
+"name","slug","first_year_available","form_factor","is_removable","bits_per_address_unit","address_units_per_sector","sectors_per_track","total_data_tracks","hidden_tracks","heads","notes"
+"IBM 23FD","ibm_23fd",1971,"8”",1,8,319,8,32,0,1,"http://fileformats.archiveteam.org/wiki/IBM_23FD"
+"IBM 33FD (242K)","ibm_33fd_242k",1973,"8”",1,8,128,26,73,0,1,
+"IBM 33FD (284K)","ibm_33fd_284k",1973,"8”",1,8,256,15,74,1,1,"Does NOT include index cylinder"
+"IBM 33FD (303K)","ibm_33fd_303k",1973,"8”",1,8,512,8,74,1,1,"Does NOT include index cylinder"
+"IBM 43FD (492K)","ibm_43fd_492k",1976,"8”",1,8,128,26,74,1,2,"Does NOT include index cylinder"
+"IBM 43FD (568K)","ibm_43fd_568k",1976,"8”",1,8,256,15,74,1,2,"Does NOT include index cylinders"
+"IBM 53FD (985K)","ibm_53fd_985k",1977,"8”",1,8,256,26,74,1,2,"Does NOT include index cylinders"
+"IBM 53FD (1136K)","ibm_53fd_1136k",1977,"8”",1,8,512,15,74,1,2,"Does NOT include index cylinders"
+"IBM 53FD (1212kB)","ibm_53fd_1212k",1977,"8”",1,8,1024,8,74,1,2,"Does NOT include index cylinders"
+"DEC RX01","dec_rx01",1975,"8”",1,8,128,26,77,0,1,"http://avitech.com.au/?page_id=1008"
+"DEC RX02","dec_rx02",1978,"8”",1,8,256,26,77,0,1,"http://avitech.com.au/?page_id=1008"
+"IBM 3740","ibm_3740",1973,"8”",1,8,128,26,73,0,1,
+"MS-DOS 8” SS SD","msdos_8in_ss_sd",,"8”",1,8,128,26,77,0,1,
+"MS-DOS 8” DS SD","msdos_8in_ds_sd",,"8”",1,8,128,26,77,0,2,
+"MS-DOS 8” SS DD","msdos_8in_ss_dd",,"8”",1,8,1024,8,77,0,1,
+"MS-DOS 8” DS DD","msdos_8in_ds_dd",,"8”",1,8,1024,8,77,0,2,
+"MS-DOS 5 1/4” SS DD 160K","msdos_514in_ss_dd_8",,"5 1/4”",1,8,512,8,40,0,1,
+"MS-DOS 5 1/4” DS DD 320K","msdos_514in_ds_dd_8",,"5 1/4”",1,8,512,8,40,0,2,
+"MS-DOS 5 1/4” SS DD 180K","msdos_514in_ss_dd_9",,"5 1/4”",1,8,512,9,40,0,1,
+"MS-DOS 5 1/4” DS DD 360K","msdos_514in_ds_dd_9",,"5 1/4”",1,8,512,9,40,0,2,
+"MS-DOS 5 1/4” SS QD","msdos_514in_ss_qd",,"5 1/4”",1,8,512,8,80,0,1,"Rare"
+"MS-DOS 5 1/4” DS QD","msdos_514in_ds_qd",,"5 1/4”",1,8,512,8,80,0,2,"Rare"
+"MS-DOS 5 1/4” DS HD","msdos_514in_ds_hd",,"5 1/4”",1,8,512,15,80,0,2,
+"MS-DOS 3 1/2” SS DD 320K","msdos_312in_ss_dd_8",,"3 1/2”",1,8,512,8,80,0,1,
+"MS-DOS 3 1/2” SS DD 360K","msdos_312in_ss_dd_9",,"3 1/2”",1,8,512,9,80,0,1,
+"MS-DOS 3 1/2” DS DD 640K","msdos_312in_ds_dd_8",,"3 1/2”",1,8,512,8,80,0,2,
+"MS-DOS 3 1/2” DS DD 720K","msdos_312in_ds_dd_9",,"3 1/2”",1,8,512,9,80,0,2,
+"MS-DOS 3 1/2” DS HD 1440K","msdos_312in_ds_hd_18",,"3 1/2”",1,8,512,18,80,0,2,
+"MS-DOS 3 1/2” DS HD 1680K","msdos_312in_ds_hd_21_80",,"3 1/2”",1,8,512,21,80,0,2,
+"MS-DOS 3 1/2” DS HD 1720K","msdos_312in_ds_hd_21_82",,"3 1/2”",1,8,512,21,82,0,2,
+"MS-DOS 3 1/2” DS ED","msdos_312in_ds_ed",,"3 1/2”",1,8,512,36,80,0,2,
