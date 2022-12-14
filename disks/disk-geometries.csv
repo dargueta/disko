@@ -30,3 +30,5 @@
 "MS-DOS 3 1/2"" DS HD 1680K","msdos_312in_ds_hd_21_80",1986,"3 1/2""",1,8,512,21,80,0,2,"Release year is a guess"
 "MS-DOS 3 1/2"" DS HD 1720K","msdos_312in_ds_hd_21_82",1986,"3 1/2""",1,8,512,21,82,0,2,"Release year is a guess"
 "MS-DOS 3 1/2"" DS ED","msdos_312in_ds_ed",1986,"3 1/2""",1,8,512,36,80,0,2,"Release year is a guess"
+"ST-506","st_506",1980,,0,8,256,26,153,0,4,
+"ST-412","St_412",1981,,0,8,256,26,306,0,4,
