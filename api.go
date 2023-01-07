@@ -69,7 +69,7 @@ const MountFlagsAllowAll = (MountFlagsAllowRead |
 	MountFlagsAllowAdminister)
 const MountFlagsMask = MountFlagsCustomStart - 1
 
-// FileSystemImplementer is the interface required for all file system
+// FileSystemImplementer is the minimum interface required for all file system
 // implementations.
 type FileSystemImplementer interface {
 	// Mount initializes the file system implementation with access settings.
@@ -139,7 +139,7 @@ type FileSystemImplementer interface {
 	//    true.
 	//  - The image will already be correctly sized according to `options`.
 	//  - It will consist entirely of null bytes.
-	FormatImage(options disks.FormatterOptions, metadata map[string]string) DriverError
+	FormatImage(options disks.BasicFormatterOptions) DriverError
 }
 
 // A BootCodeImplementer implements access to the boot code stored on a file
@@ -312,24 +312,39 @@ type SupportsChownHandle interface {
 // to this is not recommended.
 var UndefinedTimestamp = time.Time{}
 
+var FSTextEncodingUTF8 = "utf8"
+var FSTextEncodingASCII = "ascii"
+var FSTextEncodingBCDIC = "bcdic"
+var FSTextEncodingEBCDIC = "ebcdic"
+
 // FSFeatures indicates the features available for the file system. If a file
 // system supports a feature, driver implementations MUST declare it as available
 // even if it hasn't implemented it yet.
 type FSFeatures struct {
+	// DoesNotRequireFormatting is true if and only if a driver doesn't need to
+	// format an image before use. This is mostly only used for archive formats.
 	DoesNotRequireFormatting bool
-	HasDirectories           bool
-	HasSymbolicLinks         bool
-	HasHardLinks             bool
-	HasCreatedTime           bool
-	HasAccessedTime          bool
-	HasModifiedTime          bool
-	HasChangedTime           bool
-	HasDeletedTime           bool
-	HasUnixPermissions       bool
-	HasUserPermissions       bool
-	HasGroupPermissions      bool
-	HasUserID                bool
-	HasGroupID               bool
+
+	// HasDirectories indicates if the file system supports directories, but
+	// makes no assertion as to whether any nesting is supported.
+	HasDirectories   bool
+	HasSymbolicLinks bool
+	HasHardLinks     bool
+	HasCreatedTime   bool
+	HasAccessedTime  bool
+	HasModifiedTime  bool
+	HasChangedTime   bool
+	HasDeletedTime   bool
+
+	// HasUnixPermissions is true if the file system supports a permissions model
+	// similar to user/group/other, read/write/execute model that Unix uses. The
+	// file system does not need to support group permissions to set this.
+	HasUnixPermissions bool
+
+	HasUserPermissions  bool
+	HasGroupPermissions bool
+	HasUserID           bool
+	HasGroupID          bool
 
 	// TimestampEpoch returns the earliest representable timestamp on this file
 	// system. File systems that don't support timestamps of any kind must
@@ -446,6 +461,7 @@ type Driver interface {
 	// to an absolute normalized path using forward slashes (/) as the component
 	// separator. The return value is always an absolute path.
 	NormalizePath(path string) string
+
 	// GetFSFeatures returns a struct that gives the various features the file
 	// system supports, regardless of whether the driver implements these
 	// features or not.
