@@ -84,7 +84,7 @@ type File struct {
 	*basicstream.BasicStream
 
 	// Fields
-	owningDriver *Driver
+	owningDriver *BaseDriver
 	objectHandle extObjectHandle
 	fileInfo     FileInfo
 	ioFlags      disko.IOFlags
@@ -96,7 +96,7 @@ type File struct {
 // NewFileFromObjectHandle creates a Disko file object that is (more or less) a
 // drop-in replacement for [os.File].
 func NewFileFromObjectHandle(
-	driver *Driver,
+	driver *BaseDriver,
 	object extObjectHandle,
 	ioFlags disko.IOFlags,
 ) (File, error) {
