@@ -7,6 +7,26 @@ import (
 	"github.com/gocarina/gocsv"
 )
 
+/////////////////////////////////////////////////////////////////////////////////
+// Formatter options
+
+type BasicFormatterOptions interface {
+	Metadata() interface{}
+	TotalSizeBytes() int64
+}
+
+type FormatterOptionsWithMaxFiles interface {
+	BasicFormatterOptions
+	MaxFiles() int64
+}
+
+type FormatterWithGeometryOptions struct {
+	Geometry DiskGeometry
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Geometry
+
 type DiskGeometry struct {
 	Name                  string `csv:"name"`
 	slug                  string `csv:"slug"`
@@ -22,10 +42,12 @@ type DiskGeometry struct {
 	notes                 string `csv:"notes"`
 }
 
-type FormatterOptions struct {
-	TotalFiles int64
-	Geometry   DiskGeometry
+func (g *DiskGeometry) TotalSizeBytes() int64 {
+	return int64(
+		g.AddressUnitsPerSector * g.SectorsPerTrack * g.TotalDataTracks * g.Heads)
 }
+
+////////////////////////////////////////////////////////////////////////////////
 
 // https://en.wikipedia.org/wiki/List_of_floppy_disk_formats
 // go:embed disk-geometries.csv
