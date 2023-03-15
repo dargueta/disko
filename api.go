@@ -135,7 +135,7 @@ type FileSystemImplementer interface {
 	//
 	// The following guarantees apply:
 	//
-	//  - This will never be called if `FSFeatures.DoesNotRequireFormatting` is
+	//  - This will never be called if [FSFeatures.DoesNotRequireFormatting] is
 	//    true.
 	//  - The image will already be correctly sized according to `options`.
 	//  - It will consist entirely of null bytes.
@@ -176,6 +176,7 @@ type VolumeLabelImplementer interface {
 	// Thus, if you set the volume label to "(^_^)" you may get "(¬_¬)" when you
 	// read it back -- a very different sentiment.
 	SetVolumeLabel(label string) DriverError
+
 	// GetVolumeLabel gets the volume label from the file system.
 	//
 	// The return value is guaranteed to be UTF-8 encoded. Implementations must
@@ -312,10 +313,10 @@ type SupportsChownHandle interface {
 // to this is not recommended.
 var UndefinedTimestamp = time.Time{}
 
-var FSTextEncodingUTF8 = "utf8"
-var FSTextEncodingASCII = "ascii"
-var FSTextEncodingBCDIC = "bcdic"
-var FSTextEncodingEBCDIC = "ebcdic"
+const FSTextEncodingUTF8 = "utf8"
+const FSTextEncodingASCII = "ascii"
+const FSTextEncodingBCDIC = "bcdic"
+const FSTextEncodingEBCDIC = "ebcdic"
 
 // FSFeatures indicates the features available for the file system. If a file
 // system supports a feature, driver implementations MUST declare it as available
