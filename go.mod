@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/boljen/go-bitmap v0.0.0-20151001105940-23cd2fb0ce7d
-	github.com/gocarina/gocsv v0.0.0-20230226133904-70c27cb2918a
+	github.com/gocarina/gocsv v0.0.0-20230406101422-6445c2b15027
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/noxer/bytewriter v1.0.0
 	github.com/urfave/cli/v2 v2.25.0
