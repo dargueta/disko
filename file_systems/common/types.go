@@ -4,11 +4,13 @@ package common
 
 import "math"
 
-type LogicalBlock uint
-type PhysicalBlock uint
+type LogicalBlock uint64
+type PhysicalBlock uint64
+type BlockIndex uint64
 
-const InvalidLogicalBlock = LogicalBlock(math.MaxUint)
-const InvalidPhysicalBlock = PhysicalBlock(math.MaxUint)
+const InvalidLogicalBlock = LogicalBlock(math.MaxUint64)
+const InvalidPhysicalBlock = PhysicalBlock(math.MaxUint64)
+const InvalidBlockOffset = PhysicalBlock(math.MaxUint64)
 
 // Truncator is an interface for objects that support a Truncate() method. This
 // method must behave just like [os.File.Truncate].

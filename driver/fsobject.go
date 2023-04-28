@@ -14,7 +14,7 @@ type tExtObjectHandle struct {
 
 // wrapObjectHandle combines
 func wrapObjectHandle(handle disko.ObjectHandle, absolutePath string) extObjectHandle {
-	return tExtObjectHandle{
+	return &tExtObjectHandle{
 		// FIXME (dargueta): This is hella wrong
 		//extObjectHandle.ObjectHandle: handle,
 		absolutePath: absolutePath,
