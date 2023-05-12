@@ -6,6 +6,7 @@ import (
 	"os"
 	posixpath "path"
 	"path/filepath"
+	"time"
 
 	"github.com/dargueta/disko"
 )
@@ -298,6 +299,84 @@ func (driver *BaseDriver) chdirToObject(object extObjectHandle) error {
 	return nil
 }
 
+func (driver *BaseDriver) Chmod(name string, mode os.FileMode) error {
+	absPath := driver.NormalizePath(name)
+	object, err := driver.getObjectAtPathFollowingLink(absPath)
+	if err != nil {
+		return err
+	}
+
+	chmodObject, ok := object.(disko.SupportsChmodHandle)
+	if !ok {
+		return disko.ErrNotImplemented
+	}
+	return chmodObject.Chmod(mode)
+}
+
+func (driver *BaseDriver) Chown(name string, uid, gid int) error {
+	absPath := driver.NormalizePath(name)
+	object, err := driver.getObjectAtPathFollowingLink(absPath)
+	if err != nil {
+		return err
+	}
+
+	chmownObject, ok := object.(disko.SupportsChownHandle)
+	if !ok {
+		return disko.ErrNotImplemented
+	}
+	return chmownObject.Chown(uid, gid)
+}
+
+// TODO(dargueta): This differs from [BaseDriver.Chown] only in that it calls
+// [BaseDriver.getObjectAtPathNoFollow] instead of [BaseDriver.getObjectAtPathFollowingLink].
+// Surely there's a cleaner way to do this.
+func (driver *BaseDriver) Lchown(name string, uid, gid int) error {
+	absPath := driver.NormalizePath(name)
+	object, err := driver.getObjectAtPathNoFollow(absPath)
+	if err != nil {
+		return err
+	}
+
+	chmownObject, ok := object.(disko.SupportsChownHandle)
+	if !ok {
+		return disko.ErrNotImplemented
+	}
+	return chmownObject.Chown(uid, gid)
+}
+
+func (driver *BaseDriver) Chtimes(name string, atime time.Time, mtime time.Time) error {
+	absPath := driver.NormalizePath(name)
+	object, err := driver.getObjectAtPathFollowingLink(absPath)
+	if err != nil {
+		return err
+	}
+
+	chmownObject, ok := object.(disko.SupportsChtimesHandle)
+	if !ok {
+		return disko.ErrNotImplemented
+	}
+
+	features := driver.implementation.GetFSFeatures()
+
+	// Ignore any timestamps that the implementation doesn't support.
+	if !features.HasAccessedTime {
+		atime = disko.UndefinedTimestamp
+	}
+	if !features.HasModifiedTime {
+		mtime = disko.UndefinedTimestamp
+	}
+
+	// This function only supports the standard `os.Chtimes` interface, so we
+	// pass in UndefinedTimestamp for the values that we want to leave alone.
+	return chmownObject.Chtimes(
+		disko.UndefinedTimestamp,
+		atime,
+		mtime,
+		disko.UndefinedTimestamp,
+		disko.UndefinedTimestamp,
+	)
+}
+
 func (driver *BaseDriver) Open(path string) (File, error) {
 	return driver.OpenFile(path, disko.O_RDONLY, 0)
 }
@@ -364,6 +443,38 @@ func (driver *BaseDriver) readDir(
 	}
 
 	return output, nil
+}
+
+func (driver *BaseDriver) Link(oldname, newname string) error {
+	linker, ok := driver.implementation.(disko.HardLinkImplementer)
+	if !ok {
+		return disko.ErrNotSupported
+	}
+
+	absOld := driver.NormalizePath(oldname)
+	oldHandle, err := driver.getObjectAtPathFollowingLink(absOld)
+	if err != nil {
+		return err
+	}
+
+	absNew := driver.NormalizePath(newname)
+	// Technically checking to see if the file exists before attempting the link
+	// can result in a TOCTOU bug. If this were a more serious project, we would
+	// do some sort of locking or push the check into the underlying implementation.
+	// This is supposed to be a fun little thing, so I'm ignoring that edge case.
+	_, err = driver.getObjectAtPathFollowingLink(absNew)
+	if err == nil {
+		return disko.ErrExists.WithMessage("hard link target already exists: " + absNew)
+	}
+
+	targetParentPath, targetName := posixpath.Split(absNew)
+	parentHandle, err := driver.getObjectAtPathFollowingLink(targetParentPath)
+	if err != nil {
+		return err
+	}
+
+	_, err = linker.CreateHardLink(oldHandle, parentHandle, targetName)
+	return err
 }
 
 func (driver *BaseDriver) Readlink(path string) (string, error) {

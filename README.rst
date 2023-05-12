@@ -51,14 +51,14 @@ The base driver implements the following functions out of the box:
 Function  Support Required FS Features
 ========= ======= ====================
 Chdir     ✔       1
-Chmod             2
-Chown             3
-Chtimes           4
+Chmod     ✔       2
+Chown     ✔       3
+Chtimes   ✔       4
 Create    ✔
 Flush
 Getwd     ✔
-Lchown            3, 6
-Link              5
+Lchown    ✔       3, 6
+Link      ✔       5
 Lstat     ✔
 Mkdir     ✔
 MkdirAll  ✔
@@ -69,7 +69,7 @@ ReadFile  ✔
 Readlink  ✔
 Remove    ✔
 RemoveAll ✔
-Repath
+Rename
 SameFile  ✔
 Stat      ✔
 Symlink           6

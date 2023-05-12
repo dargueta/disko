@@ -142,6 +142,26 @@ type FileSystemImplementer interface {
 	FormatImage(options disks.BasicFormatterOptions) DriverError
 }
 
+// A HardLinkImplementer implements hard linking from one object to another.
+type HardLinkImplementer interface {
+	// CreateHardLink creates a new file system object that is a hard link from
+	// the source to the target.
+	//
+	// The following guarantees apply:
+	//
+	//	- The target will not already exist.
+	//	- `source` will never be a directory.
+	//	- `targetParentDir` will always be an existing directory.
+	//
+	// A thoroug explanation for why hard links are disallowed for directories
+	// can be found here: https://askubuntu.com/a/525129
+	CreateHardLink(
+		source ObjectHandle,
+		targetParentDir ObjectHandle,
+		targetName string,
+	) (ObjectHandle, DriverError)
+}
+
 // A BootCodeImplementer implements access to the boot code stored on a file
 // system.
 //
@@ -251,6 +271,8 @@ type ObjectHandle interface {
 	//   - Symbolic links should not be dereferenced, so X and Y are not the same
 	//     even if X is a symbolic link to Y.
 	//   - Hard links are considered the same as the files they refer to.
+	//
+	// For a UNIX-like file system, this is equivalent to comparing the inumbers.
 	SameAs(other ObjectHandle) bool
 }
 
@@ -276,6 +298,9 @@ type SupportsChtimesHandle interface {
 	//    [FSFeatures] is false) will always be [UndefinedTimestamp].
 	//  - `deletedAt` will only be set if the object has been deleted and the
 	//    flag is supported by the file system.
+	//
+	// If a supported timestamp is passed in as [UndefinedTimestamp],
+	// implementations should not modify the existing timestamp for the object.
 	Chtimes(
 		createdAt,
 		lastAccessed,
