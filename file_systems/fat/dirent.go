@@ -11,8 +11,8 @@ import (
 	"github.com/dargueta/disko"
 )
 
-// fatEpoch is 1980-01-01 00:00:00 at local time.
-var fatEpoch = time.Unix(315561600, 0)
+// fatEpoch is the earliest representable timestamp for the FAT file system.
+var fatEpoch = time.Date(1980, time.January, 1, 0, 0, 0, 0, time.Local)
 
 const (
 	// AttrReadOnly is an attribute flag marking a directory entry as read-only.
@@ -145,10 +145,8 @@ func (d *Dirent) SetCreatedAt(t time.Time) error {
 	return nil
 }
 
-// GetDeletedAt returns the time at which the directory entry was deleted, or the Unix
-// epoch and an error object if the file hasn't been deleted. Note that the Unix epoch,
-// 1970-01-01 00:00:00 UTC, is a decade *before* the earliest representable date in a
-// FAT timestamp, 1980-01-01 00:00:00 local time.
+// GetDeletedAt returns the time at which the directory entry was deleted, or
+// [disko.UndefinedTimestamp] and an error object if the file hasn't been deleted.
 func (d *Dirent) GetDeletedAt() (time.Time, error) {
 	if !d.isDeleted {
 		return disko.UndefinedTimestamp, disko.ErrInvalidArgument
@@ -156,8 +154,8 @@ func (d *Dirent) GetDeletedAt() (time.Time, error) {
 	return d.stat.DeletedAt, nil
 }
 
-// SetDeletedAt sets the time at which a directory entry was deleted, marking it as deleted
-// if it hasn't already been.
+// SetDeletedAt sets the time at which a directory entry was deleted, marking it
+// as deleted if it hasn't already been.
 // It is an error to try to set this time before 1980-01-01 00:00:00 local time.
 func (d *Dirent) SetDeletedAt(t time.Time) error {
 	if t.Before(fatEpoch) {
@@ -170,7 +168,7 @@ func (d *Dirent) SetDeletedAt(t time.Time) error {
 // DirentSize is the size of a single raw directory entry, in bytes.
 const DirentSize = 32
 
-// DateFromInt converts the FAT on-disk representation of a date into a Go time.Time
+// DateFromInt converts the FAT on-disk representation of a date into a [time.Time]
 // object.
 func DateFromInt(value uint16) time.Time {
 	createDay := int(value & 0x001f)
@@ -180,9 +178,9 @@ func DateFromInt(value uint16) time.Time {
 	return time.Date(createYear, createMonth, createDay, 0, 0, 0, 0, nil)
 }
 
-// TimestampFromParts converts a FAT timestamp into a time.Time object. datePart is
-// required; timePart and hundredths should be 0 if they're not present in the source
-// field(s).
+// TimestampFromParts converts a FAT timestamp into a [time.Time] object.
+// datePart is required; timePart and hundredths should be 0 if they're not
+// present in the source field(s).
 func TimestampFromParts(datePart uint16, timePart uint16, hundredths uint8) time.Time {
 	dateDt := DateFromInt(datePart)
 
@@ -201,11 +199,12 @@ func TimestampFromParts(datePart uint16, timePart uint16, hundredths uint8) time
 }
 
 // AttrFlagsToFileMode converts FAT attribute flags into the mode flags used by
-// syscall.Stat_t.Mode.
+// [syscall.Stat_t.Mode].
 func AttrFlagsToFileMode(flags uint8) os.FileMode {
 	var mode os.FileMode
 
-	// FAT has no way to mark files as executable or not, so the executable bit is always set.
+	// FAT has no way to mark files as executable or not, so the executable bit
+	// is always set.
 	if (flags & AttrReadOnly) != 0 {
 		mode = 0o755
 	} else {
@@ -249,8 +248,8 @@ func TimeToTimespec(t time.Time) syscall.Timespec {
 	return syscall.NsecToTimespec(t.UnixNano())
 }
 
-// NewDirentFromRaw creates a fully processed Dirent from a raw one, such as converting
-// 24-bit values into time.Time values.
+// NewDirentFromRaw creates a fully processed [Dirent] from a raw one, such as
+// converting 24-bit values into [time.Time] values.
 func NewDirentFromRaw(bootSector *FATBootSector, rawDirent *RawDirent) (Dirent, error) {
 	lastModified := TimestampFromParts(
 		rawDirent.LastModifiedDate, rawDirent.LastModifiedTime, 0)
@@ -304,11 +303,11 @@ func NewDirentFromRaw(bootSector *FATBootSector, rawDirent *RawDirent) (Dirent, 
 	trimmedExt := strings.TrimRight(string(rawDirent.Extension[:]), " ")
 
 	if trimmedName[0] == 0xE5 {
-		// Represents a deleted file, and the real first character of the filename is in
-		// CreatedTimeMillis
+		// Represents a deleted file. The real first character of the filename is in
+		// CreatedTimeMillis.
 		trimmedName = string([]byte{rawDirent.CreatedTimeMillis}) + trimmedName[1:]
 	} else if trimmedName[0] == 0x05 {
-		// First character of the filename is E5
+		// First character of the filename is E5.
 		trimmedName = "\xe5" + trimmedName[1:]
 	} else if trimmedName[0] == 0 {
 		// This directory entry is free and thus invalid.
@@ -368,8 +367,8 @@ func (d Dirent) Name() string { return d.name }
 
 // Size is the size of the directory entry if and ONLY if it's a regular file.
 //
-// Directories will have this value set to 0. The only way to tell the size of a directory
-// is to recurse through it completely, and that's kinda excessive.
+// Directories will have this value set to 0. The only way to tell the size of a
+// directory is to recurse through it completely, and that's kinda excessive.
 //
 // TODO (dargueta): Is there a more efficient way to get the size for directories?
 // All directories must contain at least `.` and `..` entries, so they'll always be at

@@ -411,8 +411,8 @@ type FSFeatures struct {
 //
 // If a file system doesn't support a particular feature, implementations should
 // use a reasonable default value. For most of these 0 is fine, but for
-// compatibility they should use 1 for `Nlinks`, 0o777 for `ModeFlags`;
-// unsupported timestamps MUST be [UndefinedTimestamp].
+// compatibility they should use 1 for `Nlinks`, and 0o777 for `ModeFlags`.
+// Unsupported timestamps MUST be set to [UndefinedTimestamp].
 type FileStat struct {
 	DeviceID     uint64
 	InodeNumber  uint64
@@ -452,25 +452,33 @@ func (stat *FileStat) IsSymlink() bool {
 type FSStat struct {
 	// BlockSize is the size of a logical block on the file system, in bytes.
 	BlockSize uint
+
 	// TotalBlocks is the total number of blocks on the disk image.
 	TotalBlocks uint64
+
 	// BlocksFree is the number of unallocated blocks on the image.
 	BlocksFree uint64
+
 	// BlocksAvailable is the number of blocks available for use by user data.
 	// This should always be less than or equal to [FSStat.BlocksFree].
 	BlocksAvailable uint64
+
 	// Files is the total number of used directory entries on the file system.
 	// Implementations should return 0 if the information is not available.
 	Files uint64
+
 	// FilesFree is the number of remaining directory entries available for use.
 	// Implementations should return [math.MaxUint64] for file systems that have
 	// no limit on the maximum number of directory entries.
 	FilesFree uint64
+
 	// FileSystemID is the serial number for the disk image, if available.
 	FileSystemID string
+
 	// MaxNameLength is the longest possible name for a directory entry, in
 	// bytes. Implementations should return [math.MaxUint] if there is no limit.
 	MaxNameLength uint
+
 	// Label is the volume label, if available.
 	Label string
 }
@@ -482,6 +490,8 @@ type FSStat struct {
 // The presence of a function doesn't imply that the file system it's wrapping
 // supports or implements that feature, so be sure to check the returned errors
 // if you need something to happen.
+//
+// For most users, [disko.driver.BasicDriver] will meet most needs.
 type Driver interface {
 	// NormalizePath converts a path from the user's native file system syntax
 	// to an absolute normalized path using forward slashes (/) as the component
