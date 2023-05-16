@@ -85,9 +85,9 @@ Files
 
 File handles support the following methods from ``os.File``:
 
-================ ======= ==================== =====
-Function         Support Required FS Features Notes
-================ ======= ==================== =====
+================ ======= ====================
+Function         Support Required FS Features
+================ ======= ====================
 Chdir            ✔       1
 Chmod            ✔       2
 Chown            ✔       3
@@ -112,7 +112,7 @@ Write            ✔
 WriteAt          ✔
 WriteString      ✔
 WriteTo          ✔
-================ ======= ==================== =====
+================ ======= ====================
 
 File Systems
 ------------
@@ -208,25 +208,28 @@ Further Reading
 License
 -------
 
-Against my better judgement I'm open-sourcing this footgun for anyone to use,
-albeit at their own peril. This is released under the terms of the Apache 2.0
-License. Please see LICENSE.txt in this repository for the legal text.
+This is released under the terms of the Apache 2.0 License. Please see LICENSE.txt
+in this repository for the legal text.
 
 Acknowledgments
 ---------------
 
-This project uses the following third-party packages in accordance with their
-licenses. A project's appearance in this list does not imply endorsement by or
-affiliation with the author.
+This project uses open-source software built by other people, who have my
+gratitude for building things so that I don't have to. [#]_
 
-* `cli <github.com/urfave/cli>`_ by urfave
-* `go-bitmap <https://github.com/boljen/go-bitmap>`_ by Bol Christophe
+* `Bol Christophe <https://github.com/boljen>`_
+* `gocarina <https://github.com/gocarina>`_
+* `HashiCorp <https://github.com/hashicorp>`_
+* `Tim Scheuermann <https://github.com/noxer>`_
+* `urfave <https://github.com/urfave>`_
 
 Footnotes
 ---------
 
-.. [#] Timestamps are stored using the 1973 revision that uses the canonical
+.. [#] Timestamps are stored according to the 1973 revision that uses the canonical
        Unix epoch. The first version of the specification can't represent
        timestamps past 1973-04-08 12:06:28.250.
 .. [#] Also known as "DOS Plus".
-.. [#] Note this version 3 of the file system, not MINIX version 3.
+.. [#] Note this is version 3 of the file system, not MINIX version 3.
+.. [#] This should not be taken to imply that any of the people or organizations
+       listed here endorse or are associated with this project. It's just a thank you.
