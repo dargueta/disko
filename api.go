@@ -9,9 +9,9 @@ import (
 	"github.com/dargueta/disko/file_systems/common"
 )
 
-const KB = 1024
-const MB = KB * 1024
-const GB = MB * 1024
+const KiB = 1024
+const MiB = KiB * 1024
+const GiB = MiB * 1024
 
 type MountFlags int
 
@@ -20,21 +20,26 @@ const (
 	// MountFlagsAllowRead indicates to Driver.Mount() that the image should be
 	// mounted with read permissions.
 	MountFlagsAllowRead = MountFlags(1 << iota)
+
 	// MountFlagsAllowWrite indicates to Driver.Mount() that the image should be
 	// mounted with write permissions. Existing files can be modified, but
 	// nothing can be created or deleted.
 	MountFlagsAllowWrite = MountFlags(1 << iota)
+
 	// MountFlagsAllowInsert indicates to Driver.Mount() that the image should
 	// be mounted with insert permissions. New files and directories can be
 	// created and modified, but existing files cannot be touched unless
 	// MountFlagsAllowWrite is also specified.
 	MountFlagsAllowInsert = MountFlags(1 << iota)
+
 	// MountFlagsAllowDelete indicates to Driver.Mount() that the image should
 	// be mounted with permissions to delete files and directories.
 	MountFlagsAllowDelete = MountFlags(1 << iota)
+
 	// MountFlagsAllowAdminister indicates to Driver.Mount() that the image
 	// should be mounted with the ability to change file permissions.
 	MountFlagsAllowAdminister = MountFlags(1 << iota)
+
 	// MountFlagsPreserveTimestamps indicates that existing objects'
 	// LastAccessed, LastModified, LastChanged, and DeletedAt timestamps should
 	// NOT be changed. There are a few exceptions:
@@ -42,6 +47,7 @@ const (
 	// Objects created or deleted will have their timestamps set appropriately
 	// and then left alone for the duration of the mount.
 	MountFlagsPreserveTimestamps = MountFlags(1 << iota)
+
 	// MountFlagsCustomStart is the lowest bit flag that is not defined by the
 	// API standard and is free for drivers to use in an implementation-specific
 	// manner. All bits higher than this are guaranteed to be ignored by drivers
@@ -127,16 +133,15 @@ type FileSystemImplementer interface {
 	// This function should be callable regardless of whether the file system
 	// has been mounted or not.
 	GetFSFeatures() FSFeatures
+}
 
+// A FormatImageImplementer initializes an empty disk image.
+type FormatImageImplementer interface {
 	// FormatImage creates a new blank file system on the image this was created
-	// with, using characteristics defined in `options`. Implementations must
-	// not return an error just because the file system they implement doesn't
-	// need formatting (such as tar or JSON).
+	// with, using characteristics defined in `options`.
 	//
 	// The following guarantees apply:
 	//
-	//  - This will never be called if [FSFeatures.DoesNotRequireFormatting] is
-	//    true.
 	//  - The image will already be correctly sized according to `options`.
 	//  - It will consist entirely of null bytes.
 	FormatImage(options disks.BasicFormatterOptions) DriverError
