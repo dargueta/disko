@@ -2,6 +2,7 @@ package disks
 
 import (
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/gocarina/gocsv"
@@ -81,7 +82,7 @@ func init() {
 			return nil
 		},
 	)
-	if err != nil {
+	if err != nil && err != io.EOF {
 		panic(err)
 	}
 }

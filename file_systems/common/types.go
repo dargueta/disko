@@ -2,7 +2,9 @@
 // across multiple file system implementations.
 package common
 
-import "math"
+import (
+	"math"
+)
 
 type LogicalBlock uint64
 type PhysicalBlock uint64
@@ -18,6 +20,8 @@ type Truncator interface {
 	Truncate(size int64) error
 }
 
+// A BlockDevice represents a resource that can be accessed like a file, but
+// with fixed-size groups of bytes ("blocks") rather than individual bytes.
 type BlockDevice interface {
 	// BytesPerBlock returns the size of a single block, in bytes.
 	BytesPerBlock() uint
@@ -31,17 +35,21 @@ type BlockDevice interface {
 	// equal to `BytesPerBlock * TotalBlocks`.
 	Size() int64
 
-	// LengthToNumBlocks gives the minimum number of blocks required to hold the
-	// given number of bytes.
-	LengthToNumBlocks(size uint) uint
+	// GetMinBlocksForSize gives the minimum number of blocks required to hold
+	// the given number of bytes.
+	GetMinBlocksForSize(size uint) uint
 }
 
 type BlockDeviceReader interface {
-	Read(start LogicalBlock, buffer []byte) error
+	// ReadAt reads data beginning at the given logical block (indexed from 0)
+	// into the buffer. `buffer` must be an integral multiple of the block size.
+	ReadAt(buffer []byte, start LogicalBlock) (int, error)
 }
 
 type BlockDeviceWriter interface {
-	Write(start LogicalBlock, buffer []byte) error
+	// WriteAt writes data beginning at the given logical block (indexed from 0)
+	// into the device. `buffer` must be an integral multiple of the block size.
+	WriteAt(buffer []byte, start LogicalBlock) (int, error)
 }
 
 type BlockDeviceReaderWriter interface {
@@ -49,15 +57,25 @@ type BlockDeviceReaderWriter interface {
 	BlockDeviceWriter
 }
 
+// A BlockDeviceResizer allows resizing a [BlockDevice].
 type BlockDeviceResizer interface {
+	// Resize resizes a block device to the given number of blocks. If the size
+	// is increased, new, null-filled blocks are appended to the end. If the
+	// size decreases, blocks are removed from the end.
+	//
+	// Because this operates at the block device level, resizing can damage the
+	// file system on the device (if any).
 	Resize(newTotalBlocks uint) error
 }
 
+// A DiskImage is a [BlockDevice] that supports random-access reading.
 type DiskImage interface {
 	BlockDevice
 	BlockDeviceReader
 }
 
+// A WritableDiskImage is a [DiskImage] that supports both random-access reading
+// and writing.
 type WritableDiskImage interface {
 	DiskImage
 	BlockDeviceWriter
