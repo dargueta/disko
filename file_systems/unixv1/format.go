@@ -8,11 +8,12 @@ import (
 
 	bitmap "github.com/boljen/go-bitmap"
 	"github.com/dargueta/disko"
+	"github.com/dargueta/disko/file_systems/common"
 	"github.com/noxer/bytewriter"
 )
 
 // getBitmapSizeInBytes returns the minimum number of bytes required to store a
-// block or inode bitmap with the given number of bits.
+// block or inode bitmap containing the given number of bits.
 func getBitmapSizeInBytes(bits uint) uint {
 	// Round up the number of blocks and inodes to the nearest multiple of 8,
 	// then divide by 8 to give the total number of bytes each bitmap requires
@@ -79,14 +80,16 @@ func (driver *UnixV1Driver) Format(stat disko.FSStat) disko.DriverError {
 		return disko.ErrInvalidArgument.WithMessage(msg)
 	}
 
-	err := driver.image.Resize(uint(stat.TotalBlocks))
+	image := driver.image.(common.WritableDiskImage)
+
+	err := image.(common.BlockDeviceResizer).Resize(uint(stat.TotalBlocks))
 	if err != nil {
-		return err
+		return disko.CastToDriverError(err)
 	}
 
-	outputSlice, err := driver.image.GetSlice(0, firstDataBlock)
+	outputSlice, err := image.GetSlice(0, firstDataBlock)
 	if err != nil {
-		return err
+		return disko.CastToDriverError(err)
 	}
 
 	writer := bytewriter.New(outputSlice)
@@ -97,7 +100,8 @@ func (driver *UnixV1Driver) Format(stat disko.FSStat) disko.DriverError {
 	blockBitmap := bitmap.New(int(stat.TotalBlocks))
 	for i := 0; i < int(stat.TotalBlocks); i++ {
 		// The first two blocks and last 64 are always marked as allocated and
-		// can't be freed.
+		// can't be freed. (The first two sectors are the allocation bitmaps,
+		// and the last 64 are reserved for the boot image.)
 		blockBitmap.Set(i, (i >= 2) && (i < (int(stat.TotalBlocks)-64)))
 	}
 
@@ -154,8 +158,8 @@ func (driver *UnixV1Driver) Format(stat disko.FSStat) disko.DriverError {
 		RawDirent{Inumber: 41, Name: [8]byte{'.', '.'}},
 	)
 
-	driver.image.MarkBlockRangeDirty(0, firstDataBlock)
-	return driver.image.Flush()
+	image.MarkBlockRangeDirty(0, firstDataBlock)
+	return disko.CastToDriverError(image.Flush())
 }
 
 /*
