@@ -48,6 +48,9 @@ var ErrTooManyLinks = rootError.WithMessage("Too many links")
 var ErrTooManyOpenFiles = rootError.WithMessage("Too many open files in system")
 var ErrTooManyUsers = rootError.WithMessage("Too many users")
 
+// CastToDriverError ensures that the argument is a [DriverError]. If `err` is
+// is nil or already a [DriverError], it's returned unmodified. Otherwise the
+// error object is wrapped in a generic DriverError.
 func CastToDriverError(err error) DriverError {
 	if err == nil {
 		return nil
