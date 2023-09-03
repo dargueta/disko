@@ -7,6 +7,8 @@ import (
 
 	c "github.com/dargueta/disko/utilities/compression"
 	"github.com/noxer/bytewriter"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type imageC9nTestRunner struct {
@@ -58,9 +60,7 @@ func runRoundTripCompressionTest(t *testing.T, sourceData []byte) {
 	compressedWriter := bytewriter.New(compressedBuffer)
 
 	compressedSize, err := c.CompressImage(sourceDataReader, compressedWriter)
-	if err != nil {
-		t.Fatalf("unexpected error while compressing: %s", err.Error())
-	}
+	require.NoError(t, err, "unexpected error while compressing")
 	t.Logf("image size after compression: %d -> %d", len(sourceData), compressedSize)
 
 	decompressedBuffer := make([]byte, len(sourceData))
@@ -68,41 +68,20 @@ func runRoundTripCompressionTest(t *testing.T, sourceData []byte) {
 	compressedReader := bytes.NewReader(compressedBuffer[:compressedSize])
 
 	n, err := c.DecompressImage(compressedReader, decompressedWriter)
-	if err != nil {
-		t.Fatalf("unexpected error while decompressing: %s", err.Error())
-	}
-	if n != int64(len(sourceData)) {
-		t.Errorf(
-			"decompressed image has wrong size: expected %d, got %d",
-			len(sourceData),
-			n,
-		)
-	}
-	if !bytes.Equal(sourceData, decompressedBuffer) {
-		t.Error("original and decompressed data don't match.")
-	}
+	require.NoError(t, err, "unexpected error while decompressing")
+	assert.EqualValues(t, len(sourceData), n, "decompressed image has wrong size")
+	assert.Equal(t, sourceData, decompressedBuffer, "decompressed data is wrong")
 }
 
 func runRoundTripCompressionToBytesTest(t *testing.T, originalData []byte) {
 	compressed, err := c.CompressImageToBytes(bytes.NewReader(originalData))
-	if err != nil {
-		t.Fatalf("unexpected error while compressing: %s", err.Error())
-	}
+	require.NoError(t, err, "error while compressing")
 	t.Logf("image compressed %d -> %d", len(originalData), len(compressed))
 
 	decompressed, err := c.DecompressImageToBytes(bytes.NewReader(compressed))
-	if err != nil {
-		t.Fatalf("unexpected error while decompressing: %s", err.Error())
-	}
+	require.NoError(t, err, "error while decompressing")
 
-	if len(originalData) != len(decompressed) {
-		t.Errorf(
-			"decompressed data length doesn't match; expected %d, got %d",
-			len(originalData),
-			len(decompressed),
-		)
-	}
-	if !bytes.Equal(originalData, decompressed) {
-		t.Errorf("decompressed data doesn't match original")
-	}
+	assert.Equal(
+		t, len(originalData), len(decompressed), "decompressed data length is wrong")
+	assert.Equal(t, originalData, decompressed, "decompressed data is wrong")
 }
