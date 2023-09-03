@@ -1,7 +1,6 @@
 package blockcache_test
 
 import (
-	"bytes"
 	"math/rand"
 	"testing"
 
@@ -20,16 +19,13 @@ func TestBlockCache__Fetch__Basic(t *testing.T) {
 
 	currentBlock := make([]byte, 128)
 	for i := c.LogicalBlock(0); i < 64; i++ {
-		_, err := cache.ReadAt(currentBlock, i)
-		if err != nil {
-			t.Errorf("failed to read block %d of [0, 64): %s", i, err.Error())
-			continue
-		}
+		nRead, err := cache.ReadAt(currentBlock, i)
+		assert.NoErrorf(t, err, "failed to read block %d of [0, 64)", i)
+		assert.EqualValues(t, len(currentBlock), nRead)
 
 		start := i * 128
-		if !bytes.Equal(currentBlock, rawBlocks[start:start+128]) {
-			t.Errorf("block %d read from the cache doesn't match", i)
-		}
+		assert.Equalf(t, rawBlocks[start:start+128], currentBlock,
+			"block %d read from the cache doesn't match", i)
 	}
 }
 
@@ -51,13 +47,13 @@ func TestBlockCache__Fetch__ReadPastEnd(t *testing.T) {
 	// Read one block past the last valid block (equal to the total number of
 	// blocks). This must fail.
 	nRead, err = cache.ReadAt(buffer, 16)
-	assert.Error(t, err, "tried reading block 16 of [0, 16) but it didn't fail")
+	assert.Error(t, err, "reading block 16 of [0, 16) should've failed")
 	assert.Equal(t, 0, nRead)
 
 	// Try reading zero bytes at one block past the last valid block. This should
 	// also fail.
 	nRead, err = cache.ReadAt([]byte{}, 16)
-	assert.Error(t, err, "tried reading 0 bytes of block 16 of [0, 16) but it didn't fail")
+	assert.Error(t, err, "reading 0 bytes of block 16 of [0, 16) should've failed")
 	assert.Equal(t, 0, nRead)
 
 	nRead, err = cache.ReadAt(make([]byte, 8192), 0)
@@ -92,7 +88,7 @@ func TestBlockCache__Write__WriteStartingPastEndFails(t *testing.T) {
 	writeBuffer := make([]byte, cache.BytesPerBlock())
 
 	n, err := cache.WriteAt(writeBuffer, c.LogicalBlock(16))
-	assert.Error(t, err, "writing past the end of the buffer should've failed but it didn't")
+	assert.Error(t, err, "writing past the end of the buffer should've failed")
 	assert.Equal(t, 0, n)
 }
 
@@ -108,7 +104,7 @@ func TestBlockCache__Write__WriteOverlappingPastEndFails(t *testing.T) {
 	rand.Read(writeBuffer)
 
 	n, err := cache.WriteAt(writeBuffer, c.LogicalBlock(12))
-	assert.Error(t, err, "writing past the end of the buffer should've failed but it didn't")
+	assert.Error(t, err, "writing past the end of the buffer should've failed")
 	assert.Equal(t, 0, n)
-	assert.Equal(t, copyOfOriginalData, cacheData, "cache data was modified but shouldn't've been")
+	assert.Equal(t, copyOfOriginalData, cacheData, "cache data unexpectedly modified")
 }

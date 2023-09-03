@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	c "github.com/dargueta/disko/utilities/compression"
+	"github.com/stretchr/testify/assert"
 )
 
 type BasicTestCase struct {
@@ -24,9 +25,7 @@ var basicTestCases = []BasicTestCase{
 func runBasicTestCase(t *testing.T, test BasicTestCase) {
 	grouper := c.NewRLEGrouper(bytes.NewBuffer(test.Data))
 	result, _ := grouper.GetNextRun()
-	if result != test.ExpectedResult {
-		t.Errorf("Expected %+v, got %+v", test.ExpectedResult, result)
-	}
+	assert.Equal(t, test.ExpectedResult, result)
 }
 
 func TestRLEGrouper__Basic(t *testing.T) {
@@ -49,18 +48,15 @@ func TestRLEGrouper__Sequence(t *testing.T) {
 
 	buffer := bytes.NewBuffer(data)
 	grouper := c.NewRLEGrouper(buffer)
+	hitEOF := false
+
 	for i, expectedRun := range expected {
 		result, err := grouper.GetNextRun()
-		if result != expectedRun {
-			t.Errorf(
-				"run %d is wrong: expected %+v but got %+v",
-				i,
-				expectedRun,
-				result,
-			)
-		}
-		if expectedRun == c.InvalidRLERun && err != io.EOF {
-			t.Errorf("expected err to be io.EOF, got %q", err.Error())
+		assert.Equalf(t, expectedRun, result, "run %d is wrong", i)
+		if expectedRun == c.InvalidRLERun {
+			assert.Equal(t, io.EOF, err, "expected io.EOF sentinel error")
+			hitEOF = true
 		}
 	}
+	assert.True(t, hitEOF, "never hit EOF sentinel")
 }
