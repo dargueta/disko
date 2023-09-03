@@ -49,7 +49,11 @@ type FlushBlockCallback func(blockIndex c.LogicalBlock, buffer []byte) error
 type ResizeCallback func(newTotalBlocks c.LogicalBlock) error
 
 type BlockCache struct {
-	loadedBlocks  bitmap.Bitmap
+	// loadedBlocks is a bitmap indicating which blocks are in `data`; 1 means
+	// present, 0 is not loaded.
+	loadedBlocks bitmap.Bitmap
+	// dirtyBlocks is a bitmap indicating which blocks in `data` have been
+	// modified and need to be written back to the underlying storage.
 	dirtyBlocks   bitmap.Bitmap
 	fetch         FetchBlockCallback
 	flush         FlushBlockCallback
@@ -59,7 +63,7 @@ type BlockCache struct {
 	data          []byte
 }
 
-// New creates a new BlockCache.
+// New creates a new [BlockCache].
 //
 // There are three callback functions:
 //
@@ -67,7 +71,7 @@ type BlockCache struct {
 //   - `flushCb` writes a single block to the backing storage.
 //   - `resizeCb` resizes the backing storage to a given number of blocks. If
 //     nil is passed for this argument, a stub function is provided that always
-//     returns an error with code [errors.ENOTSUP].
+//     returns [disko.ErrNotSupported].
 func New(
 	bytesPerBlock uint,
 	totalBlocks uint,
@@ -194,9 +198,9 @@ func (cache *BlockCache) Size() int64 {
 	return int64(cache.bytesPerBlock) * int64(cache.totalBlocks)
 }
 
-// LengthToNumBlocks gives the minimum number of blocks required to hold the
+// GetMinBlocksForSize gives the minimum number of blocks required to hold the
 // given number of bytes.
-func (cache *BlockCache) LengthToNumBlocks(size uint) uint {
+func (cache *BlockCache) GetMinBlocksForSize(size uint) uint {
 	return (size + cache.bytesPerBlock - 1) / cache.bytesPerBlock
 }
 
@@ -204,7 +208,7 @@ func (cache *BlockCache) LengthToNumBlocks(size uint) uint {
 // starting from block `start`. If not, it returns an error describing the exact
 // conditions. If no error would occur, this returns nil.
 func (cache *BlockCache) checkBounds(start c.LogicalBlock, bufferSize uint) error {
-	numBlocks := cache.LengthToNumBlocks(bufferSize)
+	numBlocks := cache.GetMinBlocksForSize(bufferSize)
 
 	if uint(start) >= cache.totalBlocks {
 		return disko.ErrArgumentOutOfRange.WithMessage(
@@ -355,7 +359,7 @@ func (cache *BlockCache) Read(start c.LogicalBlock, buffer []byte) error {
 		return err
 	}
 
-	numBlocks := cache.LengthToNumBlocks(bufLen)
+	numBlocks := cache.GetMinBlocksForSize(bufLen)
 	err = cache.loadBlockRange(start, numBlocks)
 	if err != nil {
 		return err
@@ -384,7 +388,7 @@ func (cache *BlockCache) Write(start c.LogicalBlock, buffer []byte) error {
 		return err
 	}
 
-	totalBlocks := cache.LengthToNumBlocks(bufLen)
+	totalBlocks := cache.GetMinBlocksForSize(bufLen)
 	targetByteSlice, err := cache.GetSlice(start, totalBlocks)
 	if err != nil {
 		return err

@@ -24,8 +24,10 @@
 
 # End of https://www.toptal.com/developers/gitignore/api/go
 
+.idea/
 .vscode/
 *.o
 *.a
 *.code-workspace
 bin/
+*#

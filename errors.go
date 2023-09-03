@@ -48,6 +48,16 @@ var ErrTooManyLinks = rootError.WithMessage("Too many links")
 var ErrTooManyOpenFiles = rootError.WithMessage("Too many open files in system")
 var ErrTooManyUsers = rootError.WithMessage("Too many users")
 
+func CastToDriverError(err error) DriverError {
+	if err == nil {
+		return nil
+	}
+	if driverError, ok := err.(DriverError); ok {
+		return driverError
+	}
+	return rootError.Wrap(err)
+}
+
 func (e baseDiskoError) Error() string {
 	return string(e)
 }

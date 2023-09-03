@@ -16,24 +16,13 @@ import (
 // BasicStream is a file-like wrapper around a BlockCache that emulates a
 // subset of the functionality provided by an [os.File] instance.
 type BasicStream struct {
-	// Interfaces
-	c.Truncator
-	io.Closer
-	io.ReaderAt
-	io.ReaderFrom
-	io.ReadWriteSeeker
-	io.StringWriter
-	io.WriterAt
-	io.WriterTo
-
-	// Fields
 	size     int64
 	position int64
 	data     *blockcache.BlockCache
 	ioFlags  disko.IOFlags
 }
 
-// New creates a BasicStream on top of a block cache. The `size` argument gives
+// New creates a [BasicStream] on top of a block cache. The `size` argument gives
 // the exact size of the stream, in bytes. The only requirement for this is that
 // it must be between 0 and `data.Size()` (inclusive).
 //
@@ -70,9 +59,9 @@ func New(
 }
 
 // convertLinearAddr converts a byte offset into a block+block offset pair. It
-// disregards the actual size of the stream, so it's possible to generate
-// offsets beyond the end of the stream. `offs` is guaranteed to be in the range
-// [0, BytesPerBlock).
+// disregards the actual size of the stream, so it's possible (by design) to
+// generate offsets beyond the end of the stream. `offs` is guaranteed to be in
+// the range [0, BytesPerBlock).
 func (stream *BasicStream) convertLinearAddr(offset int64) (blk c.LogicalBlock, offs uint) {
 	bytesPerBlock := int64(stream.data.BytesPerBlock())
 	blk = c.LogicalBlock(offset / bytesPerBlock)
@@ -93,6 +82,7 @@ func (stream *BasicStream) Read(buffer []byte) (int, error) {
 	return totalRead, err
 }
 
+// ReadAt implements [io.ReaderAt].
 func (stream *BasicStream) ReadAt(buffer []byte, offset int64) (int, error) {
 	if !stream.ioFlags.Read() {
 		return 0, disko.ErrNotPermitted
@@ -130,6 +120,7 @@ func (stream *BasicStream) ReadAt(buffer []byte, offset int64) (int, error) {
 	return int(numBytesToRead), err
 }
 
+// ReadFrom implements [io.ReaderFrom].
 func (stream *BasicStream) ReadFrom(r io.Reader) (n int64, err error) {
 	if !stream.ioFlags.Write() {
 		return 0, disko.ErrNotPermitted
@@ -168,8 +159,8 @@ func (stream *BasicStream) ReadFrom(r io.Reader) (n int64, err error) {
 // `whence`. It must be one of [io.SeekStart], [io.SeekCurrent], or [io.SeekEnd].
 //
 // Seeking past the end of the file is possible; the file will automatically be
-// resized upon the first write. Attempting to read past the end of the file
-// returns no data.
+// resized upon the first write past the end. Attempting to read past the end of
+// the file returns no data.
 //
 // If the stream was created with the `O_APPEND` flag, seeking will succeed, but
 // any write operation will automatically reposition the stream pointer to the
@@ -235,7 +226,7 @@ func (stream *BasicStream) Truncate(size int64) error {
 			fmt.Sprintf("truncate failed: new file size %d is too large", size),
 		)
 	}
-	newTotalBlocks := stream.data.LengthToNumBlocks(uint(size))
+	newTotalBlocks := stream.data.GetMinBlocksForSize(uint(size))
 
 	err := stream.data.Resize(newTotalBlocks)
 	if err != nil {
@@ -250,9 +241,7 @@ func (stream *BasicStream) Truncate(size int64) error {
 	return nil
 }
 
-// Write writes bytes into the stream. If the stream was created with the
-// [disko.O_APPEND] flag set, the stream pointer is repositioned to the end
-// first before writing.
+// Write implements [io.Writer].
 func (stream *BasicStream) Write(buffer []byte) (int, error) {
 	var err error
 
@@ -308,8 +297,8 @@ func (stream *BasicStream) implWriteAt(buffer []byte, offset int64) (int, error)
 	return len(buffer), nil
 }
 
-// WriteAt writes data at the given offset in the stream. It is an error to
-// use this function if the stream was created with the [disko.O_APPEND] flag.
+// WriteAt implements [io.WriterAt] It is an error to use this function if the
+// stream was created with the [disko.O_APPEND] flag.
 func (stream *BasicStream) WriteAt(buffer []byte, offset int64) (int, error) {
 	if stream.ioFlags.Append() {
 		return 0, disko.ErrNotPermitted
@@ -317,11 +306,12 @@ func (stream *BasicStream) WriteAt(buffer []byte, offset int64) (int, error) {
 	return stream.implWriteAt(buffer, offset)
 }
 
-// WriteString writes a string to the stream.
+// WriteString implements [io.StringWriter].
 func (stream *BasicStream) WriteString(s string) (int, error) {
 	return stream.Write([]byte(s))
 }
 
+// WriteTo implements [io.WriterTo].
 func (stream *BasicStream) WriteTo(w io.Writer) (n int64, err error) {
 	buffer := make([]byte, stream.data.BytesPerBlock())
 	totalWritten := int64(0)

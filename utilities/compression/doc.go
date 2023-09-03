@@ -33,7 +33,7 @@
 // to 12,243 bytes. If instead of limiting ourselves to one byte for the run
 // length we encode the length with ULEB128, we can get this down to just 5 bytes.
 // That advantage is nearly eliminated though once we gzip the result; the RLE8
-// shrinks to 50 bytes, ULEB128 expands to 25 bytes. In order to reduce the
-// complexity of the code, we will (for now) stick to RLE8.
+// shrinks to 50 bytes, ULEB128 expands from 5 to 25 bytes. In order to reduce
+// the complexity of the code, we will (for now) stick to RLE8.
 
 package compression

@@ -5,8 +5,13 @@ import (
 	"os"
 	"time"
 
+	"github.com/dargueta/disko/disks"
 	"github.com/dargueta/disko/file_systems/common"
 )
+
+const KiB = 1024
+const MiB = KiB * 1024
+const GiB = MiB * 1024
 
 type MountFlags int
 
@@ -15,21 +20,26 @@ const (
 	// MountFlagsAllowRead indicates to Driver.Mount() that the image should be
 	// mounted with read permissions.
 	MountFlagsAllowRead = MountFlags(1 << iota)
+
 	// MountFlagsAllowWrite indicates to Driver.Mount() that the image should be
 	// mounted with write permissions. Existing files can be modified, but
 	// nothing can be created or deleted.
 	MountFlagsAllowWrite = MountFlags(1 << iota)
+
 	// MountFlagsAllowInsert indicates to Driver.Mount() that the image should
 	// be mounted with insert permissions. New files and directories can be
 	// created and modified, but existing files cannot be touched unless
 	// MountFlagsAllowWrite is also specified.
 	MountFlagsAllowInsert = MountFlags(1 << iota)
+
 	// MountFlagsAllowDelete indicates to Driver.Mount() that the image should
 	// be mounted with permissions to delete files and directories.
 	MountFlagsAllowDelete = MountFlags(1 << iota)
+
 	// MountFlagsAllowAdminister indicates to Driver.Mount() that the image
 	// should be mounted with the ability to change file permissions.
 	MountFlagsAllowAdminister = MountFlags(1 << iota)
+
 	// MountFlagsPreserveTimestamps indicates that existing objects'
 	// LastAccessed, LastModified, LastChanged, and DeletedAt timestamps should
 	// NOT be changed. There are a few exceptions:
@@ -37,6 +47,7 @@ const (
 	// Objects created or deleted will have their timestamps set appropriately
 	// and then left alone for the duration of the mount.
 	MountFlagsPreserveTimestamps = MountFlags(1 << iota)
+
 	// MountFlagsCustomStart is the lowest bit flag that is not defined by the
 	// API standard and is free for drivers to use in an implementation-specific
 	// manner. All bits higher than this are guaranteed to be ignored by drivers
@@ -64,7 +75,7 @@ const MountFlagsAllowAll = (MountFlagsAllowRead |
 	MountFlagsAllowAdminister)
 const MountFlagsMask = MountFlagsCustomStart - 1
 
-// FileSystemImplementer is the interface required for all file system
+// FileSystemImplementer is the minimum interface required for all file system
 // implementations.
 type FileSystemImplementer interface {
 	// Mount initializes the file system implementation with access settings.
@@ -81,7 +92,7 @@ type FileSystemImplementer interface {
 	Unmount() DriverError
 
 	// CreateObject creates an object on the file system, such as a file or
-	// directory. You can tell the what it is based on the flags.
+	// directory. You can tell the what it is based on the [os.FileMode] flags.
 	//
 	// The following guarantees apply:
 	//
@@ -122,15 +133,38 @@ type FileSystemImplementer interface {
 	// This function should be callable regardless of whether the file system
 	// has been mounted or not.
 	GetFSFeatures() FSFeatures
+}
 
+// A FormatImageImplementer initializes an empty disk image.
+type FormatImageImplementer interface {
 	// FormatImage creates a new blank file system on the image this was created
-	// with, using characteristics defined in `stat`.
+	// with, using characteristics defined in `options`.
 	//
 	// The following guarantees apply:
 	//
-	//	- The image will be correctly sized according to `stat`.
-	//	- It will consist entirely of null bytes.
-	FormatImage(stat FSStat) DriverError
+	//  - The image will already be correctly sized according to `options`.
+	//  - It will consist entirely of null bytes.
+	FormatImage(options disks.BasicFormatterOptions) DriverError
+}
+
+// A HardLinkImplementer implements hard linking from one object to another.
+type HardLinkImplementer interface {
+	// CreateHardLink creates a new file system object that is a hard link from
+	// the source to the target.
+	//
+	// The following guarantees apply:
+	//
+	//	- The target will not already exist.
+	//	- `source` will never be a directory.
+	//	- `targetParentDir` will always be an existing directory.
+	//
+	// A thoroug explanation for why hard links are disallowed for directories
+	// can be found here: https://askubuntu.com/a/525129
+	CreateHardLink(
+		source ObjectHandle,
+		targetParentDir ObjectHandle,
+		targetName string,
+	) (ObjectHandle, DriverError)
 }
 
 // A BootCodeImplementer implements access to the boot code stored on a file
@@ -167,6 +201,7 @@ type VolumeLabelImplementer interface {
 	// Thus, if you set the volume label to "(^_^)" you may get "(¬_¬)" when you
 	// read it back -- a very different sentiment.
 	SetVolumeLabel(label string) DriverError
+
 	// GetVolumeLabel gets the volume label from the file system.
 	//
 	// The return value is guaranteed to be UTF-8 encoded. Implementations must
@@ -241,6 +276,8 @@ type ObjectHandle interface {
 	//   - Symbolic links should not be dereferenced, so X and Y are not the same
 	//     even if X is a symbolic link to Y.
 	//   - Hard links are considered the same as the files they refer to.
+	//
+	// For a UNIX-like file system, this is equivalent to comparing the inumbers.
 	SameAs(other ObjectHandle) bool
 }
 
@@ -266,6 +303,9 @@ type SupportsChtimesHandle interface {
 	//    [FSFeatures] is false) will always be [UndefinedTimestamp].
 	//  - `deletedAt` will only be set if the object has been deleted and the
 	//    flag is supported by the file system.
+	//
+	// If a supported timestamp is passed in as [UndefinedTimestamp],
+	// implementations should not modify the existing timestamp for the object.
 	Chtimes(
 		createdAt,
 		lastAccessed,
@@ -303,19 +343,35 @@ type SupportsChownHandle interface {
 // to this is not recommended.
 var UndefinedTimestamp = time.Time{}
 
+const FSTextEncodingUTF8 = "utf8"
+const FSTextEncodingASCII = "ascii"
+const FSTextEncodingBCDIC = "bcdic"
+const FSTextEncodingEBCDIC = "ebcdic"
+
 // FSFeatures indicates the features available for the file system. If a file
 // system supports a feature, driver implementations MUST declare it as available
 // even if it hasn't implemented it yet.
 type FSFeatures struct {
-	HasDirectories      bool
-	HasSymbolicLinks    bool
-	HasHardLinks        bool
-	HasCreatedTime      bool
-	HasAccessedTime     bool
-	HasModifiedTime     bool
-	HasChangedTime      bool
-	HasDeletedTime      bool
-	HasUnixPermissions  bool
+	// DoesNotRequireFormatting is true if and only if a driver doesn't need to
+	// format an image before use. This is mostly only used for archive formats.
+	DoesNotRequireFormatting bool
+
+	// HasDirectories indicates if the file system supports directories, but
+	// makes no assertion as to whether any nesting is supported.
+	HasDirectories   bool
+	HasSymbolicLinks bool
+	HasHardLinks     bool
+	HasCreatedTime   bool
+	HasAccessedTime  bool
+	HasModifiedTime  bool
+	HasChangedTime   bool
+	HasDeletedTime   bool
+
+	// HasUnixPermissions is true if the file system supports a permissions model
+	// similar to user/group/other, read/write/execute model that Unix uses. The
+	// file system does not need to support group permissions to set this.
+	HasUnixPermissions bool
+
 	HasUserPermissions  bool
 	HasGroupPermissions bool
 	HasUserID           bool
@@ -360,8 +416,8 @@ type FSFeatures struct {
 //
 // If a file system doesn't support a particular feature, implementations should
 // use a reasonable default value. For most of these 0 is fine, but for
-// compatibility they should use 1 for `Nlinks`, 0o777 for `ModeFlags`;
-// unsupported timestamps MUST be [UndefinedTimestamp].
+// compatibility they should use 1 for `Nlinks`, and 0o777 for `ModeFlags`.
+// Unsupported timestamps MUST be set to [UndefinedTimestamp].
 type FileStat struct {
 	DeviceID     uint64
 	InodeNumber  uint64
@@ -401,25 +457,33 @@ func (stat *FileStat) IsSymlink() bool {
 type FSStat struct {
 	// BlockSize is the size of a logical block on the file system, in bytes.
 	BlockSize uint
+
 	// TotalBlocks is the total number of blocks on the disk image.
 	TotalBlocks uint64
+
 	// BlocksFree is the number of unallocated blocks on the image.
 	BlocksFree uint64
+
 	// BlocksAvailable is the number of blocks available for use by user data.
 	// This should always be less than or equal to [FSStat.BlocksFree].
 	BlocksAvailable uint64
+
 	// Files is the total number of used directory entries on the file system.
 	// Implementations should return 0 if the information is not available.
 	Files uint64
+
 	// FilesFree is the number of remaining directory entries available for use.
 	// Implementations should return [math.MaxUint64] for file systems that have
 	// no limit on the maximum number of directory entries.
 	FilesFree uint64
+
 	// FileSystemID is the serial number for the disk image, if available.
 	FileSystemID string
+
 	// MaxNameLength is the longest possible name for a directory entry, in
 	// bytes. Implementations should return [math.MaxUint] if there is no limit.
 	MaxNameLength uint
+
 	// Label is the volume label, if available.
 	Label string
 }
@@ -431,11 +495,14 @@ type FSStat struct {
 // The presence of a function doesn't imply that the file system it's wrapping
 // supports or implements that feature, so be sure to check the returned errors
 // if you need something to happen.
+//
+// For most users, [disko.driver.BasicDriver] will meet most needs.
 type Driver interface {
 	// NormalizePath converts a path from the user's native file system syntax
 	// to an absolute normalized path using forward slashes (/) as the component
 	// separator. The return value is always an absolute path.
 	NormalizePath(path string) string
+
 	// GetFSFeatures returns a struct that gives the various features the file
 	// system supports, regardless of whether the driver implements these
 	// features or not.
