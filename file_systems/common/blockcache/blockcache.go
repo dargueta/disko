@@ -346,52 +346,52 @@ func (cache *BlockCache) Flush() error {
 	return cache.flushBlockRange(0, cache.totalBlocks)
 }
 
-// Read fills `buffer` with data beginning at block `start`, loading any missing
+// ReadAt fills `buffer` with data beginning at block `start`, loading any missing
 // blocks first. `buffer` does not need to be an exact multiple of the size of
 // one block.
 //
 // Attempting to read past the end of the cache will result in an error, and
 // `buffer` will be left unmodified.
-func (cache *BlockCache) Read(start c.LogicalBlock, buffer []byte) error {
+func (cache *BlockCache) ReadAt(buffer []byte, start c.LogicalBlock) (int, error) {
 	bufLen := uint(len(buffer))
 	err := cache.checkBounds(start, bufLen)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	numBlocks := cache.GetMinBlocksForSize(bufLen)
 	err = cache.loadBlockRange(start, numBlocks)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	sourceData, err := cache.GetSlice(start, numBlocks)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	copy(buffer, sourceData)
-	return nil
+	return len(sourceData), nil
 }
 
-// Write copies data into the cache from `buffer`, beginning at block `start`.
+// WriteAt copies data into the cache from `buffer`, beginning at block `start`.
 // All modified blocks are marked as dirty. `buffer` does not need to be an
 // exact multiple of the size of one block.
 //
 // Attempting to write past the end of the cache will result in an error, and
 // the cache will be left unmodified.
-func (cache *BlockCache) Write(start c.LogicalBlock, buffer []byte) error {
+func (cache *BlockCache) WriteAt(buffer []byte, start c.LogicalBlock) (int, error) {
 	bufLen := uint(len(buffer))
 
 	err := cache.checkBounds(start, bufLen)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	totalBlocks := cache.GetMinBlocksForSize(bufLen)
 	targetByteSlice, err := cache.GetSlice(start, totalBlocks)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	copy(targetByteSlice, buffer)
@@ -402,7 +402,7 @@ func (cache *BlockCache) Write(start c.LogicalBlock, buffer []byte) error {
 		cache.loadedBlocks.Set(currentBlockIndex, true)
 		cache.dirtyBlocks.Set(currentBlockIndex, true)
 	}
-	return nil
+	return len(buffer), nil
 }
 
 // Resize changes the number of blocks in the cache. Blocks are added to and
