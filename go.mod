@@ -1,13 +1,13 @@
 module github.com/dargueta/disko
 
-go 1.18
+go 1.19
 
 require (
 	github.com/boljen/go-bitmap v0.0.0-20151001105940-23cd2fb0ce7d
-	github.com/gocarina/gocsv v0.0.0-20230513223533-9ddd7fd60602
+	github.com/gocarina/gocsv v0.0.0-20230616125104-99d496ca653d
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/noxer/bytewriter v1.0.0
-	github.com/urfave/cli/v2 v2.25.3
+	github.com/urfave/cli/v2 v2.25.7
 )
 
 require (

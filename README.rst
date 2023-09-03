@@ -3,7 +3,7 @@ Disko: A Disk Image Editor
 
 |go-versions| |platforms|
 
-.. |go-versions| image:: https://img.shields.io/badge/Go-1.18,%201.19,%201.20-blue.svg
+.. |go-versions| image:: https://img.shields.io/badge/Go-1.19,%201.20,%201.21-blue.svg
 .. |platforms| image::  https://img.shields.io/badge/platform-Linux%20%7C%20MacOS%20%7C%20Windows-lightgrey
 
 I've recently gotten into retro computing and found I need to create disk images.
