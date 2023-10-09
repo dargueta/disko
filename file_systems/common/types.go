@@ -49,8 +49,21 @@ type BlockDeviceReader interface {
 type BlockDeviceWriter interface {
 	// WriteAt writes data beginning at the given logical block (indexed from 0)
 	// into the device. `buffer` must be an integral multiple of the block size.
+	// The blocks are automatically marked as dirty.
 	WriteAt(buffer []byte, start LogicalBlock) (int, error)
+
+	// Flush writes out all pending changes to the underlying storage.
 	Flush() error
+
+	// MarkBlockRangeDirty marks a range of blocks as needing to be flushed,
+	// regardless of whether they've been written to or not. If this device does
+	// no buffering, implementations must not return an error.
+	MarkBlockRangeDirty(start LogicalBlock, length uint) error
+
+	// MarkBlockRangeClean marks a range of blocks as unmodified and not needing
+	// to be flushed. In that sense, it's the inverse of [MarkBlockRangeDirty].
+	// If the device does no buffering, implementations must not return an error.
+	MarkBlockRangeClean(start LogicalBlock, length uint) error
 }
 
 type BlockDeviceReaderWriter interface {
@@ -64,8 +77,8 @@ type BlockDeviceResizer interface {
 	// is increased, new, null-filled blocks are appended to the end. If the
 	// size decreases, blocks are removed from the end.
 	//
-	// Because this operates at the block device level, resizing can damage the
-	// file system on the device (if any).
+	// Because this operates at the block level, resizing may damage a file
+	// system on the device.
 	Resize(newTotalBlocks uint) error
 }
 
