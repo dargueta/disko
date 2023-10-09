@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"io"
 	"time"
 
 	"github.com/boljen/go-bitmap"
@@ -46,7 +45,6 @@ type UnixV1Driver struct {
 	blockFreeMap      bitmap.Bitmap
 	inodes            []Inode
 	isMounted         bool
-	rawStream         io.ReadWriteSeeker
 	image             c.DiskImage
 	currentMountFlags disko.MountFlags
 }
@@ -60,17 +58,22 @@ func DeserializeTimestamp(tstamp uint32) time.Time {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Implementing DriverImplementer interface
-// [x] Mount
-// [x] Unmount
-// [ ] CreateObject
-// [ ] GetObject
-// [ ] GetRootDirectory
-// [x] FSStat
-// [ ] GetFSFeatures
-// [x] FormatImage
-// [ ] SetBootCode
-// [ ] GetBootCode
+// FileSystemImplementer
+//     [x] Mount
+//     [x] Unmount
+//     [ ] CreateObject
+//     [ ] GetObject
+//     [ ] GetRootDirectory
+//     [x] FSStat
+//     [ ] GetFSFeatures
+// FormatImageImplementer
+//     [x] FormatImage
+// HardLinkImplementer
+//     [ ] CreateHardLink
+// BootCodeImplementer
+//     [ ] SetBootCode
+//     [ ] GetBootCode
+// VolumeLabelImplementer (No)
 
 func (driver *UnixV1Driver) Mount(
 	image *blockcache.BlockCache,
@@ -87,23 +90,30 @@ func (driver *UnixV1Driver) Mount(
 
 	// Wrap the block device with a stream for ease of reading the stuff in it.
 	// For our current purposes we only need the boot block.
-	bootSectorSlice, err := image.GetSlice(0, 1)
+	superblockBytes := make([]byte, 1024)
+	_, err := image.ReadAt(superblockBytes[:], c.LogicalBlock(0))
 	if err != nil {
-		return disko.ErrIOFailed.Wrap(err)
+		return disko.CastToDriverError(err)
 	}
-	rawStream := bytes.NewReader(bootSectorSlice)
+	sbReader := bytes.NewReader(superblockBytes)
 
 	// blockBitmapSize gives the size of the bitmap showing which blocks are in
 	// use, in bytes. It's always an even number.
 	var blockBitmapSize uint16
-	err = binary.Read(rawStream, binary.LittleEndian, &blockBitmapSize)
+	err = binary.Read(sbReader, binary.LittleEndian, &blockBitmapSize)
 	if err != nil {
 		return disko.ErrIOFailed.Wrap(err)
+	} else if blockBitmapSize%2 != 0 {
+		message := fmt.Sprintf(
+			"corruption detected: block bitmap length must be an even number,"+
+				" got %d",
+			blockBitmapSize,
+		)
+		return disko.ErrFileSystemCorrupted.WithMessage(message)
 	}
 
-	// blockBitmap is the actual bitmap.
 	blockBitmap := make([]byte, blockBitmapSize)
-	_, err = rawStream.Read(blockBitmap)
+	_, err = sbReader.Read(blockBitmap)
 	if err != nil {
 		return disko.ErrIOFailed.Wrap(err)
 	}
@@ -111,9 +121,16 @@ func (driver *UnixV1Driver) Mount(
 	// inodeBitmapSize is the size of the bitmap for which bitmaps are currently
 	// in use, in bytes. It also is always an even number.
 	var inodeBitmapSize uint16
-	err = binary.Read(rawStream, binary.LittleEndian, &inodeBitmapSize)
+	err = binary.Read(sbReader, binary.LittleEndian, &inodeBitmapSize)
 	if err != nil {
 		return disko.ErrIOFailed.Wrap(err)
+	} else if inodeBitmapSize%2 != 0 {
+		message := fmt.Sprintf(
+			"corruption detected: inode bitmap length must be an even number,"+
+				" got %d",
+			inodeBitmapSize,
+		)
+		return disko.ErrFileSystemCorrupted.WithMessage(message)
 	}
 
 	// Together, the bitmaps can't exceed 1000 bytes because there are 24 other
@@ -129,20 +146,35 @@ func (driver *UnixV1Driver) Mount(
 	}
 
 	inodeBitmap := make([]byte, inodeBitmapSize)
-	_, err = rawStream.Read(inodeBitmap)
+	_, err = sbReader.Read(inodeBitmap)
 	if err != nil {
 		return disko.ErrIOFailed.Wrap(err)
 	}
 
-	rawInodes := make([]RawInode, inodeBitmapSize*8)
-	err = binary.Read(rawStream, binary.LittleEndian, rawInodes[:])
+	totalInodes := uint(inodeBitmapSize) * 8
+	bytesPerInode := image.BytesPerBlock() / NumInodesPerBlock
+	inodeArraySize := totalInodes * bytesPerInode
+
+	// Read every single inode into memory. The superblock takes the first two
+	// sectors (0 and 1) so we start at 2.
+	inodeArrayBytes := make([]byte, inodeArraySize)
+	_, err = image.ReadAt(inodeArrayBytes[:], c.LogicalBlock(2))
 	if err != nil {
 		return disko.ErrIOFailed.Wrap(err)
 	}
 
-	driver.inodes = make([]Inode, inodeBitmapSize*8)
+	driver.inodes = make([]Inode, totalInodes)
 
-	// TODO (dargueta): Parse all raw inodes into processed ones
+	// Deserialize the inodes we read in.
+	iarrayReader := bytes.NewReader(inodeArrayBytes)
+	inodeBytes := make([]byte, bytesPerInode)
+
+	for i := 0; i < int(totalInodes); i++ {
+		iarrayReader.Read(inodeBytes)
+		// The first inode stored on disk is 41. 1-40 are reserved for "special
+		// files" according to the documentation.
+		driver.inodes[i] = BytesToInode(Inumber(i+41), inodeBytes)
+	}
 
 	driver.image = image
 	driver.isMounted = true

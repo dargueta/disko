@@ -1,6 +1,8 @@
 package unixv1
 
 import (
+	"bytes"
+	"encoding/binary"
 	"os"
 	"time"
 
@@ -51,6 +53,14 @@ func RawInodeToInode(inumber Inumber, raw RawInode) Inode {
 			LastModified: fsEpoch.Add(time.Second * time.Duration(raw.LastModifiedTime)),
 		},
 	}
+}
+
+func BytesToInode(inumber Inumber, data []byte) Inode {
+	var raw RawInode
+
+	reader := bytes.NewReader(data)
+	binary.Read(reader, binary.LittleEndian, &raw)
+	return RawInodeToInode(inumber, raw)
 }
 
 func InodeToRawInode(inode Inode) (Inumber, RawInode) {
