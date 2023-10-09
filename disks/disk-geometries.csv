@@ -10,6 +10,7 @@
 "IBM 53FD (1212kB)","ibm_53fd_1212k",1977,"8""",1,8,1024,8,74,1,2,"Does NOT include index cylinders"
 "DEC RX01","dec_rx01",1975,"8""",1,8,128,26,77,0,1,"http://avitech.com.au/?page_id=1008"
 "DEC RX02","dec_rx02",1978,"8""",1,8,256,26,77,0,1,"http://avitech.com.au/?page_id=1008"
+"DEC RK05","rk05",1974,"19""",1,16,256,12,200,3,2,"https://www.pdp8online.com/rk05/rk05.shtml"
 "IBM 3740","ibm_3740",1973,"8""",1,8,128,26,73,0,1,
 "MS-DOS 8"" SS SD","msdos_8in_ss_sd",1981,"8""",1,8,128,26,77,0,1,"Release year is a guess"
 "MS-DOS 8"" DS SD","msdos_8in_ds_sd",1981,"8""",1,8,128,26,77,0,2,"Release year is a guess"
