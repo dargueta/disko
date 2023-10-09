@@ -382,7 +382,7 @@ func (d Dirent) ModTime() time.Time { return d.GetLastModifiedAt() }
 
 func (d Dirent) IsDir() bool { return d.mode.IsDir() }
 
-func (d Dirent) Sys() interface{} { return d.stat }
+func (d Dirent) Sys() any { return d.stat }
 
 func (d Dirent) Stat() disko.FileStat { return d.stat }
 

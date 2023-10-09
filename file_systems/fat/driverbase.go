@@ -30,7 +30,7 @@ type FATDriverCommon interface {
 
 type FATDriver struct {
 	fs       FATDriverCommon
-	diskFile interface{}
+	diskFile any
 }
 
 func (drv *FATDriver) getFirstSectorOfCluster(cluster ClusterID) (SectorID, error) {
