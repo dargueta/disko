@@ -158,7 +158,7 @@ type HardLinkImplementer interface {
 	//	- `source` will never be a directory.
 	//	- `targetParentDir` will always be an existing directory.
 	//
-	// A thoroug explanation for why hard links are disallowed for directories
+	// A thorough explanation for why hard links are disallowed for directories
 	// can be found here: https://askubuntu.com/a/525129
 	CreateHardLink(
 		source ObjectHandle,
