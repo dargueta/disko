@@ -44,6 +44,7 @@ var fsEpoch time.Time = time.Date(1971, 1, 1, 0, 0, 0, 0, nil)
 type UnixV1Driver struct {
 	blockFreeMap      bitmap.Bitmap
 	inodes            []Inode
+	specialInodes     [40]Inode
 	isMounted         bool
 	image             c.DiskImage
 	currentMountFlags disko.MountFlags
@@ -65,7 +66,7 @@ func DeserializeTimestamp(tstamp uint32) time.Time {
 //     [ ] GetObject
 //     [ ] GetRootDirectory
 //     [x] FSStat
-//     [ ] GetFSFeatures
+//     [x] GetFSFeatures
 // FormatImageImplementer
 //     [x] FormatImage
 // HardLinkImplementer
@@ -220,5 +221,23 @@ func (driver *UnixV1Driver) FSStat() disko.FSStat {
 		Files:           totalFiles,
 		FilesFree:       uint64(len(driver.inodes)),
 		MaxNameLength:   8,
+	}
+}
+
+func (driver *UnixV1Driver) GetFSFeatures() disko.FSFeatures {
+	return disko.FSFeatures{
+		HasCreatedTime:      true,
+		HasDirectories:      true,
+		HasHardLinks:        true,
+		HasUnixPermissions:  true,
+		HasUserPermissions:  true,
+		HasUserID:           true,
+		TimestampEpoch:      fsEpoch,
+		DefaultNameEncoding: "ascii",
+		DefaultBlockSize:    512,
+		SupportsBootCode:    true,
+		MaxBootCodeSize:     32768,
+		MinTotalBlocks:      int64(66 + len(driver.inodes)/NumInodesPerBlock),
+		MaxTotalBlocks:      65536,
 	}
 }
