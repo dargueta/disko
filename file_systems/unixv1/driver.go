@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/boljen/go-bitmap"
@@ -39,7 +40,7 @@ const RawDefaultDirectoryPermissions = FlagFileAllocated | FlagIsDirectory |
 const CanonicalDefaultDirectoryPermissions = disko.S_IFDIR | disko.S_IRUSR |
 	disko.S_IWUSR | disko.S_IRGRP | disko.S_IROTH
 
-var fsEpoch time.Time = time.Date(1971, 1, 1, 0, 0, 0, 0, nil)
+var fsEpoch time.Time = time.Date(1971, 1, 1, 0, 0, 0, 0, time.UTC)
 
 type UnixV1Driver struct {
 	blockFreeMap      bitmap.Bitmap
@@ -61,6 +62,7 @@ func DeserializeTimestamp(tstamp uint32) time.Time {
 ////////////////////////////////////////////////////////////////////////////////
 // FileSystemImplementer
 //     [x] Mount
+//     [ ] Flush
 //     [x] Unmount
 //     [ ] CreateObject
 //     [ ] GetObject
@@ -76,8 +78,17 @@ func DeserializeTimestamp(tstamp uint32) time.Time {
 //     [ ] GetBootCode
 // VolumeLabelImplementer (No)
 
+func NewDriverFromStream(stream io.ReadWriteSeeker) UnixV1Driver {
+	return UnixV1Driver{
+		image: blockcache.WrapStreamWithInferredSize(stream, 512, false)}
+}
+
+func NewDriverFromStreamWithNumBlocks(stream io.ReadWriteSeeker, totalBlocks uint) UnixV1Driver {
+	return UnixV1Driver{
+		image: blockcache.WrapStream(stream, 512, totalBlocks, false)}
+}
+
 func (driver *UnixV1Driver) Mount(
-	image *blockcache.BlockCache,
 	flags disko.MountFlags,
 ) disko.DriverError {
 	if driver.isMounted {
@@ -92,10 +103,14 @@ func (driver *UnixV1Driver) Mount(
 	// Wrap the block device with a stream for ease of reading the stuff in it.
 	// For our current purposes we only need the boot block.
 	superblockBytes := make([]byte, 1024)
-	_, err := image.ReadAt(superblockBytes[:], c.LogicalBlock(0))
+	nRead, err := driver.image.ReadAt(superblockBytes[:], c.LogicalBlock(0))
 	if err != nil {
 		return disko.CastToDriverError(err)
+	} else if nRead != 1024 {
+		return disko.ErrIOFailed.WithMessage(fmt.Sprintf("read failed: expected 1024B, got %d", nRead))
 	}
+
+	fmt.Printf("SUPERBLOCK (FIRST 32): %+v\n", superblockBytes[:32])
 	sbReader := bytes.NewReader(superblockBytes)
 
 	// blockBitmapSize gives the size of the bitmap showing which blocks are in
@@ -153,13 +168,13 @@ func (driver *UnixV1Driver) Mount(
 	}
 
 	totalInodes := uint(inodeBitmapSize) * 8
-	bytesPerInode := image.BytesPerBlock() / NumInodesPerBlock
+	bytesPerInode := driver.image.BytesPerBlock() / NumInodesPerBlock
 	inodeArraySize := totalInodes * bytesPerInode
 
 	// Read every single inode into memory. The superblock takes the first two
 	// sectors (0 and 1) so we start at 2.
 	inodeArrayBytes := make([]byte, inodeArraySize)
-	_, err = image.ReadAt(inodeArrayBytes[:], c.LogicalBlock(2))
+	_, err = driver.image.ReadAt(inodeArrayBytes[:], c.LogicalBlock(2))
 	if err != nil {
 		return disko.ErrIOFailed.Wrap(err)
 	}
@@ -177,7 +192,6 @@ func (driver *UnixV1Driver) Mount(
 		driver.inodes[i] = BytesToInode(Inumber(i+41), inodeBytes)
 	}
 
-	driver.image = image
 	driver.isMounted = true
 	return nil
 }
@@ -199,6 +213,9 @@ func (driver *UnixV1Driver) Unmount() disko.DriverError {
 }
 
 func (driver *UnixV1Driver) FSStat() disko.FSStat {
+	// The brute-force way to get the amount of free space is to iterate through
+	// the free map and count the number of unallocated blocks. We could do this
+	// via math but eh.
 	freeBlocks := uint64(0)
 	for i := 0; i < int(driver.image.TotalBlocks()); i++ {
 		if driver.blockFreeMap.Get(i) {
@@ -206,10 +223,10 @@ func (driver *UnixV1Driver) FSStat() disko.FSStat {
 		}
 	}
 
-	totalFiles := uint64(0)
+	totalAllocatedFiles := uint64(0)
 	for _, inode := range driver.inodes {
 		if inode.IsAllocated() {
-			totalFiles++
+			totalAllocatedFiles++
 		}
 	}
 
@@ -217,9 +234,9 @@ func (driver *UnixV1Driver) FSStat() disko.FSStat {
 		BlockSize:       512,
 		TotalBlocks:     uint64(driver.image.TotalBlocks()),
 		BlocksFree:      freeBlocks,
-		BlocksAvailable: uint64(driver.image.TotalBlocks()) - freeBlocks,
-		Files:           totalFiles,
-		FilesFree:       uint64(len(driver.inodes)),
+		BlocksAvailable: freeBlocks,
+		Files:           totalAllocatedFiles,
+		FilesFree:       uint64(len(driver.inodes)) - totalAllocatedFiles,
 		MaxNameLength:   8,
 	}
 }
@@ -237,7 +254,7 @@ func (driver *UnixV1Driver) GetFSFeatures() disko.FSFeatures {
 		DefaultBlockSize:    512,
 		SupportsBootCode:    true,
 		MaxBootCodeSize:     32768,
-		MinTotalBlocks:      int64(66 + len(driver.inodes)/NumInodesPerBlock),
-		MaxTotalBlocks:      65536,
+		MinTotalBlocks:      66,
+		MaxTotalBlocks:      8000,
 	}
 }
