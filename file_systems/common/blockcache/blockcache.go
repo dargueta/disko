@@ -13,6 +13,7 @@ import (
 	"github.com/boljen/go-bitmap"
 	"github.com/dargueta/disko"
 	c "github.com/dargueta/disko/file_systems/common"
+	"github.com/xaionaro-go/bytesextra"
 )
 
 // FetchBlockCallback is a pointer to a function that writes the contents of a
@@ -163,6 +164,23 @@ func WrapStream(
 	}
 
 	return New(bytesPerBlock, totalBlocks, fetchCb, flushCb, resizeCb)
+}
+
+func WrapStreamWithInferredSize(
+	stream io.ReadWriteSeeker,
+	bytesPerBlock uint,
+	allowResize bool,
+) *BlockCache {
+	// TODO (dargueta): Should we ignore seeking errors?
+	eofOffset, _ := stream.Seek(0, io.SeekEnd)
+	totalBlocks := uint(eofOffset) / bytesPerBlock
+	stream.Seek(0, io.SeekStart)
+	return WrapStream(stream, bytesPerBlock, totalBlocks, allowResize)
+}
+
+func WrapSlice(storage []byte, bytesPerBlock uint) *BlockCache {
+	stream := bytesextra.NewReadWriteSeeker(storage)
+	return WrapStream(stream, bytesPerBlock, uint(len(storage))/bytesPerBlock, false)
 }
 
 // seekToBlock sets the stream pointer for a stream to the offset of a block.

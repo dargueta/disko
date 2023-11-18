@@ -9,6 +9,7 @@ require (
 	github.com/noxer/bytewriter v1.0.0
 	github.com/stretchr/testify v1.8.4
 	github.com/urfave/cli/v2 v2.25.7
+	github.com/xaionaro-go/bytesextra v0.0.0-20220103144954-846e454ddea9
 )
 
 require (
