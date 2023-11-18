@@ -81,14 +81,24 @@ type FileSystemImplementer interface {
 	// Mount initializes the file system implementation with access settings.
 	Mount(flags MountFlags) DriverError
 
+	// Flush writes out all pending changes to the disk image. The file system
+	// must be left in a valid state once this is finished. Files and file
+	// handles *may* be open when this is called, so implementations must
+	// ensure these remain in a usable state.
+	//
+	// The following guarantees apply:
+	//
+	// 	- This will only be called if [Mount] returned successfully.
+	Flush() DriverError
+
 	// Unmount writes out all pending changes to the disk image and releases any
 	// resources the implementation may be holding.
 	//
 	// The following guarantees apply:
 	//
-	// 	- This will only be called if [Mount] returned successfully.
+	//  - [Flush] will always be called before this.
 	//	- There will be no open files or other handles (directory traversers, etc.)
-	//	  and all changes will have been flushed.
+	//	  when this is called.
 	Unmount() DriverError
 
 	// CreateObject creates an object on the file system, such as a file or

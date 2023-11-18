@@ -237,7 +237,11 @@ func (driver *BaseDriver) OpenFile(
 		)
 	}
 
-	object, err := driver.getObjectAtPathFollowingLink(absPath)
+	var object extObjectHandle
+	var parentObject extObjectHandle
+	var err error
+
+	object, err = driver.getObjectAtPathFollowingLink(absPath)
 	if err != nil {
 		// An error occurred. If the file is missing we may be able to create it
 		// and proceed.
@@ -248,7 +252,7 @@ func (driver *BaseDriver) OpenFile(
 				// parent directory, then call CreateObject() for the file in
 				// that directory.
 				parentDir, baseName := posixpath.Split(absPath)
-				parentObject, err := driver.getObjectAtPathFollowingLink(parentDir)
+				parentObject, err = driver.getObjectAtPathFollowingLink(parentDir)
 				if err != nil {
 					// Parent directory doesn't exist
 					return File{}, err

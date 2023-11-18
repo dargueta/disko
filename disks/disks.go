@@ -12,7 +12,7 @@ import (
 // Formatter options
 
 type BasicFormatterOptions interface {
-	Metadata() interface{}
+	Metadata() any
 	TotalSizeBytes() int64
 }
 

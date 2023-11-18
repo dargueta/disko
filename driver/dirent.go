@@ -51,6 +51,6 @@ func (dirent DirectoryEntry) ModTime() time.Time {
 	return dirent.stat.LastModified
 }
 
-func (dirent DirectoryEntry) Sys() interface{} {
+func (dirent DirectoryEntry) Sys() any {
 	return dirent.stat
 }
