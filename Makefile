@@ -1,23 +1,29 @@
 BINDIR := bin
-DRIVER_BASE_DIR := drivers
+
+DISKO_BIN = $(BINDIR)/disko
+ZIPIMAGE_BIN = $(BINDIR)/zipimage
+UNZIPIMAGE_BIN = $(BINDIR)/unzipimage
+
+COMPRESSION_SOURCES = $(wildcard utilities/compression/*.go)
 
 
-.PHONY: all
-all: $(BINDIR)/disko
+.PHONY: all cli disko zipimage unzipimage
 
-BASE_SOURCES = $(wildcard ./*.go)
-
-DRIVER_NAMES = common cpm fat fat8 lbr minix unixv1 unixv6 unixv10
-DRIVER_DIRECTORIES = $(addprefix drivers/,$(DRIVER_NAMES))
-ALL_DRIVER_SOURCES = $(foreach d,$(DRIVER_DIRECTORIES),$(wildcard $(d)/*.go))
-
-CLI_SOURCES = $(wildcard cmd/*.go)
-
-ALL_SOURCES = $(ALL_DRIVER_SOURCES) $(CLI_SOURCES) $(BASE_SOURCES)
+all: disko
+cli: disko zipimage unzipimage
+disko: $(DISKO_BIN)
+zipimage: $(ZIPIMAGE_BIN)
+unzipimage: $(UNZIPIMAGE_BIN)
 
 
-$(BINDIR)/disko: $(ALL_SOURCES) | $(BINDIR)
+$(DISKO_BIN): $(ALL_SOURCES) | $(BINDIR)
 	go build -v -o $@ ./...
+
+$(ZIPIMAGE_BIN): $(COMPRESSION_SOURCES) cmd/zipimage/main.go | $(BINDIR)
+	go build -v -o $@ ./cmd/zipimage
+
+$(UNZIPIMAGE_BIN): $(COMPRESSION_SOURCES) cmd/unzipimage/main.go | $(BINDIR)
+	go build -v -o $@ ./cmd/unzipimage
 
 
 $(BINDIR):
