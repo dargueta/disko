@@ -103,14 +103,13 @@ func (driver *UnixV1Driver) Mount(
 	// Wrap the block device with a stream for ease of reading the stuff in it.
 	// For our current purposes we only need the boot block.
 	superblockBytes := make([]byte, 1024)
-	nRead, err := driver.image.ReadAt(superblockBytes[:], c.LogicalBlock(0))
+	nRead, err := driver.image.ReadAt(superblockBytes, c.LogicalBlock(0))
 	if err != nil {
 		return disko.CastToDriverError(err)
 	} else if nRead != 1024 {
 		return disko.ErrIOFailed.WithMessage(fmt.Sprintf("read failed: expected 1024B, got %d", nRead))
 	}
 
-	fmt.Printf("SUPERBLOCK (FIRST 32): %+v\n", superblockBytes[:32])
 	sbReader := bytes.NewReader(superblockBytes)
 
 	// blockBitmapSize gives the size of the bitmap showing which blocks are in
@@ -174,7 +173,7 @@ func (driver *UnixV1Driver) Mount(
 	// Read every single inode into memory. The superblock takes the first two
 	// sectors (0 and 1) so we start at 2.
 	inodeArrayBytes := make([]byte, inodeArraySize)
-	_, err = driver.image.ReadAt(inodeArrayBytes[:], c.LogicalBlock(2))
+	_, err = driver.image.ReadAt(inodeArrayBytes, c.LogicalBlock(2))
 	if err != nil {
 		return disko.ErrIOFailed.Wrap(err)
 	}
