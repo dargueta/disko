@@ -83,6 +83,11 @@ func (e baseDiskoError) Wrap(err error) DriverError {
 	}
 }
 
+// NewError creates a new basic [DriverError] with the given message.
+func NewError(message string) DriverError {
+	return baseDiskoError(message)
+}
+
 // -----------------------------------------------------------------------------
 
 type customDriverError struct {
