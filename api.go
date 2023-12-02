@@ -289,6 +289,14 @@ type ObjectHandle interface {
 	//
 	// For a UNIX-like file system, this is equivalent to comparing the inumbers.
 	SameAs(other ObjectHandle) bool
+
+	// Close frees any resources associated with the handle, such as open file
+	// descriptors or temporary directories. The handle cannot be used after
+	// calling this method.
+	//
+	// 	- Closing a handle on a deleted object must not return an error.
+	//	- Subsequent calls should return [disko.ErrFileDescriptorBadState].
+	Close() error
 }
 
 // SupportsListDirHandle is an interface for an [ObjectHandle] that represents a
