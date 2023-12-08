@@ -3,12 +3,13 @@ package compression_test
 import (
 	"bytes"
 	"crypto/rand"
-	"errors"
 	"io"
 	"testing"
 
 	c "github.com/dargueta/disko/utilities/compression"
 	"github.com/noxer/bytewriter"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type RLE8TestCase struct {
@@ -88,15 +89,8 @@ func TestRLE8Decompress__MissingRepeatCount(t *testing.T) {
 	writer := bytewriter.New(decompressed)
 
 	_, err := c.DecompressRLE8(bytes.NewReader(data), writer)
-	if err == nil {
-		t.Fatal("read with missing repeat count should've failed but didn't")
-	}
-	if !errors.Is(err, io.ErrUnexpectedEOF) {
-		t.Errorf(
-			"error type is wrong, doesn't wrap io.ErrUnexpectedEOF: %s",
-			err.Error(),
-		)
-	}
+	assert.Error(t, err, "read with missing repeat count should've failed but didn't")
+	assert.ErrorIs(t, err, io.ErrUnexpectedEOF, "error should wrap io.ErrUnexpectedEOF")
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -109,26 +103,14 @@ func runCompressionTestCase(t *testing.T, test RLE8TestCase) {
 
 	n, err := c.CompressRLE8(inputBuffer, outputWriter)
 
-	if err != nil {
-		t.Errorf("unexpected error: %s", err.Error())
-		return
-	}
-
-	if n != int64(len(test.ExpectedOutput)) {
-		t.Errorf(
-			"bytes written should be %d, got %d",
-			len(test.ExpectedOutput),
-			n,
-		)
-	}
-
-	if !bytes.Equal(test.ExpectedOutput, outputBuffer[:n]) {
-		t.Errorf(
-			"output data is wrong: expected %q, got %q",
-			test.ExpectedOutput,
-			outputBuffer,
-		)
-	}
+	assert.NoError(t, err)
+	assert.EqualValues(t, len(test.ExpectedOutput), n, "# bytes written is wrong")
+	assert.Truef(
+		t,
+		bytes.Equal(test.ExpectedOutput, outputBuffer[:n]),
+		"output data is wrong: expected %q, got %q",
+		test.ExpectedOutput,
+		outputBuffer)
 }
 
 func runRoundTripTestCase(t *testing.T, originalData []byte) {
@@ -141,28 +123,18 @@ func runRoundTripTestCase(t *testing.T, originalData []byte) {
 	compressedWriter := bytewriter.New(compressedBuffer)
 
 	n, err := c.CompressRLE8(inputBuffer, compressedWriter)
-	if err != nil {
-		t.Fatalf("unexpected error while compressing: %s", err.Error())
-	} else {
-		t.Logf("compressed %d to %d", len(originalData), n)
-	}
+	require.NoError(t, err, "error while compressing")
 
+	t.Logf("compressed %d to %d", len(originalData), n)
 	outputBuffer := make([]byte, len(originalData))
 	outputWriter := bytewriter.New(outputBuffer)
 	compressedReader := bytes.NewReader(compressedBuffer[:n])
 
 	n, err = c.DecompressRLE8(compressedReader, outputWriter)
-	if err != nil {
-		t.Fatalf("unexpected error while decompressing: %s", err.Error())
-	}
-	if n != int64(len(originalData)) {
-		t.Errorf(
-			"returned decompressed size is wrong; expected %d, got %d",
-			len(originalData),
-			n,
-		)
-	}
-	if !bytes.Equal(originalData, outputBuffer) {
-		t.Error("decompressed data doesn't match original data")
-	}
+	assert.NoError(t, err, "error while decompressing")
+	assert.EqualValues(t, len(originalData), n, "returned decompressed size is wrong")
+	assert.True(
+		t,
+		bytes.Equal(originalData, outputBuffer),
+		"decompressed data doesn't match original")
 }

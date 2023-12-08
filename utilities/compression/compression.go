@@ -11,7 +11,7 @@ import (
 // CompressImage compresses a disk image using RLE8 and gzip.
 //
 // The returned int64 gives the number of bytes written to the output stream. If
-// an error occurred, the value is undefined and should not be used.
+// an error occurred, this value is undefined and should not be used.
 func CompressImage(input io.Reader, output io.Writer) (int64, error) {
 	// Because we have no way of getting the number of bytes written to the
 	// output stream from an io.Writer, we need to keep track of it ourselves.
