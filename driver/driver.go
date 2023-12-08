@@ -67,6 +67,8 @@ func (driver *BaseDriver) resolveSymlink(
 
 	for stat.IsSymlink() {
 		symlinkText, err := driver.getContentsOfObject(object)
+		object.Close()
+
 		if err != nil {
 			return nil,
 				err.WithMessage(
@@ -126,6 +128,7 @@ func (driver *BaseDriver) getObjectAtPathNoFollow(
 	if err != nil {
 		return nil, err
 	}
+	defer parentObject.Close()
 
 	parentStat := parentObject.Stat()
 	if !parentStat.IsDir() {
@@ -154,11 +157,13 @@ func (driver *BaseDriver) getObjectAtPathFollowingLink(
 
 	stat := object.Stat()
 	for stat.IsSymlink() {
-		object, err = driver.resolveSymlink(object)
+		nextObject, err := driver.resolveSymlink(object)
+		object.Close()
 		if err != nil {
 			return nil, err
 		}
-		stat = object.Stat()
+		stat = nextObject.Stat()
+		object = nextObject
 	}
 
 	return object, nil
@@ -257,11 +262,17 @@ func (driver *BaseDriver) OpenFile(
 					// Parent directory doesn't exist
 					return File{}, err
 				}
+
 				object, err = driver.createExtObject(
 					baseName,
 					parentObject,
 					perm,
 				)
+				parentObject.Close()
+
+				if err != nil {
+					return File{}, err
+				}
 			}
 			// Else: The file doesn't exist and we can't create it.
 		}
@@ -288,6 +299,8 @@ func (driver *BaseDriver) Chdir(path string) error {
 	if err != nil {
 		return err
 	}
+	defer object.Close()
+
 	return driver.chdirToObject(object)
 }
 
@@ -392,6 +405,8 @@ func (driver *BaseDriver) ReadFile(path string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer object.Close()
+
 	return driver.getContentsOfObject(object)
 }
 
@@ -408,6 +423,8 @@ func (driver *BaseDriver) Stat(path string) (disko.FileStat, error) {
 	if err != nil {
 		return disko.FileStat{}, err
 	}
+	defer object.Close()
+
 	return object.Stat(), nil
 }
 
@@ -418,6 +435,8 @@ func (driver *BaseDriver) ReadDir(path string) ([]disko.DirectoryEntry, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer directory.Close()
+
 	return driver.readDir(directory)
 }
 
@@ -444,6 +463,7 @@ func (driver *BaseDriver) readDir(
 
 		dirent := NewDirectoryEntryFromHandle(direntObject)
 		output = append(output, dirent)
+		direntObject.Close()
 	}
 
 	return output, nil
@@ -491,6 +511,7 @@ func (driver *BaseDriver) Readlink(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	defer object.Close()
 
 	stat := object.Stat()
 	if !stat.IsSymlink() {
@@ -512,14 +533,17 @@ func (driver *BaseDriver) Lstat(path string) (disko.FileStat, error) {
 	if err != nil {
 		return disko.FileStat{}, err
 	}
+	defer object.Close()
 
 	// Unconditionally try to resolve `object` as a symlink. If it isn't one,
 	// nothing happens and we get `object` back.
-	object, err = driver.resolveSymlink(object)
+	realObject, err := driver.resolveSymlink(object)
 	if err != nil {
 		return disko.FileStat{}, err
 	}
-	return object.Stat(), nil
+	defer realObject.Close()
+
+	return realObject.Stat(), nil
 }
 
 // Create creates a file and opens it for reading and writing. It fails if the
@@ -566,6 +590,7 @@ func (driver *BaseDriver) Remove(path string) error {
 	if err != nil {
 		return err
 	}
+	defer object.Close()
 
 	stat := object.Stat()
 	if stat.IsDir() {
@@ -602,6 +627,7 @@ func (driver *BaseDriver) Truncate(path string) error {
 	if err != nil {
 		return err
 	}
+	defer object.Close()
 
 	stat := object.Stat()
 	if stat.IsDir() {
@@ -644,6 +670,7 @@ func (driver *BaseDriver) Mkdir(path string, perm os.FileMode) error {
 	if err != nil {
 		return err
 	}
+	defer parentObject.Close()
 
 	parentStat := parentObject.Stat()
 	if !parentStat.IsDir() {
@@ -656,7 +683,10 @@ func (driver *BaseDriver) Mkdir(path string, perm os.FileMode) error {
 		)
 	}
 
-	_, err = driver.implementation.CreateObject(baseName, parentObject, perm)
+	object, err := driver.implementation.CreateObject(baseName, parentObject, perm)
+	if err == nil {
+		object.Close()
+	}
 	return err
 }
 
@@ -679,8 +709,12 @@ func (driver *BaseDriver) MkdirAll(path string, perm os.FileMode) error {
 			return err
 		}
 	}
+	defer parentObject.Close()
 
-	_, err = driver.implementation.CreateObject(baseName, parentObject, perm)
+	object, err := driver.implementation.CreateObject(baseName, parentObject, perm)
+	if err == nil {
+		object.Close()
+	}
 	return err
 }
 
@@ -690,6 +724,7 @@ func (driver *BaseDriver) RemoveAll(path string) error {
 	if err != nil {
 		return err
 	}
+	defer directory.Close()
 
 	stat := directory.Stat()
 	if !stat.IsDir() {
@@ -735,14 +770,17 @@ func (driver *BaseDriver) removeDirectory(directory extObjectHandle) error {
 		if direntStat.IsDir() {
 			absPath := posixpath.Join(directory.AbsolutePath(), name)
 			wrappedDirent := wrapObjectHandle(dirent, absPath)
+
 			rmErr := driver.removeDirectory(wrappedDirent)
 			if rmErr != nil {
+				dirent.Close()
 				return rmErr
 			}
 		}
 
 		// Delete the file or empty directory.
 		err = dirent.Unlink()
+		dirent.Close()
 		if err != nil {
 			return err
 		}

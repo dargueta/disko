@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/dargueta/disko"
+	"github.com/stretchr/testify/require"
 )
 
 //go:embed testdata/empty-floppy.img
@@ -33,34 +34,28 @@ func FirstDifference(left, right []byte) int {
 
 func ValidateImage(t *testing.T, totalBlocks, sectorsPerTrack uint, expectedImage []byte) {
 	totalBytes := totalBlocks * 128
-	if len(expectedImage) != int(totalBytes) {
-		t.Fatalf(
-			"Embedded test data is wrong: image should be %d bytes, got %d",
-			totalBytes,
-			len(expectedImage),
-		)
-	}
+	require.EqualValuesf(
+		t,
+		len(expectedImage),
+		totalBytes,
+		"embedded test data is wrong: image should be %d bytes, got %d",
+		totalBytes,
+		len(expectedImage))
 
 	tmpFile, err := os.CreateTemp("", "")
-	if err != nil {
-		t.Fatalf("Failed to create temporary file: %v", err)
-	}
+	require.NoError(t, err, "failed to create temporary file")
 	defer tmpFile.Close()
 
 	driver := NewDriverFromFile(tmpFile)
 	err = driver.Format(disko.FSStat{TotalBlocks: uint64(totalBlocks)})
-	if err != nil {
-		t.Fatalf("Formatting failed: %s", err.Error())
-	}
+	require.NoError(t, err, "formatting the image failed")
 
 	imageContents := make([]byte, totalBytes)
 	bytesRead, err := tmpFile.ReadAt(imageContents, 0)
-	if err != nil && err != io.EOF {
-		t.Fatalf("Failed to read image file: %s", err.Error())
+	if err != nil {
+		require.ErrorIs(t, err, io.EOF, "failed to read the image file")
 	}
-	if uint(bytesRead) != totalBytes {
-		t.Fatalf("Image size is wrong; expected %d, got %d", totalBytes, bytesRead)
-	}
+	require.EqualValues(t, totalBytes, bytesRead, "image size is wrong")
 
 	// Iterate sector by sector and show an error message for each sector that
 	// differs from expected.

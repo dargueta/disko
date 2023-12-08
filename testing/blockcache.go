@@ -8,6 +8,8 @@ import (
 	"github.com/dargueta/disko"
 	c "github.com/dargueta/disko/file_systems/common"
 	"github.com/dargueta/disko/file_systems/common/blockcache"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Create an image with the given number of blocks and bytes per block. It is
@@ -16,14 +18,13 @@ func CreateRandomImage(bytesPerBlock, totalBlocks uint, t *testing.T) []byte {
 	backingData := make([]byte, bytesPerBlock*totalBlocks)
 
 	_, err := rand.Read(backingData)
-	if err != nil {
-		t.Fatalf(
-			"failed to initialize %d blocks of size %d with random bytes: %s",
-			totalBlocks,
-			bytesPerBlock,
-			err.Error(),
-		)
-	}
+	require.NoErrorf(
+		t,
+		err,
+		"failed to initialize %d blocks of size %d with random bytes",
+		totalBlocks,
+		bytesPerBlock,
+	)
 	return backingData
 }
 
@@ -105,15 +106,7 @@ func CreateDefaultCache(
 	cache := blockcache.New(
 		bytesPerBlock, totalBlocks, fetchCallback, flushCallback, nil,
 	)
-	if cache.BytesPerBlock() != bytesPerBlock {
-		t.Errorf(
-			"wrong bytes per block: %d != %d", cache.BytesPerBlock(), bytesPerBlock,
-		)
-	}
-
-	if cache.TotalBlocks() != totalBlocks {
-		t.Errorf("wrong total blocks: %d != %d", cache.TotalBlocks(), totalBlocks)
-	}
-
+	assert.EqualValues(t, bytesPerBlock, cache.BytesPerBlock(), "wrong bytes per block")
+	assert.EqualValues(t, totalBlocks, cache.TotalBlocks(), "wrong total blocks")
 	return cache
 }

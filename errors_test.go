@@ -5,23 +5,14 @@ import (
 	"testing"
 
 	"github.com/dargueta/disko"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDiskoErrorWithMessage(t *testing.T) {
 	newErr := disko.ErrBlockDeviceRequired.WithMessage("asdfqwerty")
-	expectedMessage := "Block device required: asdfqwerty"
-
-	if newErr.Error() != expectedMessage {
-		t.Errorf(
-			"error message is wrong: expected %q, got %q",
-			expectedMessage,
-			newErr.Error(),
-		)
-	}
-
-	if !errors.Is(newErr, disko.ErrBlockDeviceRequired) {
-		t.Error("error is wrapped improperly, Disko error not set as parent")
-	}
+	assert.Equal(
+		t, "Block device required: asdfqwerty", newErr.Error(), "error message is wrong")
+	assert.ErrorIs(t, newErr, disko.ErrBlockDeviceRequired)
 }
 
 func TestDiskoErrorWrap(t *testing.T) {
@@ -29,18 +20,7 @@ func TestDiskoErrorWrap(t *testing.T) {
 	newErr := disko.ErrExists.Wrap(originalErr)
 	expectedMessage := "File exists: original error"
 
-	if newErr.Error() != expectedMessage {
-		t.Errorf(
-			"error message is wrong: expected %q, got %q",
-			expectedMessage,
-			newErr.Error(),
-		)
-	}
-
-	if !errors.Is(newErr, originalErr) {
-		t.Error("error is wrapped improperly, original error not set as parent")
-	}
-	if !errors.Is(newErr, disko.ErrExists) {
-		t.Error("error is wrapped improperly, Disko error not set as parent")
-	}
+	assert.EqualValues(t, expectedMessage, newErr.Error(), "error message is wrong")
+	assert.ErrorIs(t, newErr, originalErr, "original error not set as parent")
+	assert.ErrorIs(t, newErr, disko.ErrExists, "Disko error not set as parent")
 }

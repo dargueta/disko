@@ -9,6 +9,8 @@ import (
 	"github.com/dargueta/disko"
 	"github.com/dargueta/disko/file_systems/common/basicstream"
 	diskotest "github.com/dargueta/disko/testing"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // SeekInfo is a struct useful for testing seeking in  a stream using relative
@@ -23,62 +25,41 @@ type SeekInfo struct {
 func TestBasicStreamNew__Basic(t *testing.T) {
 	cache := diskotest.CreateDefaultCache(128, 256, false, nil, t)
 	stream, err := basicstream.New(cache.Size(), cache, disko.O_RDONLY)
-	if err != nil {
-		t.Fatalf("couldn't create stream: %s", err.Error())
-	}
+	require.NoError(t, err, "couldn't create stream")
 
 	rawExpectedData, err := cache.Data()
-	if err != nil {
-		t.Fatalf("failed to get cache data as slice: %s", err.Error())
-	}
+	require.NoError(t, err, "failed to get cache data as slice")
 
 	streamData := make([]byte, cache.Size())
 	n, err := stream.Read(streamData)
-	if n != int(cache.Size()) {
-		t.Errorf(
-			"read wrong number of bytes from stream: expected %d bytes, got %d",
-			cache.Size(),
-			n,
-		)
-	}
-	if err != nil {
-		t.Fatalf("failed to read entire stream contents: %s", err.Error())
-	}
-	if !bytes.Equal(rawExpectedData, streamData) {
-		t.Error("data read from stream is not equal to the expected raw data")
-	}
+
+	require.NoError(t, err, "failed to read entire stream contents")
+	assert.EqualValues(t, cache.Size(), n, "read wrong number of bytes from stream")
+	assert.True(
+		t,
+		bytes.Equal(rawExpectedData, streamData),
+		"data read from stream is not equal to the expected raw data")
 }
 
 // Read less than one block (ensures rounding is correct)
 func TestBasicStreamNew__LessThanOneBlock(t *testing.T) {
 	cache := diskotest.CreateDefaultCache(128, 16, false, nil, t)
 	stream, err := basicstream.New(cache.Size(), cache, disko.O_RDONLY)
-	if err != nil {
-		t.Fatalf("couldn't create stream: %s", err.Error())
-	}
+	require.NoError(t, err, "couldn't create stream")
 
 	rawExpectedData, err := cache.GetSlice(0, 1)
-	if err != nil {
-		t.Fatalf("failed to get cache data as slice: %s", err.Error())
-	}
+	require.NoError(t, err, "failed to get cache data as slice")
 
 	const readSize = 39
 
 	streamData := make([]byte, readSize)
 	n, err := stream.Read(streamData)
-	if n != int(39) {
-		t.Errorf(
-			"read wrong number of bytes from stream: expected %d bytes, got %d",
-			readSize,
-			n,
-		)
-	}
-	if err != nil {
-		t.Fatalf("failed to read %d bytes from stream: %s", readSize, err.Error())
-	}
-	if !bytes.Equal(rawExpectedData[:readSize], streamData) {
-		t.Error("data read from stream is not equal to the expected raw data")
-	}
+	require.NoErrorf(t, err, "failed to read %d bytes from stream", readSize)
+	assert.EqualValues(t, 39, n, "read wrong number of bytes from stream")
+	assert.True(
+		t,
+		bytes.Equal(rawExpectedData[:readSize], streamData),
+		"data read from stream is not equal to the expected raw data")
 }
 
 // Read various sizes at various offsets from the beginning of the stream. This
@@ -86,9 +67,7 @@ func TestBasicStreamNew__LessThanOneBlock(t *testing.T) {
 func TestBasicStream__SeekStart(t *testing.T) {
 	cache := diskotest.CreateDefaultCache(128, 16, false, nil, t)
 	stream, err := basicstream.New(cache.Size(), cache, disko.O_RDONLY)
-	if err != nil {
-		t.Fatalf("failed to create stream: %s", err.Error())
-	}
+	require.NoError(t, err, "failed to create stream")
 
 	byteOffsets := []int64{
 		// Beginning of the stream
@@ -136,9 +115,7 @@ func TestBasicStream__SeekStart(t *testing.T) {
 func TestBasicStream__SeekJumpingAround(t *testing.T) {
 	cache := diskotest.CreateDefaultCache(128, 8, false, nil, t)
 	stream, err := basicstream.New(cache.Size(), cache, disko.O_RDONLY)
-	if err != nil {
-		t.Fatalf("failed to create stream: %s", err.Error())
-	}
+	require.NoError(t, err, "failed to create stream")
 
 	seeks := []SeekInfo{
 		{
@@ -192,9 +169,7 @@ func TestBasicStream__SeekJumpingAround(t *testing.T) {
 
 	for _, seek := range seeks {
 		_, err := doCheckedSeek(stream, seek, t)
-		if err != nil {
-			t.Error(err)
-		}
+		assert.NoError(t, err)
 	}
 }
 
@@ -233,8 +208,8 @@ func checkStreamRead(
 	t *testing.T,
 ) {
 	where, err := doCheckedSeek(stream, seek, t)
+	assert.NoError(t, err)
 	if err != nil {
-		t.Error(err.Error())
 		return
 	}
 
@@ -242,26 +217,17 @@ func checkStreamRead(
 
 	buffer := make([]byte, readSize)
 	n, err := stream.Read(buffer)
-	if err != nil {
-		t.Errorf(
-			"failed to read %d bytes from absolute offset %d: %s",
-			readSize,
-			where,
-			err.Error(),
-		)
-	} else if n != readSize {
-		t.Errorf(
-			"wrong read size: expected %d bytes, got %d",
-			readSize,
-			n,
-		)
-	}
-
-	if !bytes.Equal(expectedData, buffer) {
-		t.Errorf(
-			"%d bytes read at offset %d don't match expected data",
-			n,
-			where,
-		)
-	}
+	assert.NoErrorf(
+		t,
+		err,
+		"failed to read %d bytes from absolute offset %d: %s",
+		readSize,
+		where)
+	assert.EqualValues(t, readSize, n, "read wrong number of bytes")
+	assert.Truef(
+		t,
+		bytes.Equal(expectedData, buffer),
+		"%d bytes read at offset %d don't match expected data",
+		n,
+		where)
 }
