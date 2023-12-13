@@ -304,9 +304,9 @@ func (cache *BlockCache) loadBlockRange(start c.LogicalBlock, count uint) error 
 		err = cache.fetch(c.LogicalBlock(blockIndex), buffer)
 		if err != nil {
 			return fmt.Errorf(
-				"failed to load block %d from source: %s",
+				"failed to load block %d from source: %w",
 				blockIndex,
-				err.Error(),
+				err,
 			)
 		}
 
@@ -342,7 +342,7 @@ func (cache *BlockCache) flushBlockRange(start c.LogicalBlock, count uint) error
 		err = cache.flush(c.LogicalBlock(blockIndex), buffer)
 		if err != nil {
 			return fmt.Errorf(
-				"failed to flush block %d to storage: %s", blockIndex, err.Error(),
+				"failed to flush block %d to storage: %w", blockIndex, err,
 			)
 		}
 
