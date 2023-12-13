@@ -193,35 +193,35 @@ func TestBasicStream__ReadBasic(t *testing.T) {
 	// If one byte is remaining then the read size will be 0 and we'll get stuck
 	// in an infinite loop. Thus, we need to stop when there's only one byte left,
 	// not 0.
+	iterationNumber := 0
 	for bytesRead < 511 {
 		readSize := rand.Int() % bytesRemaining
 		buffer := make([]byte, readSize)
 
 		n, readErr := stream.Read(buffer)
-		if readSize == bytesRemaining {
-			assert.ErrorIs(t, readErr, io.EOF)
-		} else {
-			assert.NoErrorf(
-				t,
-				readErr,
-				"read failed (tried=%; remaining=%d; tell=%d; returned N=%d)",
-				readSize,
-				bytesRemaining,
-				stream.Tell(),
-				n)
-		}
+		require.NoErrorf(
+			t,
+			readErr,
+			"read failed (tried=%; remaining=%d; tell=%d; actual=%d; iteration=%d)",
+			readSize,
+			bytesRemaining,
+			stream.Tell(),
+			n,
+			iterationNumber)
 
 		assert.Equal(t, readSize, n, "read wrong # of bytes")
 		assert.Equal(t, int64(bytesRead+n), stream.Tell(), "fpos is wrong")
 		require.Truef(
 			t,
 			bytes.Equal(buffer, data[bytesRead:bytesRead+n]),
-			"data read is wrong\nexpected: %v\ngot %v",
+			"data read is wrong on iteration %d\nexpected: %v\ngot %v",
+			iterationNumber,
 			data[bytesRead:bytesRead+n],
 			buffer)
 
 		bytesRead += n
 		bytesRemaining -= n
+		iterationNumber++
 	}
 
 	assert.EqualValues(t, 511, bytesRead)

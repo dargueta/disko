@@ -78,7 +78,9 @@ func (stream *BasicStream) Close() error {
 // Read implements [io.Reader].
 func (stream *BasicStream) Read(buffer []byte) (int, error) {
 	totalRead, err := stream.ReadAt(buffer, stream.position)
-	stream.position += int64(totalRead)
+	if err == nil {
+		stream.position += int64(totalRead)
+	}
 	return totalRead, err
 }
 
