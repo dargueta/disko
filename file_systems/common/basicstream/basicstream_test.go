@@ -187,33 +187,45 @@ func TestBasicStream__ReadBasic(t *testing.T) {
 
 	assert.EqualValues(t, 0, stream.Tell(), "Tell() at beginning of stream should be 0")
 
-	bytesRemaining := int64(512)
+	bytesRemaining := 512
+	bytesRead := 0
 
 	// If one byte is remaining then the read size will be 0 and we'll get stuck
 	// in an infinite loop. Thus, we need to stop when there's only one byte left,
 	// not 0.
-	for bytesRemaining > 1 {
-		bytesToRead := rand.Int63() % bytesRemaining
-		buffer := make([]byte, bytesToRead)
+	for bytesRead < 511 {
+		readSize := rand.Int() % bytesRemaining
+		buffer := make([]byte, readSize)
 
 		n, readErr := stream.Read(buffer)
-		if bytesToRead == bytesRemaining {
+		if readSize == bytesRemaining {
 			assert.ErrorIs(t, readErr, io.EOF)
 		} else {
 			assert.NoErrorf(
 				t,
 				readErr,
 				"read failed (tried=%; remaining=%d; tell=%d; returned N=%d)",
-				bytesToRead,
+				readSize,
 				bytesRemaining,
 				stream.Tell(),
 				n)
 		}
 
-		bytesRemaining -= int64(n)
-		assert.Equal(t, bytesToRead, int64(n), "read wrong # of bytes")
-		assert.Equal(t, 512-bytesRemaining, stream.Tell(), "fpos is wrong")
+		assert.Equal(t, readSize, n, "read wrong # of bytes")
+		assert.Equal(t, int64(bytesRead+n), stream.Tell(), "fpos is wrong")
+		require.Truef(
+			t,
+			bytes.Equal(buffer, data[bytesRead:bytesRead+n]),
+			"data read is wrong\nexpected: %v\ngot %v",
+			data[bytesRead:bytesRead+n],
+			buffer)
+
+		bytesRead += n
+		bytesRemaining -= n
 	}
+
+	assert.EqualValues(t, 511, bytesRead)
+	assert.EqualValues(t, 1, bytesRemaining)
 }
 
 // doCheckedSeek performs the requested seek on the stream and checks the results.
