@@ -103,18 +103,18 @@ func (stream *BasicStream) ReadAt(buffer []byte, offset int64) (int, error) {
 		numBytesToRead = bufLen
 	}
 
-	firstBlock, firstBlockOffset := stream.convertLinearAddr(offset)
+	firstBlock, startOffset := stream.convertLinearAddr(offset)
 	lastBlock, _ := stream.convertLinearAddr(offset + numBytesToRead)
 
 	sourceData, err := stream.data.GetSlice(
 		firstBlock,
-		uint(lastBlock-firstBlock),
+		uint(lastBlock-firstBlock+1),
 	)
 	if err != nil {
 		return 0, err
 	}
 
-	copy(buffer, sourceData[firstBlockOffset:firstBlockOffset+uint(numBytesToRead)])
+	copy(buffer, sourceData[startOffset:startOffset+uint(numBytesToRead)])
 
 	if numBytesToRead < bufLen {
 		err = io.EOF

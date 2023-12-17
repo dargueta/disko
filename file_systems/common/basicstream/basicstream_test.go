@@ -31,10 +31,13 @@ func TestBasicStreamNew__Basic(t *testing.T) {
 
 	rawExpectedData, err := cache.Data()
 	require.NoError(t, err, "failed to get cache data as slice")
+	require.Equal(t, 128*256, len(rawExpectedData), "cache data buffer is wrong size")
+	require.EqualValues(t, 128*256, cache.Size(), "cache size is wrong")
+	require.EqualValues(t, 0, stream.Tell(), "stream offset is wrong")
 
 	streamData := make([]byte, cache.Size())
-	n, err := stream.Read(streamData)
 
+	n, err := stream.Read(streamData)
 	require.NoError(t, err, "failed to read entire stream contents")
 	assert.EqualValues(t, cache.Size(), n, "read wrong number of bytes from stream")
 	assert.True(
@@ -202,11 +205,11 @@ func TestBasicStream__ReadBasic(t *testing.T) {
 		require.NoErrorf(
 			t,
 			readErr,
-			"read failed (tried=%; remaining=%d; tell=%d; actual=%d; iteration=%d)",
+			"read failed (tried=%d; actual=%d; remaining=%d; tell=%d; iteration=%d)",
 			readSize,
+			n,
 			bytesRemaining,
 			stream.Tell(),
-			n,
 			iterationNumber)
 
 		assert.Equal(t, readSize, n, "read wrong # of bytes")
@@ -214,7 +217,11 @@ func TestBasicStream__ReadBasic(t *testing.T) {
 		require.Truef(
 			t,
 			bytes.Equal(buffer, data[bytesRead:bytesRead+n]),
-			"data read is wrong on iteration %d\nexpected: %v\ngot %v",
+			"data read is wrong (tried=%d actual=%d remaining=%d iteration=%d)\n"+
+				"expected:\n%v\n\ngot\n%v",
+			readSize,
+			n,
+			bytesRemaining,
 			iterationNumber,
 			data[bytesRead:bytesRead+n],
 			buffer)

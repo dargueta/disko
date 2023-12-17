@@ -222,10 +222,10 @@ func (cache *BlockCache) GetMinBlocksForSize(size uint) uint {
 	return (size + cache.bytesPerBlock - 1) / cache.bytesPerBlock
 }
 
-// checkBounds verifies that `bufferSize` bytes can be accessed in the cache
+// CheckBounds verifies that `bufferSize` bytes can be accessed in the cache
 // starting from block `start`. If not, it returns an error describing the exact
 // conditions. If no error would occur, this returns nil.
-func (cache *BlockCache) checkBounds(start c.LogicalBlock, bufferSize uint) error {
+func (cache *BlockCache) CheckBounds(start c.LogicalBlock, bufferSize uint) error {
 	numBlocks := cache.GetMinBlocksForSize(bufferSize)
 
 	if uint(start) >= cache.totalBlocks {
@@ -236,8 +236,8 @@ func (cache *BlockCache) checkBounds(start c.LogicalBlock, bufferSize uint) erro
 	if uint(start)+numBlocks > cache.totalBlocks {
 		return disko.ErrArgumentOutOfRange.WithMessage(
 			fmt.Sprintf(
-				"can't access %d bytes (%d blocks) starting at block %d; range"+
-					" not in [0, %d)",
+				"can't access %d bytes (%d blocks) starting at block %d; requested"+
+					" range not in [0, %d)",
 				bufferSize,
 				numBlocks,
 				start,
@@ -284,20 +284,20 @@ func (cache *BlockCache) Data() ([]byte, error) {
 // loadBlockRange ensures that all blocks in the range [start, start + count) are
 // present in the cache, and loads any missing ones from storage.
 func (cache *BlockCache) loadBlockRange(start c.LogicalBlock, count uint) error {
-	err := cache.checkBounds(start, count*cache.bytesPerBlock)
+	err := cache.CheckBounds(start, count*cache.bytesPerBlock)
 	if err != nil {
 		return err
 	}
 
-	for blockIndex := int(start); uint(blockIndex) < uint(start)+count; blockIndex++ {
+	for blockIndex := uint(start); blockIndex < uint(start)+count; blockIndex++ {
 		// Skip if the block is in the cache. Since dirty blocks are present by
 		// definition, we don't need to check `dirtyBlocks`.
-		if cache.loadedBlocks.Get(blockIndex) {
+		if cache.loadedBlocks.Get(int(blockIndex)) {
 			continue
 		}
 
-		startByteOffset := start * c.LogicalBlock(cache.bytesPerBlock)
-		endByteOffset := startByteOffset + c.LogicalBlock(cache.bytesPerBlock*count)
+		startByteOffset := blockIndex * cache.bytesPerBlock
+		endByteOffset := startByteOffset + cache.bytesPerBlock
 		buffer := cache.data[startByteOffset:endByteOffset]
 
 		// Load the block from backing storage directly into the cache.
@@ -311,8 +311,8 @@ func (cache *BlockCache) loadBlockRange(start c.LogicalBlock, count uint) error 
 		}
 
 		// Mark the block as present and clean.
-		cache.loadedBlocks.Set(blockIndex, true)
-		cache.dirtyBlocks.Set(blockIndex, false)
+		cache.loadedBlocks.Set(int(blockIndex), true)
+		cache.dirtyBlocks.Set(int(blockIndex), false)
 	}
 
 	return nil
@@ -321,7 +321,7 @@ func (cache *BlockCache) loadBlockRange(start c.LogicalBlock, count uint) error 
 // flushBlockRange writes out all dirty blocks (and only dirty blocks) to the
 // underlying storage and marks them as clean.
 func (cache *BlockCache) flushBlockRange(start c.LogicalBlock, count uint) error {
-	err := cache.checkBounds(start, count*cache.bytesPerBlock)
+	err := cache.CheckBounds(start, count*cache.bytesPerBlock)
 	if err != nil {
 		return err
 	}
@@ -372,7 +372,7 @@ func (cache *BlockCache) Flush() error {
 // `buffer` will be left unmodified.
 func (cache *BlockCache) ReadAt(buffer []byte, start c.LogicalBlock) (int, error) {
 	bufLen := uint(len(buffer))
-	err := cache.checkBounds(start, bufLen)
+	err := cache.CheckBounds(start, bufLen)
 	if err != nil {
 		return 0, err
 	}
@@ -401,7 +401,7 @@ func (cache *BlockCache) ReadAt(buffer []byte, start c.LogicalBlock) (int, error
 func (cache *BlockCache) WriteAt(buffer []byte, start c.LogicalBlock) (int, error) {
 	bufLen := uint(len(buffer))
 
-	err := cache.checkBounds(start, bufLen)
+	err := cache.CheckBounds(start, bufLen)
 	if err != nil {
 		return 0, err
 	}
@@ -471,7 +471,7 @@ func (cache *BlockCache) MarkBlockRangeDirty(
 	start c.LogicalBlock,
 	count uint,
 ) error {
-	err := cache.checkBounds(start, count*cache.bytesPerBlock)
+	err := cache.CheckBounds(start, count*cache.bytesPerBlock)
 	if err != nil {
 		return err
 	}

@@ -46,7 +46,7 @@ func CreateRandomImage(bytesPerBlock, totalBlocks uint, t *testing.T) []byte {
 // The fetch and flush handlers generated for the cache check bounds and
 // permissions for you, and fail with an appropriate error message. This means
 // you won't be able to test negative conditions (i.e. ensure methods fail where
-// they should) so you'll have to do that yourself. See [createRandomImage].
+// they should) so you'll have to do that yourself. See [CreateRandomImage].
 func CreateDefaultCache(
 	bytesPerBlock,
 	totalBlocks uint,
@@ -61,7 +61,7 @@ func CreateDefaultCache(
 	fetchCallback := func(blockIndex c.LogicalBlock, buffer []byte) error {
 		if blockIndex >= c.LogicalBlock(totalBlocks) {
 			message := fmt.Sprintf(
-				"attempted to read outside bounds: %d not in [0, %d)",
+				"attempted to read outside bounds: block %d not in [0, %d)",
 				blockIndex,
 				totalBlocks,
 			)

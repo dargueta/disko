@@ -1,12 +1,16 @@
 package blockcache_test
 
 import (
+	"fmt"
 	"math/rand"
 	"testing"
 
+	disko "github.com/dargueta/disko"
 	c "github.com/dargueta/disko/file_systems/common"
+	"github.com/dargueta/disko/file_systems/common/blockcache"
 	diskotest "github.com/dargueta/disko/testing"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Test block fetch functionality with no trickery such as reading past the end
@@ -90,6 +94,153 @@ func TestBlockCache__Write__WriteStartingPastEndFails(t *testing.T) {
 	n, err := cache.WriteAt(writeBuffer, c.LogicalBlock(16))
 	assert.Error(t, err, "writing past the end of the buffer should've failed")
 	assert.Equal(t, 0, n)
+}
+
+type BoundsCheckTestCase struct {
+	BlockSize      uint
+	CacheSize      uint
+	FirstBlock     uint
+	RequestedBytes uint
+	ShouldFail     bool
+}
+
+func TestBlockCache__CheckBounds(t *testing.T) {
+	cases := []BoundsCheckTestCase{
+		{
+			BlockSize:      512,
+			CacheSize:      256,
+			FirstBlock:     0,
+			RequestedBytes: 0,
+		},
+		{
+			BlockSize:      512,
+			CacheSize:      256,
+			FirstBlock:     0,
+			RequestedBytes: 256,
+		},
+		{
+			BlockSize:      512,
+			CacheSize:      256,
+			FirstBlock:     1,
+			RequestedBytes: 512 * 256,
+			ShouldFail:     true,
+		},
+		{
+			BlockSize:      512,
+			CacheSize:      256,
+			FirstBlock:     255,
+			RequestedBytes: 512,
+		},
+		{
+			BlockSize:      512,
+			CacheSize:      256,
+			FirstBlock:     256,
+			RequestedBytes: 0,
+			ShouldFail:     true,
+		},
+		{
+			BlockSize:      512,
+			CacheSize:      256,
+			FirstBlock:     255,
+			RequestedBytes: 512,
+		},
+		{
+			BlockSize:      512,
+			CacheSize:      256,
+			FirstBlock:     255,
+			RequestedBytes: 513,
+			ShouldFail:     true,
+		},
+	}
+
+	for _, testCase := range cases {
+		testName := fmt.Sprintf(
+			"blocks=%d first=%d bytes=%d error=%v",
+			testCase.CacheSize,
+			testCase.FirstBlock,
+			testCase.RequestedBytes,
+			testCase.ShouldFail)
+		t.Run(
+			testName,
+			func(subT *testing.T) {
+				cache := blockcache.New(
+					testCase.BlockSize, testCase.CacheSize, nil, nil, nil)
+				result := cache.CheckBounds(
+					c.LogicalBlock(testCase.FirstBlock),
+					testCase.RequestedBytes)
+				if testCase.ShouldFail {
+					require.Error(subT, result)
+					assert.ErrorIs(subT, result, disko.ErrArgumentOutOfRange)
+				} else {
+					assert.NoError(subT, result)
+				}
+			},
+		)
+	}
+}
+
+type CacheSizeTest struct {
+	NBlocks        uint
+	BlockSize      uint
+	RequestedBytes uint
+	ExpectedResult uint
+}
+
+func TestBlockCache__GetMinBlocksForSize__Basic(t *testing.T) {
+	cases := []CacheSizeTest{
+		{
+			NBlocks:        32,
+			BlockSize:      64,
+			RequestedBytes: 1,
+			ExpectedResult: 1,
+		},
+		{
+			NBlocks:        32,
+			BlockSize:      64,
+			RequestedBytes: 63,
+			ExpectedResult: 1,
+		},
+		{
+			NBlocks:        32,
+			BlockSize:      64,
+			RequestedBytes: 65,
+			ExpectedResult: 2,
+		},
+		{
+			NBlocks:        32,
+			BlockSize:      64,
+			RequestedBytes: 2048,
+			ExpectedResult: 32,
+		},
+		{
+			// We should be able to pass any values, regardless of the cache size.
+			NBlocks:        32,
+			BlockSize:      64,
+			RequestedBytes: 4097,
+			ExpectedResult: 65,
+		},
+	}
+
+	for _, testCase := range cases {
+		testName := fmt.Sprintf(
+			"blocks=%d count=%d req=%d",
+			testCase.BlockSize,
+			testCase.NBlocks,
+			testCase.RequestedBytes)
+		t.Run(
+			testName,
+			func(subT *testing.T) {
+				buf := make([]byte, testCase.BlockSize*testCase.NBlocks)
+				cache := blockcache.WrapSlice(buf, testCase.BlockSize)
+
+				result := cache.GetMinBlocksForSize(testCase.RequestedBytes)
+				assert.Equal(
+					subT,
+					testCase.ExpectedResult,
+					result)
+			},
+		)
+	}
 }
 
 // If we write to a block inside the cache but the buffer extends past the end
