@@ -39,12 +39,12 @@ func TestReadExistingFormat64FileMaxSize(t *testing.T) {
 	require.NoError(t, err, "mounting failed")
 
 	stat := driver.FSStat()
-	assert.Equal(t, 512, stat.BlockSize)
-	assert.Equal(t, 7984, stat.TotalBlocks)
-	assert.Equal(t, 1, stat.Files)      // The root directory
-	assert.Equal(t, 63, stat.FilesFree) // 64 files minus root directory
-	assert.Equal(t, 7984-68, stat.BlocksAvailable)
-	assert.Equal(t, 7984-68, stat.BlocksFree)
+	assert.EqualValues(t, 512, stat.BlockSize, "BlockSize")
+	assert.EqualValues(t, 7984, stat.TotalBlocks, "TotalBlocks")
+	assert.EqualValues(t, 1, stat.Files, "Files")          // The root directory
+	assert.EqualValues(t, 63, stat.FilesFree, "FilesFree") // 64 files minus root directory
+	assert.EqualValues(t, 7984-68, stat.BlocksAvailable, "BlocksAvailable")
+	assert.EqualValues(t, 7984-68, stat.BlocksFree, "BlocksFree")
 
 	err = driver.Unmount()
 	assert.NoError(t, err, "unmounting failed")

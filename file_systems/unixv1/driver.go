@@ -100,8 +100,8 @@ func (driver *UnixV1Driver) Mount(
 
 	driver.currentMountFlags = flags
 
-	// Wrap the block device with a stream for ease of reading the stuff in it.
-	// For our current purposes we only need the boot block.
+	// To simplify deserialization, read the superblock into a byte slice and
+	// wrap it with a stream.
 	superblockBytes := make([]byte, 1024)
 	nRead, err := driver.image.ReadAt(superblockBytes, c.LogicalBlock(0))
 	if err != nil {
@@ -118,6 +118,10 @@ func (driver *UnixV1Driver) Mount(
 	err = binary.Read(sbReader, binary.LittleEndian, &blockBitmapSize)
 	if err != nil {
 		return disko.ErrIOFailed.Wrap(err)
+	}
+	if blockBitmapSize == 0 {
+		return disko.ErrFileSystemCorrupted.WithMessage(
+			"corruption detected: block bitmap length is 0")
 	} else if blockBitmapSize%2 != 0 {
 		message := fmt.Sprintf(
 			"corruption detected: block bitmap length must be an even number,"+
@@ -132,6 +136,7 @@ func (driver *UnixV1Driver) Mount(
 	if err != nil {
 		return disko.ErrIOFailed.Wrap(err)
 	}
+	driver.blockFreeMap = bitmap.Bitmap(blockBitmap)
 
 	// inodeBitmapSize is the size of the bitmap for which bitmaps are currently
 	// in use, in bytes. It also is always an even number.
@@ -139,6 +144,10 @@ func (driver *UnixV1Driver) Mount(
 	err = binary.Read(sbReader, binary.LittleEndian, &inodeBitmapSize)
 	if err != nil {
 		return disko.ErrIOFailed.Wrap(err)
+	}
+	if inodeBitmapSize == 0 {
+		return disko.ErrFileSystemCorrupted.WithMessage(
+			"corruption detected: inode bitmap length is 0")
 	} else if inodeBitmapSize%2 != 0 {
 		message := fmt.Sprintf(
 			"corruption detected: inode bitmap length must be an even number,"+
