@@ -2,8 +2,10 @@ package basicstream_test
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
+	"math/rand"
 	"testing"
 
 	"github.com/dargueta/disko"
@@ -29,10 +31,12 @@ func TestBasicStreamNew__Basic(t *testing.T) {
 
 	rawExpectedData, err := cache.Data()
 	require.NoError(t, err, "failed to get cache data as slice")
+	require.EqualValues(t, cache.Size(), len(rawExpectedData), "cache data buffer is wrong size")
+	require.EqualValues(t, 0, stream.Tell(), "stream offset is wrong")
 
 	streamData := make([]byte, cache.Size())
-	n, err := stream.Read(streamData)
 
+	n, err := stream.Read(streamData)
 	require.NoError(t, err, "failed to read entire stream contents")
 	assert.EqualValues(t, cache.Size(), n, "read wrong number of bytes from stream")
 	assert.True(
@@ -55,7 +59,7 @@ func TestBasicStreamNew__LessThanOneBlock(t *testing.T) {
 	streamData := make([]byte, readSize)
 	n, err := stream.Read(streamData)
 	require.NoErrorf(t, err, "failed to read %d bytes from stream", readSize)
-	assert.EqualValues(t, 39, n, "read wrong number of bytes from stream")
+	assert.EqualValues(t, readSize, n, "read wrong number of bytes from stream")
 	assert.True(
 		t,
 		bytes.Equal(rawExpectedData[:readSize], streamData),
@@ -168,9 +172,66 @@ func TestBasicStream__SeekJumpingAround(t *testing.T) {
 	}
 
 	for _, seek := range seeks {
-		_, err := doCheckedSeek(stream, seek, t)
-		assert.NoError(t, err)
+		doCheckedSeek(stream, seek, t)
 	}
+}
+
+func TestBasicStream__ReadBasic(t *testing.T) {
+	data := diskotest.CreateRandomImage(64, 8, t)
+	require.Equal(t, 512, len(data), "raw data size is wrong")
+
+	cache := diskotest.CreateDefaultCache(64, 8, false, data, t)
+	require.EqualValues(t, 512, cache.Size(), "cache size is wrong")
+
+	stream, err := basicstream.New(cache.Size(), cache, disko.O_RDONLY)
+	require.NoError(t, err, "failed to create stream")
+	defer stream.Close()
+
+	assert.EqualValues(t, 0, stream.Tell(), "Tell() at beginning of stream should be 0")
+
+	bytesRemaining := 512
+	bytesRead := 0
+
+	// If one byte is remaining then the read size will be 0 and we'll get stuck
+	// in an infinite loop. Thus, we need to stop when there's only one byte left,
+	// not 0.
+	iterationNumber := 0
+	for bytesRead < 511 {
+		readSize := rand.Int() % bytesRemaining
+		buffer := make([]byte, readSize)
+
+		n, readErr := stream.Read(buffer)
+		require.NoErrorf(
+			t,
+			readErr,
+			"read failed (tried=%d; actual=%d; remaining=%d; tell=%d; iteration=%d)",
+			readSize,
+			n,
+			bytesRemaining,
+			stream.Tell(),
+			iterationNumber)
+
+		assert.Equal(t, readSize, n, "read wrong # of bytes")
+		assert.Equal(t, int64(bytesRead+n), stream.Tell(), "fpos is wrong")
+		require.Truef(
+			t,
+			bytes.Equal(buffer, data[bytesRead:bytesRead+n]),
+			"data read is wrong (tried=%d actual=%d remaining=%d iteration=%d)\n"+
+				"expected:\n%v\n\ngot\n%v",
+			readSize,
+			n,
+			bytesRemaining,
+			iterationNumber,
+			data[bytesRead:bytesRead+n],
+			buffer)
+
+		bytesRead += n
+		bytesRemaining -= n
+		iterationNumber++
+	}
+
+	assert.EqualValues(t, 511, bytesRead)
+	assert.EqualValues(t, 1, bytesRemaining)
 }
 
 // doCheckedSeek performs the requested seek on the stream and checks the results.
@@ -179,24 +240,33 @@ func TestBasicStream__SeekJumpingAround(t *testing.T) {
 func doCheckedSeek(stream *basicstream.BasicStream, seek SeekInfo, t *testing.T) (int64, error) {
 	originalAbsolutePosition := stream.Tell()
 	where, err := stream.Seek(seek.Offset, seek.Whence)
-	if err != nil {
-		return where, fmt.Errorf(
-			"failed to seek from %d to %d using offset %d, origin %d: %s",
-			originalAbsolutePosition,
-			seek.ExpectedFinalPosition,
-			seek.Offset,
-			seek.Whence,
-			err.Error(),
-		)
-	} else if where != seek.ExpectedFinalPosition {
-		return where, fmt.Errorf(
-			"expected Seek() to return %d, got %d",
-			seek.ExpectedFinalPosition,
-			where,
-		)
-	}
 
-	return where, nil
+	assert.NoErrorf(
+		t,
+		err,
+		"failed to seek from %d to %d using offset %d, origin %d: %v",
+		originalAbsolutePosition,
+		seek.ExpectedFinalPosition,
+		seek.Offset,
+		seek.Whence,
+		err)
+
+	assert.Equal(
+		t,
+		seek.ExpectedFinalPosition,
+		where,
+		"return value of Seek() is wrong")
+
+	assert.Equal(
+		t,
+		seek.ExpectedFinalPosition,
+		stream.Tell(),
+		"Tell() returned the wrong value")
+
+	if err == nil && t.Failed() {
+		return where, errors.New("one or more assertions failed")
+	}
+	return seek.ExpectedFinalPosition, err
 }
 
 // Factored out common code for reading
@@ -208,10 +278,7 @@ func checkStreamRead(
 	t *testing.T,
 ) {
 	where, err := doCheckedSeek(stream, seek, t)
-	assert.NoError(t, err)
-	if err != nil {
-		return
-	}
+	require.NoError(t, err)
 
 	expectedData := rawUnderlyingBytes[where : where+int64(readSize)]
 
