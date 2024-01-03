@@ -38,13 +38,22 @@ func TestReadExistingFormat64FileMaxSize(t *testing.T) {
 	err := driver.Mount(disko.MountFlagsAllowAll)
 	require.NoError(t, err, "mounting failed")
 
+	const totalBlocks = uint64(7984)
+
 	stat := driver.FSStat()
 	assert.EqualValues(t, 512, stat.BlockSize, "BlockSize")
-	assert.EqualValues(t, 7984, stat.TotalBlocks, "TotalBlocks")
+	assert.EqualValues(t, totalBlocks, stat.TotalBlocks, "TotalBlocks")
 	assert.EqualValues(t, 1, stat.Files, "Files")          // The root directory
 	assert.EqualValues(t, 63, stat.FilesFree, "FilesFree") // 64 files minus root directory
-	assert.EqualValues(t, 7984-68, stat.BlocksAvailable, "BlocksAvailable")
-	assert.EqualValues(t, 7984-68, stat.BlocksFree, "BlocksFree")
+
+	// Used blocks:
+	// 64 required for boot code
+	// 2 for superblock
+	// ilist: 64 inodes @ 32 bytes per inode = 2048B = 4 blocks
+	// 1 block for root directory contents
+	// = 71
+	assert.EqualValues(t, totalBlocks-71, stat.BlocksAvailable, "BlocksAvailable")
+	assert.EqualValues(t, totalBlocks-71, stat.BlocksFree, "BlocksFree")
 
 	err = driver.Unmount()
 	assert.NoError(t, err, "unmounting failed")
