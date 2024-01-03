@@ -49,6 +49,7 @@ type FlushBlockCallback func(blockIndex c.LogicalBlock, buffer []byte) error
 //     FAT 8/12/16.
 type ResizeCallback func(newTotalBlocks c.LogicalBlock) error
 
+// A BlockCache
 type BlockCache struct {
 	// loadedBlocks is a bitmap indicating which blocks are in `data`; 1 means
 	// present, 0 is not loaded.

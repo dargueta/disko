@@ -90,7 +90,12 @@ func (stream *BasicStream) ReadAt(buffer []byte, offset int64) (int, error) {
 		return 0, disko.ErrNotPermitted
 	}
 
+	// The address computations below assume we're reading at least one byte. If
+	// the target buffer is empty, we have nothing further to do.
 	bufLen := int64(len(buffer))
+	if bufLen == 0 {
+		return 0, nil
+	}
 
 	// Clamp the number of bytes to read to whichever is smaller; the length of
 	// the buffer or the number of bytes remaining in the file.
@@ -104,7 +109,7 @@ func (stream *BasicStream) ReadAt(buffer []byte, offset int64) (int, error) {
 	}
 
 	firstBlock, startOffset := stream.convertLinearAddr(offset)
-	lastBlock, _ := stream.convertLinearAddr(offset + numBytesToRead)
+	lastBlock, _ := stream.convertLinearAddr(offset + numBytesToRead - 1)
 
 	sourceData, err := stream.data.GetSlice(
 		firstBlock,
@@ -134,7 +139,6 @@ func (stream *BasicStream) ReadFrom(r io.Reader) (n int64, err error) {
 	var blockSize int
 	if ok {
 		blockSize = int(otherStream.data.BytesPerBlock())
-
 	} else {
 		blockSize = 512
 	}

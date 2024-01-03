@@ -31,8 +31,7 @@ func TestBasicStreamNew__Basic(t *testing.T) {
 
 	rawExpectedData, err := cache.Data()
 	require.NoError(t, err, "failed to get cache data as slice")
-	require.Equal(t, 128*256, len(rawExpectedData), "cache data buffer is wrong size")
-	require.EqualValues(t, 128*256, cache.Size(), "cache size is wrong")
+	require.EqualValues(t, cache.Size(), len(rawExpectedData), "cache data buffer is wrong size")
 	require.EqualValues(t, 0, stream.Tell(), "stream offset is wrong")
 
 	streamData := make([]byte, cache.Size())
@@ -60,7 +59,7 @@ func TestBasicStreamNew__LessThanOneBlock(t *testing.T) {
 	streamData := make([]byte, readSize)
 	n, err := stream.Read(streamData)
 	require.NoErrorf(t, err, "failed to read %d bytes from stream", readSize)
-	assert.EqualValues(t, 39, n, "read wrong number of bytes from stream")
+	assert.EqualValues(t, readSize, n, "read wrong number of bytes from stream")
 	assert.True(
 		t,
 		bytes.Equal(rawExpectedData[:readSize], streamData),

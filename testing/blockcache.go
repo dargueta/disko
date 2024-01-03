@@ -108,5 +108,6 @@ func CreateDefaultCache(
 	)
 	assert.EqualValues(t, bytesPerBlock, cache.BytesPerBlock(), "wrong bytes per block")
 	assert.EqualValues(t, totalBlocks, cache.TotalBlocks(), "wrong total blocks")
+	assert.EqualValues(t, bytesPerBlock*totalBlocks, cache.Size(), "total size is wrong")
 	return cache
 }
