@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-//go:embed testdata/max-size-with-512-files.img.rle.gz
+//go:embed testdata/max-size-with-16-files.img.rle.gz
 var diskImageFormat64FileMaxSize []byte
 
 func TestReadExistingFormat64FileMaxSize(t *testing.T) {
@@ -44,7 +44,7 @@ func TestReadExistingFormat64FileMaxSize(t *testing.T) {
 	assert.EqualValues(t, 512, stat.BlockSize, "BlockSize")
 	assert.EqualValues(t, totalBlocks, stat.TotalBlocks, "TotalBlocks")
 	assert.EqualValues(t, 1, stat.Files, "Files")          // The root directory
-	assert.EqualValues(t, 63, stat.FilesFree, "FilesFree") // 64 files minus root directory
+	assert.EqualValues(t, 15, stat.FilesFree, "FilesFree") // 16 files minus root directory
 
 	// Used blocks:
 	// 64 required for boot code
