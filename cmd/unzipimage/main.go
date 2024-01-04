@@ -41,5 +41,5 @@ func main() {
 		os.Exit(2)
 	}
 
-	fmt.Printf("Compressed input file to %d bytes.\n", nWritten)
+	fmt.Printf("Uncompressed input file to %d bytes.\n", nWritten)
 }
