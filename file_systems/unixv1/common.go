@@ -72,20 +72,20 @@ func ConvertStandardFlagsToFS(flags os.FileMode) uint16 {
 	return rawFlags
 }
 
-func (driver *UnixV1Driver) pathToInumber(path string) (Inumber, error) {
+func (driver *UnixV1Driver) inumberFromPath(path string) (Inumber, error) {
 	return Inumber(0), fmt.Errorf("pathToInumber() not implemented")
 }
 
-func (driver *UnixV1Driver) inumberToInode(inumber Inumber) (Inode, error) {
+func (driver *UnixV1Driver) inodeFromInumber(inumber Inumber) (Inode, error) {
 	return Inode{}, fmt.Errorf("inumberToInode() not implemented")
 }
 
-func (driver *UnixV1Driver) pathToInode(path string) (Inode, error) {
-	inumber, err := driver.pathToInumber(path)
+func (driver *UnixV1Driver) inodeFromPath(path string) (Inode, error) {
+	inumber, err := driver.inumberFromPath(path)
 	if err != nil {
 		return Inode{}, err
 	}
-	return driver.inumberToInode(inumber)
+	return driver.inodeFromInumber(inumber)
 }
 
 func (driver *UnixV1Driver) openFileUsingInode(inode Inode) (disko.File, error) {

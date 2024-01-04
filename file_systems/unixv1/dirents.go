@@ -47,7 +47,7 @@ func (driver *UnixV1Driver) buildDirentFromBytes(data []byte) (DirectoryEntry, e
 	inumber := binary.LittleEndian.Uint16(data)
 	name := string(data[2:])
 
-	inode, err := driver.inumberToInode(Inumber(inumber))
+	inode, err := driver.inodeFromInumber(Inumber(inumber))
 	if err != nil {
 		return DirectoryEntry{}, err
 	}
