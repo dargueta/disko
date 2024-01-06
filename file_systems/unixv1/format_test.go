@@ -11,14 +11,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-//go:embed testdata/max-size-with-16-files.img.rle.gz
-var diskImageFormat64FileMaxSize []byte
+//go:embed testdata/min-files-max-blocks.imgz
+var diskImageFormatMinFilesMaxBlocks []byte
 
-func TestReadExistingFormat64FileMaxSize(t *testing.T) {
-	driver := newDriverFromCompressedBytes(t, diskImageFormat64FileMaxSize, 7984)
+func TestReadExistingFormat16FileMaxSize(t *testing.T) {
+	driver := newDriverFromCompressedBytes(t, diskImageFormatMinFilesMaxBlocks, 7984)
 
 	// Validate the uncompressed image. The block and inode bitmaps together must
-	// be 1000 bytes or less and both must also even numbers. Having the max
+	// be 1000 bytes or less and both must also be even numbers. Having the max
 	// blocks and min inodes gives us 998 bytes for the block bitmap and 2 for
 	// the inode bitmap.
 	bootSector := make([]byte, 1024)
@@ -49,11 +49,11 @@ func TestReadExistingFormat64FileMaxSize(t *testing.T) {
 	// Used blocks:
 	// 64 required for boot code
 	// 2 for superblock
-	// ilist: 64 inodes @ 32 bytes per inode = 2048B = 4 blocks
+	// ilist: 16 inodes @ 32 bytes per inode = 512B = 1 block
 	// 1 block for root directory contents
-	// = 71
-	assert.EqualValues(t, totalBlocks-71, stat.BlocksAvailable, "BlocksAvailable")
-	assert.EqualValues(t, totalBlocks-71, stat.BlocksFree, "BlocksFree")
+	// = 68
+	assert.EqualValues(t, totalBlocks-68, stat.BlocksAvailable, "BlocksAvailable")
+	assert.EqualValues(t, totalBlocks-68, stat.BlocksFree, "BlocksFree")
 
 	err = driver.Unmount()
 	assert.NoError(t, err, "unmounting failed")
