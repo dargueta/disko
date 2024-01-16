@@ -12,7 +12,7 @@ import (
 // output until the input is exhausted. The return value is the number of bytes
 // written, only valid if no error occurred.
 func CompressRLE8(input io.Reader, output io.Writer) (int64, error) {
-	grouper := NewRLEGrouper(input)
+	grouper := NewRLEGrouperFromReader(input)
 
 	totalBytesWritten := int64(0)
 	for {

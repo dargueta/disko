@@ -25,12 +25,17 @@ var InvalidRLERun = ByteRun{0, 0}
 //
 // This functions much like the `uniq` command line utility.
 type RLEGrouper struct {
-	rd *bufio.Reader
+	rd io.ByteScanner
 }
 
-// NewRLEGrouper constructs an [RLEGrouper].
-func NewRLEGrouper(rd io.Reader) RLEGrouper {
-	return RLEGrouper{rd: bufio.NewReader(rd)}
+// NewRLEGrouperFromReader constructs an [RLEGrouper] from an [io.Reader].
+func NewRLEGrouperFromReader(rd io.Reader) RLEGrouper {
+	return NewRLEGrouperFromByteScanner(bufio.NewReader(rd))
+}
+
+// NewRLEGrouper constructs an [RLEGrouper] from an [io.ByteScanner].
+func NewRLEGrouperFromByteScanner(rd io.ByteScanner) RLEGrouper {
+	return RLEGrouper{rd: rd}
 }
 
 // GetNextRun returns a [ByteRun] for the next byte or run of byte values in the
