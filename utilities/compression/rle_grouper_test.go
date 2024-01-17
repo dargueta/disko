@@ -17,6 +17,7 @@ import (
 type FailingReader struct {
 	Data  io.Reader
 	Error error
+	T     *testing.T
 }
 
 // Read implements [io.Reader].
@@ -24,17 +25,20 @@ func (fr FailingReader) Read(buf []byte) (int, error) {
 	n, err := fr.Data.Read(buf)
 
 	if err == nil {
+		fr.T.Logf("FailingReader read %d bytes for buffer of length %d", n, len(buf))
 		return n, nil
 	}
 
 	if errors.Is(err, io.EOF) {
 		if n > 0 {
+			fr.T.Logf("FailingReader hit EOF reading %d bytes, returning nil", n)
 			// We hit EOF on this read, but we need the caller to try one more
 			// read so we can return fr.Error. Return nil as the error instead
 			// of io.EOF.
 			return n, nil
 		}
 		// n == 0, input has been exhausted. We can now return the user's error.
+		fr.T.Logf("FailingReader hit EOF, read 0 bytes")
 		return 0, fr.Error
 	}
 
@@ -60,7 +64,7 @@ var basicTestCases = []BasicTestCase{
 }
 
 func runBasicTestCase(t *testing.T, test BasicTestCase) {
-	grouper := c.NewRLEGrouperFromReader(bytes.NewBuffer(test.Data))
+	grouper := c.NewRLEGrouperFromByteScanner(bytes.NewBuffer(test.Data))
 	result, _ := grouper.GetNextRun()
 	assert.Equal(t, test.ExpectedResult, result)
 }
@@ -69,9 +73,7 @@ func TestRLEGrouper__Basic(t *testing.T) {
 	for _, test := range basicTestCases {
 		t.Run(
 			test.Name,
-			func(t *testing.T) {
-				runBasicTestCase(t, test)
-			},
+			func(t *testing.T) { runBasicTestCase(t, test) },
 		)
 	}
 }
@@ -114,17 +116,11 @@ var fullTestCases = []FullTestCase{
 }
 
 func runFullRunTestCase(t *testing.T, testCase *FullTestCase) {
-	data := []byte{1, 9, 4, 4, 4, 4, 4, 6, 6, 0, 1, 0, 0, 0}
-	expected := []c.ByteRun{
-		{byte(1), 1}, {byte(9), 1}, {byte(4), 5}, {byte(6), 2}, {byte(0), 1},
-		{byte(1), 1}, {byte(0), 3}, c.InvalidRLERun,
-	}
-
-	buffer := bytes.NewBuffer(data)
+	buffer := bytes.NewBuffer(testCase.RawBytes)
 	grouper := c.NewRLEGrouperFromByteScanner(buffer)
 	hitEOF := false
 
-	for i, expectedRun := range expected {
+	for i, expectedRun := range testCase.ExpectedRuns {
 		result, err := grouper.GetNextRun()
 		assert.Equalf(t, expectedRun, result, "run %d is wrong", i)
 		if expectedRun == c.InvalidRLERun {
@@ -146,7 +142,7 @@ func TestRLEGrouper__FullInputs(t *testing.T) {
 
 func TestRLEGrouper__ErrorOnFirstRead(t *testing.T) {
 	expectedError := errors.New("this is the expected error")
-	reader := FailingReader{Data: &bytes.Buffer{}, Error: expectedError}
+	reader := FailingReader{Data: &bytes.Buffer{}, Error: expectedError, T: t}
 
 	grouper := c.NewRLEGrouperFromReader(reader)
 	result, err := grouper.GetNextRun()
@@ -160,6 +156,7 @@ func TestRLEGrouper__ErrorOnSubsequent(t *testing.T) {
 	reader := FailingReader{
 		Data:  bytes.NewBuffer([]byte{1, 1, 1, 2, 2}),
 		Error: expectedError,
+		T:     t,
 	}
 
 	grouper := c.NewRLEGrouperFromReader(reader)
