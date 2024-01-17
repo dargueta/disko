@@ -76,7 +76,44 @@ func TestRLEGrouper__Basic(t *testing.T) {
 	}
 }
 
-func TestRLEGrouper__Sequence(t *testing.T) {
+type FullTestCase struct {
+	Name         string
+	RawBytes     []byte
+	ExpectedRuns []c.ByteRun
+}
+
+var fullTestCases = []FullTestCase{
+	{
+		"empty",
+		[]byte{},
+		[]c.ByteRun{c.InvalidRLERun},
+	},
+	{
+		"basic",
+		[]byte{1, 9, 4, 4, 4, 4, 4, 6, 6, 0, 1, 0, 0, 0},
+		[]c.ByteRun{
+			{byte(1), 1}, {byte(9), 1}, {byte(4), 5}, {byte(6), 2}, {byte(0), 1},
+			{byte(1), 1}, {byte(0), 3}, c.InvalidRLERun,
+		},
+	},
+	{
+		"leading run",
+		[]byte{1, 1, 1, 127},
+		[]c.ByteRun{{byte(1), 3}, {byte(127), 1}, c.InvalidRLERun},
+	},
+	{
+		"trailing run",
+		[]byte{127, 127, 1, 1, 1},
+		[]c.ByteRun{{byte(127), 2}, {byte(1), 3}, c.InvalidRLERun},
+	},
+	{
+		"trailing run with single after",
+		[]byte{127, 127, 1, 1, 1, 1, 3},
+		[]c.ByteRun{{byte(127), 2}, {byte(1), 4}, {byte(3), 1}, c.InvalidRLERun},
+	},
+}
+
+func runFullRunTestCase(t *testing.T, testCase *FullTestCase) {
 	data := []byte{1, 9, 4, 4, 4, 4, 4, 6, 6, 0, 1, 0, 0, 0}
 	expected := []c.ByteRun{
 		{byte(1), 1}, {byte(9), 1}, {byte(4), 5}, {byte(6), 2}, {byte(0), 1},
@@ -91,11 +128,20 @@ func TestRLEGrouper__Sequence(t *testing.T) {
 		result, err := grouper.GetNextRun()
 		assert.Equalf(t, expectedRun, result, "run %d is wrong", i)
 		if expectedRun == c.InvalidRLERun {
-			assert.Equal(t, io.EOF, err, "expected io.EOF sentinel error")
+			assert.ErrorIs(t, err, io.EOF, "expected io.EOF sentinel error")
 			hitEOF = true
 		}
 	}
 	assert.True(t, hitEOF, "never hit EOF sentinel")
+}
+
+func TestRLEGrouper__FullInputs(t *testing.T) {
+	for _, testCase := range fullTestCases {
+		t.Run(
+			testCase.Name,
+			func(subT *testing.T) { runFullRunTestCase(t, &testCase) },
+		)
+	}
 }
 
 func TestRLEGrouper__ErrorOnFirstRead(t *testing.T) {
