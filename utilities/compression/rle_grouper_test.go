@@ -153,27 +153,31 @@ func TestRLEGrouper__ErrorOnFirstRead(t *testing.T) {
 
 func TestRLEGrouper__ErrorOnSubsequent(t *testing.T) {
 	expectedError := errors.New("this is the expected error")
-	reader := FailingReader{
-		Data:  bytes.NewBuffer([]byte{1, 1, 1, 2, 2}),
-		Error: expectedError,
-		T:     t,
-	}
+	// reader := FailingReader{
+	// 	Data:  bytes.NewBuffer([]byte{1, 1, 1, 2, 2}),
+	// 	Error: expectedError,
+	// 	T:     t,
+	// }
 
-	grouper := c.NewRLEGrouperFromReader(reader)
+	//grouper := c.NewRLEGrouperFromReader(reader)
+	grouper := c.NewRLEGrouperFromByteScanner(bytes.NewBuffer([]byte{1, 1, 1, 2, 2}))
 
 	// First run
+	t.Log("Reading run 1")
 	result, err := grouper.GetNextRun()
 	assert.Equal(t, byte(1), result.Byte, "byte is wrong for run 1")
 	assert.Equal(t, 3, result.RunLength, "run length is wrong for run 1")
 	require.NoError(t, err, "run 1 failed")
 
 	// Second run
+	t.Log("Reading run 2")
 	result, err = grouper.GetNextRun()
 	assert.Equal(t, byte(2), result.Byte, "byte is wrong for run 2")
 	assert.Equal(t, 2, result.RunLength, "run length is wrong for run 2")
 	require.NoError(t, err, "run 2 failed")
 
 	// Third run should fail
+	t.Log("Reading run 3")
 	result, err = grouper.GetNextRun()
 	assert.ErrorIs(t, err, expectedError)
 	assert.Equal(t, c.InvalidRLERun, result)
