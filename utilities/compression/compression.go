@@ -54,11 +54,11 @@ func CompressImageToBytes(input io.Reader) ([]byte, error) {
 	return outputSlice, nil
 }
 
-// DecompressImage takes a gzipped, RLE8-encoded disk image and decompresses it
-// to the original raw bytes.
+// DecompressImage takes a gzipped, RLE8-encoded byte stream and decompresses it
+// to the original data.
 //
 // The returned int64 gives the number of bytes written to the output (i.e. the
-// decompressed size of the image). If an error occurred, the value is undefined
+// decompressed size of the data). If an error occurred, the value is undefined
 // and should not be used.
 func DecompressImage(input io.Reader, output io.Writer) (int64, error) {
 	gzReader, err := gzip.NewReader(input)
