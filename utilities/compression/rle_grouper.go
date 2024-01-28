@@ -41,7 +41,7 @@ func NewRLEGrouperFromByteScanner(rd io.ByteScanner) RLEGrouper {
 
 // GetNextRun returns a [ByteRun] for the next byte or run of byte values in the
 // stream. The length of a valid run is guaranteed to be in the range [1, math.MaxInt).
-// An invalid run will always have length 0.
+// A valid run will never have length 0.
 //
 // The returned error behaves identically to [io.Reader.Read], namely that if
 // the returned run length is non-zero, the error will either be nil or [io.EOF].
@@ -57,13 +57,16 @@ func (grouper RLEGrouper) GetNextRun() (ByteRun, error) {
 	for ; runLength < math.MaxInt; runLength++ {
 		currentByte, err := grouper.rd.ReadByte()
 
-		// Unlike Reader.Read(), if we get EOF as the error from ReadByte() then
-		// that means that we reached the end of the file on the previous read.
-		// On this read, currentByte is invalid.
+		// If we get EOF as the error from ReadByte() then that means that we
+		// reached the end of the file on the previous read. On this read,
+		// currentByte is invalid.
 		if err != nil {
 			if errors.Is(err, io.EOF) {
+				// Hit EOF. If we get here then the previous byte we read was part
+				// of the current run, so we don't unread the last byte we saw.
 				return ByteRun{Byte: firstByte, RunLength: runLength}, io.EOF
 			}
+			// Some other error we weren't expecting occurred.
 			return InvalidRLERun, err
 		}
 

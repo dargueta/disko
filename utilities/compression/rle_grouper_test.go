@@ -12,42 +12,37 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// A FailingReader is an [io.Reader] that returns a user-supplied error once the
-// given data (if any) has been exhausted.
+// A FailingReader is an [io.ByteScanner] that returns a user-supplied error once
+// the given data (if any) has been exhausted.
 type FailingReader struct {
-	Data  io.Reader
+	Data  io.ByteScanner
 	Error error
 	T     *testing.T
 }
 
-// Read implements [io.Reader].
-func (fr FailingReader) Read(buf []byte) (int, error) {
-	n, err := fr.Data.Read(buf)
+// ReadByte implements [io.ByteScanner].
+func (fr FailingReader) ReadByte() (byte, error) {
+	fr.T.Helper()
 
+	byteVal, err := fr.Data.ReadByte()
 	if err == nil {
-		fr.T.Logf("FailingReader read %d bytes for buffer of length %d", n, len(buf))
-		return n, nil
+		return byteVal, nil
 	}
 
 	if errors.Is(err, io.EOF) {
-		if n > 0 {
-			fr.T.Logf("FailingReader hit EOF reading %d bytes, returning nil", n)
-			// We hit EOF on this read, but we need the caller to try one more
-			// read so we can return fr.Error. Return nil as the error instead
-			// of io.EOF.
-			return n, nil
-		}
-		// n == 0, input has been exhausted. We can now return the user's error.
-		fr.T.Logf("FailingReader hit EOF, read 0 bytes")
+		// Input has been exhausted. We can now return the user's error.
 		return 0, fr.Error
 	}
 
 	// An error occurred and it's not EOF.
 	panic(
-		fmt.Errorf(
-			"unexpected error getting %d bytes in FailingReader: %w",
-			len(buf),
-			err))
+		fmt.Errorf("unexpected error getting byte in FailingReader: %w", err))
+}
+
+// UnreadByte implements [io.ByteScanner].
+func (fr FailingReader) UnreadByte() error {
+	fr.T.Helper()
+	return fr.Data.UnreadByte()
 }
 
 type BasicTestCase struct {
@@ -116,13 +111,18 @@ var fullTestCases = []FullTestCase{
 }
 
 func runFullRunTestCase(t *testing.T, testCase *FullTestCase) {
+	t.Helper()
+
 	buffer := bytes.NewBuffer(testCase.RawBytes)
 	grouper := c.NewRLEGrouperFromByteScanner(buffer)
 	hitEOF := false
 
 	for i, expectedRun := range testCase.ExpectedRuns {
+		require.Falsef(t, hitEOF, "grouper hit EOF early, on run %d", i)
+
 		result, err := grouper.GetNextRun()
 		assert.Equalf(t, expectedRun, result, "run %d is wrong", i)
+
 		if expectedRun == c.InvalidRLERun {
 			assert.ErrorIs(t, err, io.EOF, "expected io.EOF sentinel error")
 			hitEOF = true
@@ -144,23 +144,22 @@ func TestRLEGrouper__ErrorOnFirstRead(t *testing.T) {
 	expectedError := errors.New("this is the expected error")
 	reader := FailingReader{Data: &bytes.Buffer{}, Error: expectedError, T: t}
 
-	grouper := c.NewRLEGrouperFromReader(reader)
+	grouper := c.NewRLEGrouperFromByteScanner(reader)
 	result, err := grouper.GetNextRun()
 
 	assert.ErrorIs(t, err, expectedError)
 	assert.Equal(t, c.InvalidRLERun, result)
 }
 
-func TestRLEGrouper__ErrorOnSubsequent(t *testing.T) {
+func TestRLEGrouper__ErrorAfterLastRun(t *testing.T) {
 	expectedError := errors.New("this is the expected error")
-	// reader := FailingReader{
-	// 	Data:  bytes.NewBuffer([]byte{1, 1, 1, 2, 2}),
-	// 	Error: expectedError,
-	// 	T:     t,
-	// }
+	reader := FailingReader{
+		Data:  bytes.NewBuffer([]byte{1, 1, 1, 2, 2, 3}),
+		Error: expectedError,
+		T:     t,
+	}
 
-	//grouper := c.NewRLEGrouperFromReader(reader)
-	grouper := c.NewRLEGrouperFromByteScanner(bytes.NewBuffer([]byte{1, 1, 1, 2, 2}))
+	grouper := c.NewRLEGrouperFromByteScanner(reader)
 
 	// First run
 	t.Log("Reading run 1")
@@ -181,4 +180,27 @@ func TestRLEGrouper__ErrorOnSubsequent(t *testing.T) {
 	result, err = grouper.GetNextRun()
 	assert.ErrorIs(t, err, expectedError)
 	assert.Equal(t, c.InvalidRLERun, result)
+}
+
+func TestRLEGrouper__ErrorWhileReadingARun(t *testing.T) {
+	expectedError := errors.New("this is the expected error")
+	reader := FailingReader{
+		Data:  bytes.NewBuffer([]byte{1, 1, 1, 2, 2}),
+		Error: expectedError,
+		T:     t,
+	}
+
+	grouper := c.NewRLEGrouperFromByteScanner(reader)
+
+	// First run
+	t.Log("Reading run 1")
+	result, err := grouper.GetNextRun()
+	assert.Equal(t, byte(1), result.Byte, "byte is wrong for run 1")
+	assert.Equal(t, 3, result.RunLength, "run length is wrong for run 1")
+	require.NoError(t, err, "run 1 failed")
+
+	// Second run should fail
+	t.Log("Reading run 2")
+	result, err = grouper.GetNextRun()
+	assert.ErrorIs(t, err, expectedError, "run 2 succeeded unexpectedly")
 }
