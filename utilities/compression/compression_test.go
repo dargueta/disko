@@ -1,8 +1,10 @@
 package compression_test
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/rand"
+	"io"
 	"testing"
 
 	c "github.com/dargueta/disko/utilities/compression"
@@ -19,6 +21,24 @@ type imageC9nTestRunner struct {
 type imageC9nTestData struct {
 	Name string
 	Data []byte
+}
+
+// compressImageToBytes is a convenience function wrapping [CompressImage]. It
+// functions identically, except it returns the compressed data in a new byte
+// slice instead of writing to an [io.Writer].
+func compressImageToBytes(input io.Reader) ([]byte, error) {
+	buffer := bytes.Buffer{}
+	writer := bufio.NewWriter(&buffer)
+	_, err := c.CompressImage(input, writer)
+	if err != nil {
+		return nil, err
+	}
+
+	writer.Flush()
+
+	outputSlice := make([]byte, buffer.Len())
+	copy(outputSlice, buffer.Bytes())
+	return outputSlice, nil
 }
 
 func TestRoundTripImageCompression(t *testing.T) {
@@ -74,7 +94,7 @@ func runRoundTripCompressionTest(t *testing.T, sourceData []byte) {
 }
 
 func runRoundTripCompressionToBytesTest(t *testing.T, originalData []byte) {
-	compressed, err := c.CompressImageToBytes(bytes.NewReader(originalData))
+	compressed, err := compressImageToBytes(bytes.NewReader(originalData))
 	require.NoError(t, err, "error while compressing")
 	t.Logf("image compressed %d -> %d", len(originalData), len(compressed))
 
