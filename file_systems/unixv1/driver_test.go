@@ -39,7 +39,6 @@ func TestReadExistingFormat16FileMaxSize(t *testing.T) {
 		int(binary.LittleEndian.Uint16(bootSector[1000:1002])),
 		"uncompressed image is invalid; inode bitmap size is wrong")
 
-	// BUG: Entire first sector is getting skipped somehow
 	err := driver.Mount(disko.MountFlagsAllowAll)
 	require.NoError(t, err, "mounting failed")
 
@@ -67,7 +66,6 @@ func TestReadExistingFormat16FileMaxSize(t *testing.T) {
 func newDriverFromCompressedBytes(
 	t *testing.T, compressedImageBytes []byte, totalSectors uint,
 ) UnixV1Driver {
-	t.Helper()
 	imageStream := dt.LoadDiskImage(t, compressedImageBytes, 512, totalSectors)
 
 	driver := NewDriverFromStreamWithNumBlocks(imageStream, totalSectors)
