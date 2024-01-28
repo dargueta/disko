@@ -9,8 +9,8 @@
 // images as much as we can. In experiments, the best compression was achieved
 // by run-length encoding the raw image first, then using gzip on the result.
 // An IBM 8" image of 256,256 bytes can be compressed to 3,009 bytes with only
-// run-length encoding (98.8%). Compressing this with gzip results in a final
-// size of 67 bytes -- a compression ratio of 99.97%.
+// run-length encoding (about 85:1). Compressing this with gzip results in a
+// final size of 67 bytes -- a compression ratio of about 3,832:1.
 //
 // There are a variety of run-length encodings; this document refers strictly to
 // the algorithm used by the Microsoft BMP file format, also known as RLE8. A

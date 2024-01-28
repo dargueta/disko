@@ -36,29 +36,11 @@ func CompressImage(input io.Reader, output io.Writer) (int64, error) {
 	return writer.BytesWritten, err
 }
 
-// CompressImageToBytes is a convenience function wrapping [CompressImage]. It
-// functions identically, except it returns the compressed data in a new byte
-// slice instead of writing to an [io.Writer].
-func CompressImageToBytes(input io.Reader) ([]byte, error) {
-	buffer := bytes.Buffer{}
-	writer := bufio.NewWriter(&buffer)
-	_, err := CompressImage(input, writer)
-	if err != nil {
-		return nil, err
-	}
-
-	writer.Flush()
-
-	outputSlice := make([]byte, buffer.Len())
-	copy(outputSlice, buffer.Bytes())
-	return outputSlice, nil
-}
-
-// DecompressImage takes a gzipped, RLE8-encoded disk image and decompresses it
-// to the original raw bytes.
+// DecompressImage takes a gzipped, RLE8-encoded byte stream and decompresses it
+// to the original data.
 //
 // The returned int64 gives the number of bytes written to the output (i.e. the
-// decompressed size of the image). If an error occurred, the value is undefined
+// decompressed size of the data). If an error occurred, the value is undefined
 // and should not be used.
 func DecompressImage(input io.Reader, output io.Writer) (int64, error) {
 	gzReader, err := gzip.NewReader(input)

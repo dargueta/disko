@@ -12,15 +12,14 @@ import (
 // output until the input is exhausted. The return value is the number of bytes
 // written, only valid if no error occurred.
 func CompressRLE8(input io.Reader, output io.Writer) (int64, error) {
-	grouper := NewRLEGrouper(input)
+	grouper := NewRLEGrouperFromReader(input)
 
 	totalBytesWritten := int64(0)
 	for {
-		run, err := grouper.GetNextRun()
-		if errors.Is(err, io.EOF) {
-			return totalBytesWritten, nil
-		} else if err != nil {
-			return totalBytesWritten, err
+		run, getRunErr := grouper.GetNextRun()
+		if getRunErr != nil && !errors.Is(getRunErr, io.EOF) {
+			// An error was encountered and it's *not* EOF.
+			return totalBytesWritten, getRunErr
 		}
 
 		for run.RunLength >= 2 {
@@ -45,6 +44,13 @@ func CompressRLE8(input io.Reader, output io.Writer) (int64, error) {
 				return totalBytesWritten, err
 			}
 			totalBytesWritten += int64(n)
+		}
+
+		// We bail at the beginning of the loop if an error occurred and it's
+		// *not* EOF, so if the error here is non-nil then that means it *must*
+		// be EOF. That means we finished without errors.
+		if getRunErr != nil {
+			return totalBytesWritten, nil
 		}
 	}
 }
