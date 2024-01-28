@@ -1,7 +1,6 @@
 package unixv1
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/dargueta/disko"
@@ -73,11 +72,11 @@ func ConvertStandardFlagsToFS(flags os.FileMode) uint16 {
 }
 
 func (driver *UnixV1Driver) inumberFromPath(path string) (Inumber, error) {
-	return Inumber(0), fmt.Errorf("pathToInumber() not implemented")
+	return Inumber(0), disko.ErrNotImplemented.WithMessage("UnixV1Driver.pathToInumber()")
 }
 
 func (driver *UnixV1Driver) inodeFromInumber(inumber Inumber) (Inode, error) {
-	return Inode{}, fmt.Errorf("inumberToInode() not implemented")
+	return Inode{}, disko.ErrNotImplemented.WithMessage("UnixV1Driver.inumberToInode()")
 }
 
 func (driver *UnixV1Driver) inodeFromPath(path string) (Inode, error) {
@@ -89,7 +88,7 @@ func (driver *UnixV1Driver) inodeFromPath(path string) (Inode, error) {
 }
 
 func (driver *UnixV1Driver) openFileUsingInode(inode Inode) (disko.File, error) {
-	return nil, fmt.Errorf("openFileWithInode() not implemented")
+	return nil, disko.ErrNotImplemented.WithMessage("UnixV1Driver.openFileWithInode()")
 }
 
 func (driver *UnixV1Driver) getRawContentsUsingInode(inode Inode) ([]byte, error) {
