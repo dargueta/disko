@@ -11,6 +11,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// diskImageFormatMinFilesMaxBlocks is a formatted disk image. It contains the
+// combination of the minimum number of on-disk inodes (16) and the maximum
+// number of disk blocks (998) that file system is capable of representing. The
+// more inodes are allocated, the fewer blocks can be represented.
+//
 //go:embed testdata/min-files-max-blocks.imgz
 var diskImageFormatMinFilesMaxBlocks []byte
 
@@ -62,6 +67,7 @@ func TestReadExistingFormat16FileMaxSize(t *testing.T) {
 func newDriverFromCompressedBytes(
 	t *testing.T, compressedImageBytes []byte, totalSectors uint,
 ) UnixV1Driver {
+	t.Helper()
 	imageStream := dt.LoadDiskImage(t, compressedImageBytes, 512, totalSectors)
 
 	driver := NewDriverFromStreamWithNumBlocks(imageStream, totalSectors)
