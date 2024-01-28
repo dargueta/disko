@@ -43,8 +43,7 @@ func (driver *UnixV1Driver) resizeEmptyImage(stat disko.FSStat) disko.DriverErro
 		msg := fmt.Sprintf(
 			"`stat.Files` must be a non-zero multiple of %d, got %d",
 			NumInodesPerBlock,
-			stat.Files,
-		)
+			stat.Files)
 		return disko.ErrInvalidArgument.WithMessage(msg)
 	}
 
@@ -57,8 +56,7 @@ func (driver *UnixV1Driver) resizeEmptyImage(stat disko.FSStat) disko.DriverErro
 				" got %dB (%dB and %dB respectively)",
 			blockBitmapSize+inodeBitmapSize,
 			blockBitmapSize,
-			inodeBitmapSize,
-		)
+			inodeBitmapSize)
 		return disko.ErrFileTooLarge.WithMessage(msg)
 	}
 
@@ -76,8 +74,7 @@ func (driver *UnixV1Driver) resizeEmptyImage(stat disko.FSStat) disko.DriverErro
 			minBlocks,
 			float64(minBlocks)/2.0,
 			stat.TotalBlocks,
-			float64(stat.TotalBlocks)/2.0,
-		)
+			float64(stat.TotalBlocks)/2.0)
 		return disko.ErrInvalidArgument.WithMessage(msg)
 	}
 

@@ -80,21 +80,25 @@ func DeserializeTimestamp(tstamp uint32) time.Time {
 
 func NewDriverFromStream(stream io.ReadWriteSeeker) UnixV1Driver {
 	return UnixV1Driver{
-		image: blockcache.WrapStreamWithInferredSize(stream, 512, false)}
+		image: blockcache.WrapStreamWithInferredSize(stream, 512, false),
+	}
 }
 
 func NewDriverFromStreamWithNumBlocks(stream io.ReadWriteSeeker, totalBlocks uint) UnixV1Driver {
 	return UnixV1Driver{
-		image: blockcache.WrapStream(stream, 512, totalBlocks, false)}
+		image: blockcache.WrapStream(stream, 512, totalBlocks, false),
+	}
 }
 
-func (driver *UnixV1Driver) Mount(
-	flags disko.MountFlags,
-) disko.DriverError {
+func (driver *UnixV1Driver) Mount(flags disko.MountFlags) disko.DriverError {
 	if driver.isMounted {
+		// The image is already mounted. If the caller is trying to mount it again
+		// with the same flags it was previously mounted with, no settings would
+		// need to change so we treat this as a no-op.
 		if driver.currentMountFlags == flags {
 			return nil
 		}
+		// The caller is trying to mount this image with different flags.
 		return disko.ErrAlreadyInProgress
 	}
 
@@ -107,7 +111,8 @@ func (driver *UnixV1Driver) Mount(
 	if err != nil {
 		return disko.CastToDriverError(err)
 	} else if nRead != 1024 {
-		return disko.ErrIOFailed.WithMessage(fmt.Sprintf("read failed: expected 1024B, got %d", nRead))
+		return disko.ErrIOFailed.WithMessage(
+			fmt.Sprintf("read failed: expected 1024B, got %d", nRead))
 	}
 
 	sbReader := bytes.NewReader(superblockBytes)
@@ -126,8 +131,7 @@ func (driver *UnixV1Driver) Mount(
 		message := fmt.Sprintf(
 			"corruption detected: block bitmap length must be an even number,"+
 				" got %d",
-			blockBitmapSize,
-		)
+			blockBitmapSize)
 		return disko.ErrFileSystemCorrupted.WithMessage(message)
 	}
 
@@ -152,8 +156,7 @@ func (driver *UnixV1Driver) Mount(
 		message := fmt.Sprintf(
 			"corruption detected: inode bitmap length must be an even number,"+
 				" got %d",
-			inodeBitmapSize,
-		)
+			inodeBitmapSize)
 		return disko.ErrFileSystemCorrupted.WithMessage(message)
 	}
 
@@ -164,8 +167,7 @@ func (driver *UnixV1Driver) Mount(
 		message := fmt.Sprintf(
 			"corruption detected: Inode and block bitmaps can't exceed 1000"+
 				" bytes together, got %d",
-			blockBitmapSize+inodeBitmapSize,
-		)
+			blockBitmapSize+inodeBitmapSize)
 		return disko.ErrFileSystemCorrupted.WithMessage(message)
 	}
 
