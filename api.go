@@ -86,25 +86,23 @@ type FileSystemImplementer interface {
 	// handles *may* be open when this is called, so implementations must
 	// ensure these remain in a usable state.
 	//
-	// The following guarantees apply:
-	//
-	// 	- This will only be called if [Mount] returned successfully.
+	// This will only be called if [Mount] returned successfully.
 	Flush() DriverError
 
 	// Unmount writes out all pending changes to the disk image and releases any
 	// resources the implementation may be holding.
 	//
-	// The following guarantees apply:
+	// The following guarantees apply when this function is called:
 	//
-	//  - [Flush] will always be called before this.
+	//  - [Flush] will already have been called.
 	//	- There will be no open files or other handles (directory traversers, etc.)
 	//	  when this is called.
 	Unmount() DriverError
 
 	// CreateObject creates an object on the file system, such as a file or
-	// directory. You can tell the what it is based on the [os.FileMode] flags.
+	// directory. You can tell what it is based on the [os.FileMode] flags.
 	//
-	// The following guarantees apply:
+	// The following guarantees apply when this function is called:
 	//
 	// 	- This will never be called for an object that already exists.
 	//  - `parent` will always be a valid object handle.
@@ -117,14 +115,11 @@ type FileSystemImplementer interface {
 	// GetObject returns a handle to an object with the given name in a directory
 	// specified by `parent`.
 	//
-	// The following guarantees apply:
+	// The following guarantees apply when this function is called:
 	//
 	// 	- This will never be called for a nonexistent object.
 	//	- `parent` will always be a valid object handle.
-	GetObject(
-		name string,
-		parent ObjectHandle,
-	) (ObjectHandle, DriverError)
+	GetObject(name string, parent ObjectHandle) (ObjectHandle, DriverError)
 
 	// GetRootDirectory returns a handle to the root directory of the disk image.
 	// This must always be a valid object handle, even if directories are not
@@ -137,11 +132,11 @@ type FileSystemImplementer interface {
 	FSStat() FSStat
 
 	// GetFSFeatures returns a struct that gives the various features the file
-	// system supports, regardless of whether the driver implements these
-	// features or not.
+	// system specification supports, regardless of whether this driver
+	// implementation supports these features or not.
 	//
-	// This function should be callable regardless of whether the file system
-	// has been mounted or not.
+	// The results are independent of the volume's contents, so this must always
+	// return a valid value even if the volume isn't mounted or is corrupted.
 	GetFSFeatures() FSFeatures
 }
 
@@ -150,7 +145,7 @@ type FormatImageImplementer interface {
 	// FormatImage creates a new blank file system on the image this was created
 	// with, using characteristics defined in `options`.
 	//
-	// The following guarantees apply:
+	// The following guarantees apply when this function is called:
 	//
 	//  - The image will already be correctly sized according to `options`.
 	//  - It will consist entirely of null bytes.
@@ -162,7 +157,7 @@ type HardLinkImplementer interface {
 	// CreateHardLink creates a new file system object that is a hard link from
 	// the source to the target.
 	//
-	// The following guarantees apply:
+	// The following guarantees apply when this function is called:
 	//
 	//	- The target will not already exist.
 	//	- `source` will never be a directory.
@@ -232,7 +227,8 @@ type ObjectHandle interface {
 	Resize(newSize uint64) DriverError
 
 	// ReadBlocks fills `buffer` with data from a sequence of logical blocks
-	// beginning at `index`. The following guarantees apply:
+	// beginning at `index`. The following guarantees apply when this function
+	// is called:
 	//
 	//   - `buffer` is a nonzero multiple of the size of a block.
 	//   - The read range will always be within the current boundaries of the
@@ -240,7 +236,8 @@ type ObjectHandle interface {
 	ReadBlocks(index common.LogicalBlock, buffer []byte) DriverError
 
 	// WriteBlocks writes bytes from `buffer` into a sequence of logical blocks
-	// beginning at `index`. The following guarantees apply:
+	// beginning at `index`. The following guarantees apply when this function
+	// is called:
 	//
 	//   - `buffer` is a nonzero multiple of the size of a block.
 	//   - The write range will always be within the current boundaries of the
@@ -256,7 +253,7 @@ type ObjectHandle interface {
 	//		buffer := make([]byte, BlockSize * NUM_BLOCKS)
 	//		WriteBlocks(START_BLOCK, buffer)
 	//
-	// The following guarantees apply:
+	// The following guarantees apply when this function is called:
 	//
 	//   - `count` is nonzero.
 	//   - `[startIndex, startIndex + count)` will always be within the current
@@ -315,7 +312,7 @@ type SupportsChtimesHandle interface {
 	// [UndefinedTimestamp], but the implementation must ignore timestamps it
 	// doesn't support.
 	//
-	// The following guarantees apply:
+	// The following guarantees apply when this function is called:
 	//
 	//  - Timestamps known to be unsupported (i.e. the corresponding feature in
 	//    [FSFeatures] is false) will always be [UndefinedTimestamp].
@@ -396,8 +393,8 @@ type FSFeatures struct {
 	HasGroupID          bool
 
 	// TimestampEpoch returns the earliest representable timestamp on this file
-	// system. File systems that don't support timestamps of any kind must
-	// return [UndefinedTimestamp] here.
+	// system. File systems that don't support timestamps of any kind must set
+	// this to [UndefinedTimestamp].
 	TimestampEpoch time.Time
 
 	// DefaultNameEncoding gives the name of the text encoding natively used by
@@ -408,25 +405,27 @@ type FSFeatures struct {
 	DefaultNameEncoding string
 	SupportsBootCode    bool
 
-	// MaxBootCodeSize returns the maximum number of bytes that can be stored as
+	// MaxBootCodeSize gives the maximum number of bytes that can be stored as
 	// boot code in the file system. File systems that don't support boot code
 	// must return 0. File systems that don't have a theoretical upper limit
-	// should return [math.MaxInt].
+	// should set this to [math.MaxInt].
 	MaxBootCodeSize int
 
 	// DefaultBlockSize gives the default size of a single block in the file
 	// system, in bytes. File systems that don't have fixed block sizes (such as
-	// certain types of archives) must be 0.
+	// certain types of archives) must set this to 0.
 	DefaultBlockSize int
 
-	// MinTotalBlocks is the smallest valid size of the file system, in blocks.
+	// MinTotalBlocks is the smallest possible size of the file system, in blocks.
 	MinTotalBlocks int64
 
 	// MaxTotalBlocks is the largest possible size of the file system, in blocks.
 	MaxTotalBlocks int64
 
 	// MaxVolumeLabelSize gives the maximum size of the volume label for the
-	// file system, in bytes. If not supported, this should be 0.
+	// file system, in bytes. If volume labels are not supported by the file
+	// system, this should be 0. If there's no length limit, this should be
+	// [math.MaxInt].
 	MaxVolumeLabelSize int
 }
 
@@ -518,7 +517,9 @@ type FSStat struct {
 type Driver interface {
 	// NormalizePath converts a path from the user's native file system syntax
 	// to an absolute normalized path using forward slashes (/) as the component
-	// separator. The return value is always an absolute path.
+	// separator. The return value is always an absolute path. If the argument
+	// is a relative path, it's computed relative to the working directory as
+	// returned by [Driver.Getwd].
 	NormalizePath(path string) string
 
 	// GetFSFeatures returns a struct that gives the various features the file
