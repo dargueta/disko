@@ -8,7 +8,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/noxer/bytewriter v1.0.0
 	github.com/stretchr/testify v1.9.0
-	github.com/urfave/cli/v2 v2.27.2
+	github.com/urfave/cli/v2 v2.27.4
 	github.com/xaionaro-go/bytesextra v0.0.0-20220103144954-846e454ddea9
 )
 
