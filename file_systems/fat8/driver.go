@@ -24,7 +24,8 @@ type DirectoryEntry struct {
 	UnusedSectorsInLastCluster uint
 }
 
-type Driver struct {
+// Type FAT8Driver implements [disko.FileSystemImplementer] for the FAT8 file system.
+type FAT8Driver struct {
 	// image is a file object for the file the disk image is for.
 	image                *os.File
 	geometry             Geometry
@@ -42,19 +43,20 @@ type Driver struct {
 	dirents   map[string]DirectoryEntry
 }
 
-func NewDriverFromFile(stream *os.File) Driver {
-	return Driver{image: stream}
+func NewDriverFromFile(stream *os.File) FAT8Driver {
+	return FAT8Driver{image: stream}
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Implementing Driver interface
+// Implementing FileSystemImplementer interface
 
-func (driver *Driver) Mount(flags disko.MountFlags) error {
+func (driver *FAT8Driver) Mount(flags disko.MountFlags) error {
 	// Ignore attempts to mount the drive multiple times.
 	if driver.isMounted {
 		return disko.ErrAlreadyInProgress
 	}
 
+	// Determine the size of the image file.
 	offset, err := driver.image.Seek(0, io.SeekEnd)
 	if err != nil {
 		return err
@@ -66,7 +68,8 @@ func (driver *Driver) Mount(flags disko.MountFlags) error {
 	}
 	driver.geometry = geo
 
-	// All FATs are identical, so we only need to store the first one.
+	// All FATs are identical on a clean volume, so we only need to store the
+	// first one. We might add dirty volume checking later.
 	fat, err := driver.GetFAT()
 	if err != nil {
 		return err
@@ -92,15 +95,18 @@ func (driver *Driver) Mount(flags disko.MountFlags) error {
 	return nil
 }
 
-func (driver *Driver) Unmount() error {
-	err := driver.writeFAT()
-	if err != nil {
-		return err
-	}
+// Flush implements [disko.FileSystemImplementer].
+func (driver *FAT8Driver) Flush() error {
+	return driver.writeFAT()
+}
+
+// Unmount implements [disko.FileSystemImplementer].
+func (driver *FAT8Driver) Unmount() error {
 	driver.isMounted = false
 	return nil
 }
 
-func (driver *Driver) GetFSInfo() disko.FSStat {
+// FSStat implements [disko.FileSystemImplementer].
+func (driver *FAT8Driver) FSStat() disko.FSStat {
 	return driver.stat
 }

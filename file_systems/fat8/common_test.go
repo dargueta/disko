@@ -36,7 +36,6 @@ type FilenameTest struct {
 }
 
 var filenameTests = [...]FilenameTest{
-	{Filename: "", BinaryForm: []byte("         ")},
 	{Filename: "qwerty.txt", BinaryForm: []byte("QWERTYTXT")},
 	{Filename: "aSdF.g", BinaryForm: []byte("ASDF  G  ")},
 	{Filename: "noext", BinaryForm: []byte("NOEXT    ")},
@@ -65,4 +64,9 @@ func TestDeserializeFilenames(t *testing.T) {
 			deserialized,
 		)
 	}
+}
+
+func TestEmptyFilenameBad(t *testing.T) {
+	_, err := FilenameToBytes("")
+	assert.Error(t, err)
 }

@@ -47,7 +47,12 @@ func ValidateImage(t *testing.T, totalBlocks, sectorsPerTrack uint, expectedImag
 	defer tmpFile.Close()
 
 	driver := NewDriverFromFile(tmpFile)
-	err = driver.Format(disko.FSStat{TotalBlocks: uint64(totalBlocks)})
+	err = driver.FormatImage(
+		disko.FSStat{
+			BlockSize:   128,
+			TotalBlocks: uint64(totalBlocks),
+		},
+	)
 	require.NoError(t, err, "formatting the image failed")
 
 	imageContents := make([]byte, totalBytes)
