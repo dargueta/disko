@@ -88,6 +88,10 @@ func GetGeometry(totalBlocks uint) (Geometry, error) {
 // returned name will be normalized to uppercase.
 // TODO(dargueta): Ensure the filename has no invalid characters.
 func FilenameToBytes(name string) ([]byte, error) {
+	if name == "" {
+		return nil, disko.ErrInvalidArgument.WithMessage("filename must not be empty")
+	}
+
 	parts := strings.SplitN(name, ".", 2)
 
 	// Unless we got an empty string, this will always have at least one element,

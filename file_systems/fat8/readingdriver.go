@@ -11,7 +11,7 @@ import (
 // Implementing ReadingDriver interface
 
 // SameFile determines if two files are the same, given basic file information.
-func (driver *Driver) SameFile(fi1, fi2 os.FileInfo) bool {
+func (driver *FAT8Driver) SameFile(fi1, fi2 os.FileInfo) bool {
 	return strings.EqualFold(fi1.Name(), fi2.Name())
 }
 
@@ -19,7 +19,7 @@ func (driver *Driver) SameFile(fi1, fi2 os.FileInfo) bool {
 // TODO(dargueta): ReadDir(path string) ([]DirectoryEntry, error)
 // TODO(dargueta): ReadFile(path string) ([]byte, error)
 
-func (driver *Driver) Stat(path string) (disko.FileStat, error) {
+func (driver *FAT8Driver) Stat(path string) (disko.FileStat, error) {
 	normalizedPath := strings.ToUpper(path)
 
 	// We don't really care if there's a leading "/" or not, since there are no

@@ -2,25 +2,32 @@ package fat8
 
 import (
 	"bytes"
+	"fmt"
 
 	"github.com/dargueta/disko"
+	"github.com/dargueta/disko/disks"
 )
 
-////////////////////////////////////////////////////////////////////////////////
-// Implementing FormattingDriver interface
-
-// Format creates a new empty disk image using the given disk information.
+// Format implements [disko.FormatImageImplementer].
 //
 // This driver only requires the TotalBlocks field to be set in `information`.
 // It must either be 1898 for a floppy image, or 640 for a minifloppy image.
 // 2002 is accepted as a synonym for 1898.
-func (driver *Driver) Format(information disko.FSStat) error {
+func (driver *FAT8Driver) FormatImage(options disks.BasicFormatterOptions) error {
 	if driver.isMounted {
 		return disko.ErrBusy.WithMessage(
 			"image must be unmounted before it can be formatted")
 	}
 
-	geo, err := GetGeometry(uint(information.TotalBlocks))
+	if options.TotalSizeBytes()%128 != 0 {
+		return disko.ErrInvalidArgument.WithMessage(
+			fmt.Sprintf("disk image must be a multiple of 128 bytes, got %d",
+				options.TotalSizeBytes()))
+	}
+
+	totalBlocks := uint64(options.TotalSizeBytes()) / 128
+
+	geo, err := GetGeometry(uint(totalBlocks))
 	if err != nil {
 		return err
 	}
@@ -39,7 +46,7 @@ func (driver *Driver) Format(information disko.FSStat) error {
 	driver.geometry = geo
 	driver.stat = disko.FSStat{
 		BlockSize:       128,
-		TotalBlocks:     information.TotalBlocks,
+		TotalBlocks:     totalBlocks,
 		BlocksFree:      availableBlocks,
 		BlocksAvailable: availableBlocks,
 		Files:           0,

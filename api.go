@@ -505,6 +505,16 @@ type FSStat struct {
 	Label string
 }
 
+// Metadata implements [disks.BasicFormatterOptions].
+func (stat FSStat) Metadata() any {
+	return nil
+}
+
+// TotalSizeBytes implements [disks.BasicFormatterOptions].
+func (stat FSStat) TotalSizeBytes() int64 {
+	return int64(stat.BlockSize) * int64(stat.TotalBlocks)
+}
+
 // Driver is the interface implemented by the base file system driver that wraps
 // a file system implementation. For most functions, the functionality is the
 // same as the equivalent function in the [os] package.

@@ -9,7 +9,7 @@ import (
 
 // BLOCK-LEVEL ACCESS ==========================================================
 
-func (driver *Driver) ReadDiskBlocks(start PhysicalBlock, count uint) ([]byte, error) {
+func (driver *FAT8Driver) ReadDiskBlocks(start PhysicalBlock, count uint) ([]byte, error) {
 	if (uint(start) + count) >= uint(driver.stat.TotalBlocks) {
 		return nil, fmt.Errorf(
 			"refusing to read past end of image: %d blocks at %d exceeds limit of %d",
@@ -27,7 +27,7 @@ func (driver *Driver) ReadDiskBlocks(start PhysicalBlock, count uint) ([]byte, e
 	return buffer, nil
 }
 
-func (driver *Driver) WriteDiskBlocks(start PhysicalBlock, data []byte) error {
+func (driver *FAT8Driver) WriteDiskBlocks(start PhysicalBlock, data []byte) error {
 	if len(data)%128 != 0 {
 		return disko.ErrIOFailed.WithMessage(
 			fmt.Sprintf("data buffer must be a multiple of 128 bytes, got %d", len(data)),
@@ -54,7 +54,7 @@ func (driver *Driver) WriteDiskBlocks(start PhysicalBlock, data []byte) error {
 
 // IsValidCluster returns a boolean indicating whether the given cluster number
 // is valid for this disk image.
-func (driver *Driver) IsValidCluster(clusterID PhysicalCluster) bool {
+func (driver *FAT8Driver) IsValidCluster(clusterID PhysicalCluster) bool {
 	return (clusterID >= 1) && (uint(clusterID) <= driver.geometry.TotalClusters)
 }
 
@@ -67,7 +67,7 @@ func MakeInvalidClusterError(cluster PhysicalCluster, totalTracks uint) error {
 
 // ReadAbsoluteCluster reads the given cluster from the disk. `clusterID` must
 // be valid, as determined by IsValidCluster().
-func (driver *Driver) ReadAbsoluteCluster(clusterID PhysicalCluster) ([]byte, error) {
+func (driver *FAT8Driver) ReadAbsoluteCluster(clusterID PhysicalCluster) ([]byte, error) {
 	if !driver.IsValidCluster(clusterID) {
 		return nil, MakeInvalidClusterError(clusterID, driver.geometry.TotalTracks)
 	}
@@ -77,7 +77,7 @@ func (driver *Driver) ReadAbsoluteCluster(clusterID PhysicalCluster) ([]byte, er
 
 // WriteAbsoluteCluster writes bytes to the given cluster. `data` must be exactly
 // the size of a cluster.
-func (driver *Driver) WriteAbsoluteCluster(clusterID PhysicalCluster, data []byte) error {
+func (driver *FAT8Driver) WriteAbsoluteCluster(clusterID PhysicalCluster, data []byte) error {
 	if !driver.IsValidCluster(clusterID) {
 		return MakeInvalidClusterError(clusterID, driver.geometry.TotalTracks)
 	}
@@ -92,7 +92,7 @@ func (driver *Driver) WriteAbsoluteCluster(clusterID PhysicalCluster, data []byt
 	return driver.WriteDiskBlocks(PhysicalBlock(physicalBlock), data)
 }
 
-func (driver *Driver) GetFAT() ([]byte, error) {
+func (driver *FAT8Driver) GetFAT() ([]byte, error) {
 	// There are three copies of the FAT at the end of the directory track. Read
 	// each one and ensure they're all identical. If they're not, that's likely
 	// an indicator of disk corruption.
@@ -127,13 +127,15 @@ func (driver *Driver) GetFAT() ([]byte, error) {
 	return firstFAT, nil
 }
 
-func (driver *Driver) writeFAT() error {
+func (driver *FAT8Driver) writeFAT() error {
 	return driver.WriteDiskBlocks(driver.geometry.FATsStart, bytes.Repeat(driver.fat, 3))
 }
 
 // FILE-LEVEL ACCESS ===========================================================
 
-func (driver *Driver) ReadFileCluster(dirent *DirectoryEntry, cluster LogicalCluster) ([]byte, error) {
+func (driver *FAT8Driver) ReadFileCluster(
+	dirent *DirectoryEntry, cluster LogicalCluster,
+) ([]byte, error) {
 	if int(cluster) >= len(dirent.clusters) {
 		return nil, fmt.Errorf(
 			"cluster index out of bounds: %d not in [0, %d)",
@@ -147,7 +149,9 @@ func (driver *Driver) ReadFileCluster(dirent *DirectoryEntry, cluster LogicalClu
 	return driver.ReadDiskBlocks(physicalBlock, driver.geometry.SectorsPerCluster)
 }
 
-func (driver *Driver) WriteFileCluster(dirent *DirectoryEntry, cluster LogicalCluster, data []byte) error {
+func (driver *FAT8Driver) WriteFileCluster(
+	dirent *DirectoryEntry, cluster LogicalCluster, data []byte,
+) error {
 	if int(cluster) >= len(dirent.clusters) {
 		return fmt.Errorf(
 			"cluster index out of bounds: %d not in [0, %d)",
