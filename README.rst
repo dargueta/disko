@@ -208,8 +208,8 @@ Further Reading
 License
 -------
 
-This is released under the terms of the Apache 2.0 License. Please see LICENSE.txt
-in this repository for the legal text.
+This is released under the terms of the AGPL v3 license (or later). Please see
+the LICENSE file in this repository for the legal text.
 
 Acknowledgments
 ---------------
