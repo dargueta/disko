@@ -3,7 +3,7 @@ Disko: A Disk Image Editor
 
 |go-versions| |platforms|
 
-.. |go-versions| image:: https://img.shields.io/badge/Go-1.20,%201.21,%201.22-blue.svg
+.. |go-versions| image:: https://img.shields.io/badge/Go-1.20,%201.21,%201.22,%201.23-blue.svg
 .. |platforms| image::  https://img.shields.io/badge/platform-Linux%20%7C%20MacOS%20%7C%20Windows-lightgrey
 
 I've recently gotten into retro computing and found I need to create disk images.
@@ -176,8 +176,9 @@ I make the following guarantees:
   in Go's documentation.
 * This is tested on:
 
-  * The latest three minor versions of Go, e.g. if 1.19.x is the most recent
-    release, I will test this on 1.17, 1.18, and 1.19.
+  * At least the latest three minor versions of Go, e.g. if 1.19.x is the most recent
+    release, I guarantee I'll test this on 1.17, 1.18, and 1.19; 1.16 and earlier are
+    best-effort.
   * The latest versions of Ubuntu, Windows, and MacOS that are supported by
     GitHub.
 
