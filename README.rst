@@ -219,9 +219,9 @@ This project uses open-source software built by other people, who have my
 gratitude for building things so that I don't have to. [#]_
 
 * `Bol Christophe <https://github.com/boljen>`_
-* `gocarina <https://github.com/gocarina>`_
 * `HashiCorp <https://github.com/hashicorp>`_
 * `Tim Scheuermann <https://github.com/noxer>`_
+* `Jacek Szwec <github.com/jszwec/>`_
 * `urfave <https://github.com/urfave>`_
 
 Footnotes

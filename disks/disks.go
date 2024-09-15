@@ -1,11 +1,13 @@
 package disks
 
 import (
+	_ "embed"
+	"encoding/csv"
 	"fmt"
 	"io"
 	"strings"
 
-	"github.com/gocarina/gocsv"
+	"github.com/jszwec/csvutil"
 )
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -69,7 +71,8 @@ func (g *DiskGeometry) TotalSizeBytes() int64 {
 ////////////////////////////////////////////////////////////////////////////////
 
 // https://en.wikipedia.org/wiki/List_of_floppy_disk_formats
-// go:embed disk-geometries.csv
+//
+//go:embed disk-geometries.csv
 var diskGeometriesRawCSV string
 var diskGeometries map[string]DiskGeometry
 
@@ -85,23 +88,34 @@ func GetPredefinedDiskGeometry(slug string) (DiskGeometry, error) {
 
 func init() {
 	reader := strings.NewReader(diskGeometriesRawCSV)
-	err := gocsv.UnmarshalToCallback(
-		reader,
-		func(row DiskGeometry) error {
-			_, exists := diskGeometries[row.Slug]
-			if exists {
-				return fmt.Errorf(
-					"duplicate definition for disk %q found on row %d",
-					row.Slug,
-					len(diskGeometries)+1,
-				)
-			}
-			diskGeometries[row.Slug] = row
-			return nil
-		},
-	)
-	if err != nil && err != io.EOF {
-		panic(err)
+	csvReader := csv.NewReader(reader)
+	csvReader.Comma = '|'
+
+	decoder, err := csvutil.NewDecoder(csvReader)
+	if err != nil {
+		panic(fmt.Errorf("failed to create CSV decoder: %w", err))
+	}
+
+	diskGeometries = make(map[string]DiskGeometry)
+
+	for {
+		var row DiskGeometry
+		if err = decoder.Decode(&row); err == io.EOF {
+			break
+		} else if err != nil {
+			panic(
+				fmt.Errorf("failed to decode row %d: %w", len(diskGeometries)+1, err))
+		}
+
+		_, exists := diskGeometries[row.Slug]
+		if exists {
+			message := fmt.Errorf(
+				"duplicate definition for disk %q found on row %d",
+				row.Slug,
+				len(diskGeometries)+1)
+			panic(message)
+		}
+		diskGeometries[row.Slug] = row
 	}
 }
 
