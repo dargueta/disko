@@ -4,8 +4,8 @@ go 1.20
 
 require (
 	github.com/boljen/go-bitmap v0.0.0-20151001105940-23cd2fb0ce7d
-	github.com/gocarina/gocsv v0.0.0-20240520201108-78e41c74b4b1
 	github.com/hashicorp/go-multierror v1.1.1
+	github.com/jszwec/csvutil v1.10.0
 	github.com/noxer/bytewriter v1.0.0
 	github.com/stretchr/testify v1.9.0
 	github.com/urfave/cli/v2 v2.27.4
