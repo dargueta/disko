@@ -19,7 +19,7 @@
 // occurred. For example:
 //
 // 		WXXXXXXXXXXXXXXXYZZ
-//		W XX 13 Y ZZ 0
+//		W X X 13 Y Z Z 0
 //
 // This scheme lets us represent runs of up to 257 bytes with three bytes. For
 // runs longer than 257 bytes, they are treated as separate runs. For example,

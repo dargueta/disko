@@ -8,12 +8,12 @@ require (
 	github.com/jszwec/csvutil v1.10.0
 	github.com/noxer/bytewriter v1.0.0
 	github.com/stretchr/testify v1.9.0
-	github.com/urfave/cli/v2 v2.27.4
+	github.com/urfave/cli/v2 v2.27.5
 	github.com/xaionaro-go/bytesextra v0.0.0-20220103144954-846e454ddea9
 )
 
 require (
-	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
+	github.com/cpuguy83/go-md2man/v2 v2.0.5 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
