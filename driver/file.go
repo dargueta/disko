@@ -79,6 +79,8 @@ func (info *FileInfo) Stat() disko.FileStat {
 
 ////////////////////////////////////////////////////////////////////////////////
 
+// File is more or less a drop-in replacement for [os.File]. Unlike [os.File],
+// it isn't thread-safe.
 type File struct {
 	// Embed
 	*basicstream.BasicStream

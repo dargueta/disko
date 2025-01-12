@@ -34,6 +34,9 @@ func New(
 	}
 }
 
+// NormalizePath converts a file path to an absolute path using `/` as the
+// separators, and interprets `.` and `..` entries. Relative paths are rebased
+// from the current working directory (see [Getwd] for more).
 func (driver *BaseDriver) NormalizePath(path string) string {
 	path = posixpath.Clean(filepath.ToSlash(path))
 	if path == "." {
@@ -46,7 +49,7 @@ func (driver *BaseDriver) NormalizePath(path string) string {
 }
 
 // resolveSymlink dereferences `object` (if it's a symlink), following multiple
-// levels of indirection if needed to get to a file  system object. If `object`
+// levels of indirection if needed to get to a file system object. If `object`
 // isn't a symlink, this becomes a no-op and returns the handle unmodified.
 func (driver *BaseDriver) resolveSymlink(
 	object extObjectHandle,
