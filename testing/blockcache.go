@@ -28,8 +28,8 @@ func CreateRandomImage(bytesPerBlock, totalBlocks uint, t *testing.T) []byte {
 	return backingData
 }
 
-// Create a cache with default settings, fetch/flush handlers, etc. The image
-// cannot be resized.
+// CreateDefaultCache creates a block cache with default settings, fetch/flush
+// handlers, etc. The image cannot be resized.
 //
 // Arguments:
 //
@@ -43,10 +43,10 @@ func CreateRandomImage(bytesPerBlock, totalBlocks uint, t *testing.T) []byte {
 //     pass `nil` for this to get completely random data.
 //   - `t`: The testing fixture.
 //
-// The fetch and flush handlers generated for the cache check bounds and
-// permissions for you, and fail with an appropriate error message. This means
-// you won't be able to test negative conditions (i.e. ensure methods fail where
-// they should) so you'll have to do that yourself. See [CreateRandomImage].
+// The fetch and flush handlers check bounds and permissions for you, and fail
+// with an appropriate error message. This means you won't be able to test
+// negative conditions (i.e. ensure methods fail where they should) so you'll
+// have to do that yourself. See [CreateRandomImage].
 func CreateDefaultCache(
 	bytesPerBlock,
 	totalBlocks uint,
@@ -83,7 +83,7 @@ func CreateDefaultCache(
 					blockIndex,
 					totalBlocks,
 				)
-				t.Errorf(message)
+				t.Error(message)
 				return disko.ErrIOFailed.WithMessage(message)
 			}
 
@@ -98,7 +98,7 @@ func CreateDefaultCache(
 				len(buffer),
 				blockIndex,
 			)
-			t.Errorf(message)
+			t.Error(message)
 			return disko.ErrReadOnlyFileSystem.WithMessage(message)
 		}
 	}
