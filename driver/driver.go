@@ -1,3 +1,5 @@
+// Package driver implements a generic file system driver that wraps around a
+// [disko.FileSystemImplementer].
 package driver
 
 import (

@@ -40,7 +40,8 @@ func (info *FileInfo) Size() int64 {
 }
 
 // ModTime returns the timestamp of when the file was last modified. If the file
-// system doesn't record this information, implementations MUST return zero time
+// system doesn't record this information, implementations MUST return zero time.
+// [disko.UndefinedTimestamp] is a convenient alias for this.
 func (info FileInfo) ModTime() time.Time {
 	return info.FileStat.LastModified
 }
