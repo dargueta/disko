@@ -63,8 +63,8 @@ func (driver *UnixV1Driver) resizeEmptyImage(stat disko.FSStat) disko.DriverErro
 	// The upper 32KiB is reserved for the system (boot image and all that), and
 	// the first 1 KiB is reserved for the block bitmap and inode allocation
 	// bitmap. Immediately following the bitmaps is the inode array. Thus, an
-	// image must be 33 KiB (66 blocks) plus however many blocks it takes to
-	// store `stat.Files` inodes.
+	// image must be at a minimum 33 KiB (66 blocks) plus however many blocks
+	// required to store `stat.Files` inodes.
 	minBlocks := 66 + (stat.Files / NumInodesPerBlock)
 	if stat.TotalBlocks < minBlocks {
 		msg := fmt.Sprintf(
