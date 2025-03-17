@@ -1,6 +1,6 @@
 module github.com/dargueta/disko
 
-go 1.20
+go 1.21
 
 require (
 	github.com/boljen/go-bitmap v0.0.0-20151001105940-23cd2fb0ce7d
@@ -8,7 +8,7 @@ require (
 	github.com/jszwec/csvutil v1.10.0
 	github.com/noxer/bytewriter v1.0.0
 	github.com/stretchr/testify v1.10.0
-	github.com/urfave/cli/v2 v2.27.5
+	github.com/urfave/cli/v2 v2.27.6
 	github.com/xaionaro-go/bytesextra v0.0.0-20220103144954-846e454ddea9
 )
 
