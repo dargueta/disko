@@ -91,6 +91,7 @@ func (driver *UnixV1Driver) openFileUsingInode(inode Inode) (disko.File, error) 
 	return nil, disko.ErrNotImplemented.WithMessage("UnixV1Driver.openFileWithInode()")
 }
 
+// getRawContentsUsingInode returns the directory entry's contents as raw bytes.
 func (driver *UnixV1Driver) getRawContentsUsingInode(inode Inode) ([]byte, error) {
 	handle, err := driver.openFileUsingInode(inode)
 	if err != nil {
