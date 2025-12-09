@@ -15,6 +15,10 @@ disko: $(DISKO_BIN)
 zipimage: $(ZIPIMAGE_BIN)
 unzipimage: $(UNZIPIMAGE_BIN)
 
+.envrc:
+	echo "export PATH=$(PATH):$(CURDIR)/$(BINDIR)" > $@
+	if which direnv 2>&1 >/dev/null ; then direnv allow; fi
+
 
 $(DISKO_BIN): $(ALL_SOURCES) | $(BINDIR)
 	go build -v -o $@ ./...
